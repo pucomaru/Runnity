@@ -1,11 +1,19 @@
-package com.example.runnity.ui.theme
+package com.example.runnity.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Runnity 디자인 시스템 컬러 팔레트
+object ColorPalette {
+    object Light {
+        val primary = Color(0xFF000000)              // #000000
+        val secondary = Color(0xFF848487)            // #848487
+        val component = Color(0xFF9E9E9E)            // #9E9E9E
+        val containerBackground = Color(0xFFF4F4F4) // #F4F4F4
+        val background = Color(0xFFFFFFFF)           // #FFFFFF
+    }
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+    object Common {
+        val accent = Color(0xFF595858)               // #595858
+        val stopAccent = Color(0xFFFF6868)           // #FF6868
+    }
+}
