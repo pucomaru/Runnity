@@ -1,4 +1,4 @@
-package com.example.runnity.ui.screens.login
+package com.example.runnity.ui.screens.challenge
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,22 +12,23 @@ import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 
 /**
- * 로그인 화면
- * - 이메일/비밀번호 입력
- * - 소셜 로그인 (선택)
- * - 회원가입 이동
+ * 챌린지 화면
+ * - 진행 중인 챌린지 목록
+ * - 참여 가능한 챌린지 목록
+ * - 챌린지 검색 및 필터링
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun LoginScreen(
-    navController: NavController,
-    viewModel: LoginViewModel = viewModel()
+fun ChallengeScreen(
+    parentNavController: NavController? = null, // 챌린지 상세 페이지 이동 시 사용 예정
+    viewModel: ChallengeViewModel = viewModel()
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "로그인 화면",
+            text = "챌린지 화면",
             style = Typography.Title,
             color = ColorPalette.Light.primary
         )
