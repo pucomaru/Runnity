@@ -1,0 +1,73 @@
+# =====================
+# OS & IDE
+# =====================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# =====================
+# Environment & Secrets
+# =====================
+.env
+.env.*
+!.env.example
+
+# =====================
+# Docker
+# =====================
+# Docker build artifacts
+**/logs/
+**/tmp/
+**/cache/
+**/data/
+**/volumes/
+**/backups/
+
+# Ignore docker-compose override files
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Ignore Dockerfiles for specific local tests (optional)
+Dockerfile.*
+
+# =====================
+# Jenkins
+# =====================
+# Build workspace & backups
+jenkins_home/
+jenkins_data/
+**/jobs/
+**/workspace/
+**/builds/
+**/secrets/
+
+# =====================
+# Monitoring Tools (Prometheus, Grafana)
+# =====================
+prometheus_data/
+grafana_data/
+**/metrics/
+**/snapshots/
+**/dashboards/*.tmp.json
+
+# =====================
+# Logs
+# =====================
+*.log
+*.out
+*.err
+logs/
+**/nohup.out
+
+# =====================
+# Miscellaneous
+# =====================
+*.bak
+*.swp
+*.tmp
+*.pid
+*.tar
+*.gz
+*.zip
