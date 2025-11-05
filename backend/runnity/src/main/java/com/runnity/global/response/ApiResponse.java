@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 @RequiredArgsConstructor
 @JsonPropertyOrder({"isSuccess", "code", "message", "data"})
 public class ApiResponse<T> {
-    @JsonProperty("is_success")
+
     private final Boolean isSuccess;  // 성공 여부
     private final Integer code;        // 사용자 정의 코드
     private final String message;     // 응답 메시지
