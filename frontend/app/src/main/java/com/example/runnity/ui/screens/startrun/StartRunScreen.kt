@@ -1,4 +1,4 @@
-package com.example.runnity.ui.screens.login
+package com.example.runnity.ui.screens.startrun
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,22 +12,22 @@ import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 
 /**
- * 로그인 화면
- * - 이메일/비밀번호 입력
- * - 소셜 로그인 (선택)
- * - 회원가입 이동
+ * 개인 러닝 시작 화면
+ * - 러닝 시작 준비 화면
+ * - 목표 설정, 경로 선택 등
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun LoginScreen(
-    navController: NavController,
-    viewModel: LoginViewModel = viewModel()
+fun StartRunScreen(
+    parentNavController: NavController? = null, // 러닝 화면 이동 시 사용 예정
+    viewModel: StartRunViewModel = viewModel()
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "로그인 화면",
+            text = "개인 러닝 화면",
             style = Typography.Title,
             color = ColorPalette.Light.primary
         )

@@ -66,6 +66,9 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
+    // Material Icons Extended (추가 아이콘 사용)
+    implementation("androidx.compose.material:material-icons-extended")
+
     // Retrofit + OkHttp (API 통신)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)

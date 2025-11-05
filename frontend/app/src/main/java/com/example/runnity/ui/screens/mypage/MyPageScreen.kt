@@ -1,4 +1,4 @@
-package com.example.runnity.ui.screens.login
+package com.example.runnity.ui.screens.mypage
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,22 +12,23 @@ import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 
 /**
- * 로그인 화면
- * - 이메일/비밀번호 입력
- * - 소셜 로그인 (선택)
- * - 회원가입 이동
+ * 마이페이지 화면
+ * - 사용자 프로필
+ * - 러닝 통계
+ * - 설정 및 로그아웃
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun LoginScreen(
-    navController: NavController,
-    viewModel: LoginViewModel = viewModel()
+fun MyPageScreen(
+    parentNavController: NavController? = null, // 설정, 프로필 수정 페이지 이동 시 사용 예정
+    viewModel: MyPageViewModel = viewModel()
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "로그인 화면",
+            text = "마이페이지 화면",
             style = Typography.Title,
             color = ColorPalette.Light.primary
         )
