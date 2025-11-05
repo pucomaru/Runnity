@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.runnity.theme.ColorPalette
 
+// 운동 + 지도 탭바 
 @Composable
 fun TabBar(
     items: List<ImageVector> = listOf(Icons.Outlined.DirectionsRun, Icons.Outlined.Map),

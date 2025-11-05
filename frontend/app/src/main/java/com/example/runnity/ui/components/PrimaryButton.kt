@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 
+// 메인 버튼 컴포넌트
 @Composable
 fun PrimaryButton(
     text: String,
