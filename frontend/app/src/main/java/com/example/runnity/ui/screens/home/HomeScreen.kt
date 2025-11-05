@@ -1,25 +1,29 @@
 package com.example.runnity.ui.screens.home
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
+import com.example.runnity.ui.components.*
 
 /**
  * 홈 화면
  * - 메인 대시보드
- * - 내가 예약(참여)한 챌린지 리스트 표시
+ * - 날씨 카드, 추천 챌린지, 예약한 챌린지 표시
  * - 챌린지 클릭 시 세부 화면으로 이동
  *
  * @param navController 세부 화면으로 이동하기 위한 NavController (탭 내부 이동)
@@ -34,107 +38,163 @@ fun HomeScreen(
 ) {
     // TODO: ViewModel에서 실제 데이터 가져오기
     // 현재는 임시 데이터 사용
-    val myJoinedChallenges = listOf(
-        "챌린지 1: 10km 완주하기",
-        "챌린지 2: 주 3회 달리기",
-        "챌린지 3: 30분 달리기"
+
+    // 추천 챌린지 샘플 데이터
+    val recommendedChallenges = listOf(
+        RecommendedChallengeItem(
+            id = "rec_1",
+            imageUrl = null,
+            title = "러니티 추천 챌린지",
+            description = "대규모 러닝 실시간 경쟁"
+        ),
+        RecommendedChallengeItem(
+            id = "rec_2",
+            imageUrl = null,
+            title = "주말 마라톤",
+            description = "함께 달리는 즐거움"
+        ),
+        RecommendedChallengeItem(
+            id = "rec_3",
+            imageUrl = null,
+            title = "초보 러너 환영",
+            description = "천천히 함께 달려요"
+        )
     )
 
-    // Column: 세로로 UI 요소 배치
-    Column(
-        modifier = Modifier
-            .fillMaxSize()  // 화면 전체 크기
-            .padding(16.dp) // 외부 여백
-    ) {
-        // 제목
-        Text(
-            text = "내가 참여한 챌린지",
-            style = Typography.Title,
-            color = ColorPalette.Light.primary,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // LazyColumn: 리사이클러뷰처럼 스크롤 가능한 리스트
-        // items(): 리스트 데이터를 하나씩 UI로 변환
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)  // 아이템 간격
-        ) {
-            items(myJoinedChallenges.size) { index ->
-                // 각 챌린지 아이템
-                ChallengeListItem(
-                    title = myJoinedChallenges[index],
-                    challengeId = "ch_00$index",  // 임시 ID
-                    onClick = { id ->
-                        // 챌린지 클릭 시 세부 화면으로 이동
-                        // navController?.navigate("경로/파라미터")
-                        navController?.navigate("challenge_detail/$id")
-                    }
-                )
-            }
-        }
-
-        // 리스트가 비어있을 때 표시
-        if (myJoinedChallenges.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "참여 중인 챌린지가 없습니다",
-                    style = Typography.Body,
-                    color = ColorPalette.Light.component
-                )
-            }
-        }
-    }
-}
-
-/**
- * 챌린지 리스트 아이템 (재사용 가능한 컴포넌트)
- *
- * @param title 챌린지 제목
- * @param challengeId 챌린지 ID
- * @param onClick 클릭 시 실행할 함수 (람다)
- */
-@Composable
-fun ChallengeListItem(
-    title: String,
-    challengeId: String,
-    onClick: (String) -> Unit  // (String) -> Unit: 문자열을 받아서 리턴값 없는 함수
-) {
-    // Card: 그림자와 모서리가 둥근 카드 UI
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick(challengeId) },  // 클릭 이벤트: onClick 함수 호출
-        colors = CardDefaults.cardColors(
-            containerColor = ColorPalette.Light.background
+    // 예약한 챌린지 샘플 데이터
+    // TODO: ViewModel에서 실제 챌린지 시작 시간을 확인하여
+    //       시작 5분 전부터 buttonState를 Join으로 변경해야 함
+    val reservedChallenges = listOf(
+        ChallengeListItem(
+            id = "res_1",
+            distance = "3km",
+            title = "아침 러닝 챌린지",
+            startDateTime = "2025.11.05 16:09",
+            participants = "12/20",
+            buttonState = ChallengeButtonState.None  // 기본: 버튼 없음 (이미 예약됨)
         ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp  // 그림자 높이
+        ChallengeListItem(
+            id = "res_2",
+            distance = "5km",
+            title = "주말 마라톤 대회",
+            startDateTime = "2025.11.09 10:00",
+            participants = "45/50",
+            buttonState = ChallengeButtonState.None
+        ),
+        ChallengeListItem(
+            id = "res_3",
+            distance = "10km",
+            title = "야간 러닝 챌린지",
+            startDateTime = "2025.11.10 19:00",
+            participants = "8/15",
+            buttonState = ChallengeButtonState.None
         )
+    )
+
+    // 전체 레이아웃
+    Column(
+        modifier = Modifier.fillMaxSize()
     ) {
-        // 카드 내부
+        // 1. 상단 앱바 (로고 + 알람)
         Row(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,  // 양 끝 정렬
+                .fillMaxWidth()
+                .background(ColorPalette.Common.accent)  // 액센트 색상 배경
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = title,
-                    style = Typography.Body,
-                    color = ColorPalette.Light.primary  // 주 텍스트 색상 (검정)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "ID: $challengeId",
-                    style = Typography.Caption,
-                    color = ColorPalette.Light.component  // 보조 텍스트 색상 (회색)
+            // 로고 (텍스트로 표시, 추후 이미지로 변경 가능)
+            Text(
+                text = "Runnity",
+                style = Typography.Title,
+                color = Color.White
+            )
+
+            // 알람 아이콘
+            IconButton(
+                onClick = {
+                    // TODO: 알람 페이지로 이동
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Notifications,
+                    contentDescription = "알림",
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
                 )
             }
+        }
+
+        // 2. 스크롤 가능한 내용
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)  // 컴포넌트 간 16dp 간격
+        ) {
+            // 2-1. 날씨 카드
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ColorPalette.Common.accent)  // 액센트 색상 배경
+                    .padding(16.dp)
+            ) {
+                WeatherCard(
+                    country = "Korea",
+                    city = "Seoul",
+                    weather = "Cloudy",
+                    temperature = "10°",
+                    time = "9:41 AM",
+                    backgroundImageUrl = null  // TODO: 실제 날씨 배경 이미지 URL
+                )
+            }
+
+            // 2-2. 운영진 추천 챌린지 섹션
+            SectionHeader(
+                subtitle = "운영진 추천 챌린지",
+                caption = "이번 주 인기 챌린지"
+            )
+
+            RecommendedChallengeCarousel(
+                challenges = recommendedChallenges,
+                onChallengeClick = { id ->
+                    navController?.navigate("challenge_detail/$id")
+                }
+            )
+
+            // 2-3. 예약한 챌린지 섹션
+            SectionHeader(
+                subtitle = "예약한 챌린지",
+                caption = "내가 예약한 챌린지를 확인하세요"
+            )
+
+            // 예약한 챌린지 리스트
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                reservedChallenges.forEach { challenge ->
+                    ChallengeCard(
+                        distance = challenge.distance,
+                        title = challenge.title,
+                        startDateTime = challenge.startDateTime,
+                        participants = challenge.participants,
+                        buttonState = challenge.buttonState,
+                        onCardClick = {
+                            navController?.navigate("challenge_detail/${challenge.id}")
+                        },
+                        onButtonClick = {
+                            // TODO: 예약하기 버튼 클릭 처리
+                        }
+                    )
+                }
+            }
+
+            // 하단 여백
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

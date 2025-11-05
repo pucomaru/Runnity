@@ -20,14 +20,14 @@ import com.example.runnity.theme.Typography
 /**
  * 챌린지 카드의 버튼 상태
  *
- * - None: 버튼 없음 (홈에서 예약한 챌린지의 시작 시간이 안 되었을 때)
- * - Reserve: "예약하기" 버튼 표시
- * - Join: "참가하기" 버튼 표시 (챌린지 시작 시간이 되었을 때)
+ * - None: 버튼 없음 (기본 상태)
+ * - Join: "참가하기" 버튼 표시 (액센트 배경, 시작 5분 전부터 활성화)
+ *
+ * 참고: 예약하기/취소하기는 상세 화면에서만 제공
  */
 enum class ChallengeButtonState {
     None,      // 버튼 없음
-    Reserve,   // 예약하기
-    Join       // 참가하기
+    Join       // 참가하기 (액센트 배경, 시작 5분 전)
 }
 
 /**
@@ -39,9 +39,9 @@ enum class ChallengeButtonState {
  * @param title 챌린지 제목 (예: "3km 달릴 사람 구한다")
  * @param startDateTime 시작 일시 (예: "2025.11.02 21:00 시작")
  * @param participants 참여 인원 (예: "15/100명")
- * @param buttonState 버튼 상태 (None, Reserve, Join)
+ * @param buttonState 버튼 상태 (None, Join)
  * @param onCardClick 카드 클릭 이벤트 (세부 화면 이동용)
- * @param onButtonClick 버튼 클릭 이벤트 (예약하기/참가하기)
+ * @param onButtonClick 버튼 클릭 이벤트 (참가하기)
  * @param modifier Modifier (선택사항)
  *
  * 사용 예시:
@@ -50,7 +50,7 @@ enum class ChallengeButtonState {
  *     title = "3km 달릴 사람 구한다",
  *     startDateTime = "2025.11.02 21:00 시작",
  *     participants = "15/100명",
- *     buttonState = ChallengeButtonState.Reserve,
+ *     buttonState = ChallengeButtonState.Join,  // 시작 5분 전
  *     onCardClick = { },
  *     onButtonClick = { }
  * )
@@ -140,23 +140,14 @@ fun ChallengeCard(
             }
 
             // 3. 버튼 (오른쪽, 조건부 표시)
+            // 시작 5분 전부터 "참가하기" 버튼만 표시
             when (buttonState) {
-                ChallengeButtonState.Reserve -> {
-                    // "예약하기" 버튼
-                    SmallPillButton(
-                        text = "예약하기",
-                        onClick = onButtonClick,
-                        backgroundColor = ColorPalette.Light.primary,  // 검정 배경
-                        contentColor = Color.White,                    // 흰색 텍스트
-                        enableSelectionEffect = false                  // 선택 효과 없음
-                    )
-                }
                 ChallengeButtonState.Join -> {
-                    // "참가하기" 버튼
+                    // "참가하기" 버튼 (액센트 색상)
                     SmallPillButton(
                         text = "참가하기",
                         onClick = onButtonClick,
-                        backgroundColor = ColorPalette.Light.primary,
+                        backgroundColor = ColorPalette.Common.accent,  // 액센트 색상
                         contentColor = Color.White,
                         enableSelectionEffect = false
                     )
@@ -182,18 +173,7 @@ private fun ChallengeCardPreview() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(16.dp)
     ) {
-        // 예약하기 버튼
-        ChallengeCard(
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.Reserve,
-            onCardClick = {},
-            onButtonClick = {}
-        )
-
-        // 참가하기 버튼
+        // 참가하기 버튼 (시작 5분 전)
         ChallengeCard(
             distance = "5km",
             title = "주말 아침 런닝",
@@ -202,7 +182,16 @@ private fun ChallengeCardPreview() {
             buttonState = ChallengeButtonState.Join
         )
 
-        // 버튼 없음
+        // 버튼 없음 (기본 상태)
+        ChallengeCard(
+            distance = "3km",
+            title = "3km 달릴 사람 구한다",
+            startDateTime = "2025.11.02 21:00 시작",
+            participants = "15/100명",
+            buttonState = ChallengeButtonState.None
+        )
+
+        // 버튼 없음 (예약된 챌린지)
         ChallengeCard(
             distance = "10km",
             title = "한강 야간 러닝",
