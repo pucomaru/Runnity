@@ -19,7 +19,7 @@ import com.example.runnity.theme.Typography
  * @param title 제목
  * @param startDateTime 시작 일시
  * @param participants 참여 인원 (예: "15/100명")
- * @param buttonState 버튼 상태 (None, Reserve, Join)
+ * @param buttonState 버튼 상태 (None, Join) - 시작 5분 전부터 Join
  */
 data class ChallengeListItem(
     val id: String,
@@ -27,7 +27,7 @@ data class ChallengeListItem(
     val title: String,
     val startDateTime: String,
     val participants: String,
-    val buttonState: ChallengeButtonState = ChallengeButtonState.Reserve
+    val buttonState: ChallengeButtonState = ChallengeButtonState.None
 )
 
 /**
@@ -37,7 +37,7 @@ data class ChallengeListItem(
  *
  * @param challenges 챌린지 리스트
  * @param onChallengeClick 챌린지 카드 클릭 이벤트 (id 전달)
- * @param onButtonClick 예약하기/참가하기 버튼 클릭 이벤트 (id 전달)
+ * @param onButtonClick 참가하기 버튼 클릭 이벤트 (id 전달) - 시작 5분 전만 표시
  * @param showSearchBar 검색바 표시 여부 (기본: false)
  * @param showFilters 필터/정렬 버튼 표시 여부 (기본: false)
  * @param onSearchClick 검색 버튼 클릭 이벤트
@@ -58,7 +58,7 @@ data class ChallengeListItem(
  *     showSearchBar = true,
  *     showFilters = true,
  *     onChallengeClick = { id -> navController.navigate("detail/$id") },
- *     onButtonClick = { id -> viewModel.reserveChallenge(id) },
+ *     onButtonClick = { id -> viewModel.joinChallenge(id) },
  *     onSearchClick = { viewModel.toggleSearch() },
  *     onFilterClick = { viewModel.showFilterDialog() },
  *     onSortClick = { viewModel.showSortDialog() }
@@ -169,7 +169,7 @@ private fun ChallengeListSectionPreview() {
             title = "3km 달릴 사람 구한다",
             startDateTime = "2025.11.02 21:00 시작",
             participants = "15/100명",
-            buttonState = ChallengeButtonState.Reserve
+            buttonState = ChallengeButtonState.None  // 기본 상태
         ),
         ChallengeListItem(
             id = "2",
@@ -177,7 +177,7 @@ private fun ChallengeListSectionPreview() {
             title = "주말 아침 런닝",
             startDateTime = "2025.11.03 08:00 시작",
             participants = "8/20명",
-            buttonState = ChallengeButtonState.Join
+            buttonState = ChallengeButtonState.Join  // 시작 5분 전
         ),
         ChallengeListItem(
             id = "3",
