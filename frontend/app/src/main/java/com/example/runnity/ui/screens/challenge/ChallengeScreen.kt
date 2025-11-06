@@ -99,7 +99,8 @@ fun ChallengeScreen(
             searchQuery = searchQuery,
             onSearchChange = { searchQuery = it },
             onFilterClick = {
-                // TODO: 필터 페이지로 이동
+                // 필터 페이지로 이동
+                navController?.navigate("challenge_filter")
             },
             modifier = Modifier.padding(vertical = 8.dp)
         )

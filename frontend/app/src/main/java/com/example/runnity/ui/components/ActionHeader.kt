@@ -33,11 +33,13 @@ fun ActionHeader(
     onBack: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null,
     iconTint: Color = ColorPalette.Light.primary,
+    rightAction: (@Composable () -> Unit)? = null,  // 커스텀 오른쪽 액션
+    height: androidx.compose.ui.unit.Dp = 40.dp    // 커스터마이징 가능한 높이
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(height)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -60,25 +62,31 @@ fun ActionHeader(
         Box(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = Typography.Heading,
+                style = Typography.Subheading,
                 color = ColorPalette.Light.primary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
-        // Right: Close icon or spacer
-        if (onClose != null) {
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "닫기",
-                tint = iconTint,
-                modifier = Modifier
-                    .size(24.dp)
-                    .clickable { onClose() }
-            )
-        } else {
-            Spacer(modifier = Modifier.size(24.dp))
+        // Right: Custom action or Close icon or spacer
+        when {
+            rightAction != null -> {
+                rightAction()
+            }
+            onClose != null -> {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "닫기",
+                    tint = iconTint,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable { onClose() }
+                )
+            }
+            else -> {
+                Spacer(modifier = Modifier.size(24.dp))
+            }
         }
     }
 }

@@ -131,7 +131,7 @@ fun SearchBarWithFilter(
                 Icon(
                     imageVector = Icons.Filled.FilterList,
                     contentDescription = "필터",
-                    tint = ColorPalette.Light.primary,  // 검정색
+                    tint = ColorPalette.Light.component,  // 회색
                     modifier = Modifier.size(24.dp)
                 )
             }

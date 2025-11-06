@@ -27,6 +27,7 @@ import com.example.runnity.ui.screens.home.HomeScreen
 import com.example.runnity.ui.screens.startrun.StartRunScreen
 import com.example.runnity.ui.screens.challenge.ChallengeScreen
 import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
+import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 
 /**
@@ -58,10 +59,11 @@ fun MainTabScreen(
     // 하단 네비바를 보여줄 화면들 정의 (리스트 화면들만)
     // 세부 화면(challenge_detail)에서는 네비바를 숨김
     val showBottomBar = currentRoute in listOf(
-        "home",          // 홈 화면
-        "start_run",     // 개인 러닝 화면
-        "challenge",     // 챌린지 리스트 화면
-        "mypage"         // 마이페이지 화면
+        "home",              // 홈 화면
+        "start_run",         // 개인 러닝 화면
+        "challenge",         // 챌린지 리스트 화면
+        "challenge_filter",  // 챌린지 필터 화면
+        "mypage"             // 마이페이지 화면
     )
 
     // Scaffold: 상단바, 하단바, 플로팅 버튼 등을 배치하는 레이아웃
@@ -174,6 +176,13 @@ fun MainTabScreen(
                     ChallengeScreen(
                         navController = navController,           // 세부 화면으로 이동용
                         parentNavController = parentNavController
+                    )
+                }
+
+                // 챌린지 필터 화면 (네비바 있음)
+                composable("challenge_filter") {
+                    ChallengeFilterScreen(
+                        navController = navController  // 뒤로가기용
                     )
                 }
 
