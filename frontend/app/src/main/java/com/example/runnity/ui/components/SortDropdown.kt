@@ -1,5 +1,6 @@
 package com.example.runnity.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -8,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
@@ -43,11 +45,8 @@ fun SortDropdown(
 
     // Box: 드롭다운 메뉴를 위한 앵커 포인트
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp),
-        contentAlignment = Alignment.CenterEnd  // 오른쪽 정렬
+        modifier = modifier,
+        contentAlignment = Alignment.TopEnd  // 오른쪽 상단 정렬
     ) {
         // 정렬 선택 버튼 (텍스트 + 화살표)
         Row(
@@ -76,7 +75,9 @@ fun SortDropdown(
         // 드롭다운 메뉴
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }  // 메뉴 밖 클릭 시 닫기
+            onDismissRequest = { expanded = false },  // 메뉴 밖 클릭 시 닫기
+            modifier = Modifier
+                .background(Color.White)  // 흰색 배경
         ) {
             // 정렬 옵션들 (인기순, 최신순)
             sortOptions.forEach { option ->
