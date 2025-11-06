@@ -4,7 +4,7 @@ import com.runnity.challenge.domain.Challenge;
 import com.runnity.challenge.domain.ParticipationStatus;
 import com.runnity.history.dto.ChallengeResponse;
 import com.runnity.history.dto.MyChallengesResponse;
-import com.runnity.history.repository.ChallengeParticipationRepository;
+import com.runnity.history.repository.HistoryChallengeParticipationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,15 +22,20 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class HistoryService {
 
-    private final ChallengeParticipationRepository repository;
+    private final HistoryChallengeParticipationRepository repository;
 
     private static final int ENTERABLE_MINUTES_BEFORE_START = 5;
 
     public MyChallengesResponse getMyChallenges(Long memberId) {
+
+        List<ParticipationStatus> targetStatuses = new java.util.ArrayList<>();
+        targetStatuses.add(ParticipationStatus.WAITING);
+        targetStatuses.addAll(ParticipationStatus.REJOINABLE_STATUSES);
+
         List<Challenge> waitingChallenges =
                 repository.findChallengesByMemberIdAndStatus(
                         memberId,
-                        ParticipationStatus.WAITING
+                        targetStatuses
                 );
 
         if (waitingChallenges.isEmpty()) {
