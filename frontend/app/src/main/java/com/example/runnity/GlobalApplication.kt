@@ -2,6 +2,7 @@ package com.example.runnity
 
 import android.app.Application
 import com.example.runnity.data.util.TokenManager
+import com.kakao.vectormap.KakaoMapSdk
 import timber.log.Timber
 
 /**
@@ -23,5 +24,9 @@ class GlobalApplication : Application() {
 
         // TokenManager 초기화
         TokenManager.init(this)
+
+        // Kakao Map SDK 초기화 (앱 시작 시 1회)
+        KakaoMapSdk.init(this, BuildConfig.KAKAO_MAP_KEY)
+        Timber.d("GlobalApplication: KakaoMapSdk.init called")
     }
 }
