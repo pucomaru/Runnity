@@ -8,6 +8,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
+/**
+ * SecurityContext에 담길 UserPrincipal.
+ * ROLE은 간단히 ROLE_USER로 고정.
+ */
 public class UserPrincipal implements UserDetails {
 
     private final Long memberId;
@@ -21,50 +25,18 @@ public class UserPrincipal implements UserDetails {
     }
 
     public static UserPrincipal create(Member member) {
-        Collection<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
-        return new UserPrincipal(
-                member.getMemberId(),
-                member.getEmail(),
-                authorities
-        );
+        Collection<GrantedAuthority> authorities =
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+        return new UserPrincipal(member.getMemberId(), member.getEmail(), authorities);
     }
 
-    public Long getMemberId() {
-        return memberId;
-    }
+    public Long getMemberId() { return memberId; }
 
-    @Override
-    public String getUsername() {
-        return email; // UserDetails의 username으로 이메일 반환
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return UserDetails.super.isAccountNonExpired();
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return UserDetails.super.isAccountNonLocked();
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return UserDetails.super.isCredentialsNonExpired();
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return UserDetails.super.isEnabled();
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
-    }
-
-    @Override
-    public String getPassword() {
-        return "";
-    }
+    @Override public String getUsername() { return email; }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return true; }
+    @Override public Collection<? extends GrantedAuthority> getAuthorities() { return authorities; }
+    @Override public String getPassword() { return ""; }
 }
