@@ -12,7 +12,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface ChallengeParticipationRepository extends JpaRepository<ChallengeParticipation, Long> {
+public interface HistoryChallengeParticipationRepository extends JpaRepository<ChallengeParticipation, Long> {
 
     @Query("SELECT cp.challenge FROM ChallengeParticipation cp " +
             "WHERE cp.member.memberId = :memberId " +
