@@ -38,7 +38,11 @@ public record ChallengeCreateRequest(
         Boolean isPrivate,
 
         @Schema(description = "비밀번호 (비밀방일 때 필수)", example = "1234")
-        String password
+        String password,
+
+        @NotNull(message = "중계방 여부는 필수입니다")
+        @Schema(description = "중계방 여부", example = "false")
+        Boolean isBroadcast
 ) {
 
     @AssertTrue(message = "시작일시는 현재 시점으로부터 1주일 이내여야 합니다")
@@ -64,6 +68,7 @@ public record ChallengeCreateRequest(
                 .distance(this.distance)
                 .isPrivate(this.isPrivate)
                 .password(password)
+                .isBroadcast(this.isBroadcast)
                 .build();
     }
 }

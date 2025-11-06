@@ -45,6 +45,9 @@ public record ChallengeResponse(
         @Schema(description = "비밀방 여부", example = "false")
         Boolean isPrivate,
 
+        @Schema(description = "중계방 여부", example = "false")
+        Boolean isBroadcast,
+
         @Schema(description = "로그인 사용자의 참가 여부", example = "true")
         Boolean joined,
 
@@ -76,6 +79,7 @@ public record ChallengeResponse(
                 .description(challenge.getDescription())
                 .distance(challenge.getDistance())
                 .isPrivate(challenge.getIsPrivate())
+                .isBroadcast(challenge.getIsBroadcast())
                 .joined(joined)
                 .participants(participants)
                 .createdAt(challenge.getCreatedAt())

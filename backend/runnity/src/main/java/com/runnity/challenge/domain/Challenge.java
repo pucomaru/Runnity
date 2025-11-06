@@ -46,6 +46,9 @@ public class Challenge extends BaseEntity {
     @Column(length = 255, nullable = true)
     private String password;
 
+    @Column(name = "is_broadcast", nullable = false)
+    private Boolean isBroadcast;
+
     @Builder
     public Challenge(
             String title,
@@ -53,8 +56,9 @@ public class Challenge extends BaseEntity {
             LocalDateTime startAt,
             String description,
             ChallengeDistance distance,
-            Boolean isPrivate,
-            String password
+            boolean isPrivate,
+            String password,
+            boolean isBroadcast
     ) {
         this.title = title;
         this.status = ChallengeStatus.RECRUITING;
@@ -65,5 +69,6 @@ public class Challenge extends BaseEntity {
         this.endAt = startAt.plusMinutes(distance.durationMinutes());
         this.isPrivate = isPrivate;
         this.password = password;
+        this.isBroadcast = isBroadcast;
     }
 }
