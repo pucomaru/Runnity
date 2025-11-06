@@ -62,8 +62,10 @@ fun HomeScreen(
     )
 
     // 예약한 챌린지 샘플 데이터
+    // TODO: ViewModel에서 실제 데이터 가져오기
     // TODO: ViewModel에서 실제 챌린지 시작 시간을 확인하여
     //       시작 5분 전부터 buttonState를 Join으로 변경해야 함
+    //       (HomeViewModel의 startChallengeTimeChecker 구현 필요)
     val reservedChallenges = listOf(
         ChallengeListItem(
             id = "res_1",
@@ -187,7 +189,9 @@ fun HomeScreen(
                             navController?.navigate("challenge_detail/${challenge.id}")
                         },
                         onButtonClick = {
-                            // TODO: 예약하기 버튼 클릭 처리
+                            // TODO: 참가하기 버튼 클릭 처리 (Join 버튼)
+                            // - 챌린지 참가 API 호출
+                            // - 러닝 화면으로 이동
                         }
                     )
                 }
