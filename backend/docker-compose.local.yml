@@ -23,6 +23,17 @@ services:
       SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
       SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP:-kafka:9092}
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-googleClientId}
+
+      # Kakao OAuth
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-kakaoClientId}
+      KAKAO_ISS: ${KAKAO_ISS:-https://kauth.kakao.com}
+      KAKAO_JWKS_URI: ${KAKAO_JWKS_URI:-https://kauth.kakao.com/.well-known/jwks.json}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-jwtSecretKetAbcdefghijklmnop1234567890===}
     depends_on:
       - mysql
       - redis
