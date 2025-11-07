@@ -229,7 +229,6 @@ private fun DateItem(
 
     Column(
         modifier = modifier
-            .padding(4.dp)
             .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

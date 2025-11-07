@@ -1,13 +1,13 @@
 package com.example.runnity.ui.screens.challenge
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,24 +56,22 @@ fun ChallengeFilterScreen(
             onBack = { navController?.navigateUp() },
             height = 56.dp,
             rightAction = {
-                IconButton(
-                    onClick = {
-                        // 초기화
-                        selectedDistances = setOf()
-                        selectedStartDate = null
-                        selectedEndDate = null
-                        selectedStartTime = "00:00"
-                        selectedEndTime = "24:00"
-                        selectedVisibility = "공개만"
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "초기화",
-                        tint = ColorPalette.Light.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = "초기화",
+                    tint = ColorPalette.Light.primary,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable {
+                            // 초기화
+                            selectedDistances = setOf()
+                            selectedStartDate = null
+                            selectedEndDate = null
+                            selectedStartTime = "00:00"
+                            selectedEndTime = "24:00"
+                            selectedVisibility = "공개만"
+                        }
+                )
             }
         )
 
@@ -82,21 +80,19 @@ fun ChallengeFilterScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // ===== 거리(km) 섹션 =====
-            Text(
-                text = "거리(km)",
-                style = Typography.Subheading,
-                color = ColorPalette.Light.primary
-            )
+            SectionHeader(subtitle = "거리(km)")
+
             Spacer(modifier = Modifier.height(12.dp))
 
             // 첫 번째 줄: 1km ~ 5km
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf("1km", "2km", "3km", "4km", "5km").forEach { distance ->
@@ -119,7 +115,9 @@ fun ChallengeFilterScreen(
 
             // 두 번째 줄: 6km ~ 10km
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf("6km", "7km", "8km", "9km", "10km").forEach { distance ->
@@ -142,7 +140,9 @@ fun ChallengeFilterScreen(
 
             // 세 번째 줄: 15km, 하프 (가운데 정렬)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
                 SmallPillButton(
@@ -175,15 +175,13 @@ fun ChallengeFilterScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ===== 날짜 · 시간 섹션 =====
-            Text(
-                text = "날짜 · 시간",
-                style = Typography.Subheading,
-                color = ColorPalette.Light.primary
-            )
+            SectionHeader(subtitle = "날짜 · 시간")
+
             Spacer(modifier = Modifier.height(12.dp))
 
             // 날짜·시간 선택 컴포넌트
             DateTimeSelector(
+                modifier = Modifier.padding(horizontal = 16.dp),
                 selectedStartDate = selectedStartDate,
                 selectedEndDate = selectedEndDate,
                 onDateRangeSelected = { startDate, endDate ->
@@ -201,15 +199,14 @@ fun ChallengeFilterScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ===== 공개 여부 섹션 =====
-            Text(
-                text = "공개 여부",
-                style = Typography.Subheading,
-                color = ColorPalette.Light.primary
-            )
+            SectionHeader(subtitle = "공개 여부")
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SmallPillButton(
