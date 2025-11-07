@@ -2,19 +2,21 @@ package com.runnity.member.controller;
 
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.global.status.SuccessStatus;
-import com.runnity.member.dto.LoginRequestDto;
-import com.runnity.member.dto.LoginResponseDto;
-import com.runnity.member.dto.TokenRequest;
-import com.runnity.member.dto.TokenResponse;
+import com.runnity.member.dto.*;
 import com.runnity.member.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Auth", description = "소셜 로그인, 토큰 재발급 API")
@@ -78,5 +80,50 @@ public class AuthController {
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @PostMapping("/logout")
+    @Operation(
+            summary = "로그아웃",
+            description = "현재 Access Token을 블랙리스트에 등록하여 로그아웃합니다. " +
+                    "클라이언트에서도 저장된 토큰을 삭제합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<LogoutResponseDto>> logout(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            HttpServletRequest request
+    ) {
+        try {
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            // Authorization 헤더에서 토큰 추출
+            String accessToken = extractTokenFromRequest(request);
+            if (accessToken == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            // 로그아웃 처리 (블랙리스트 등록)
+            authService.logout(userPrincipal.getMemberId(), accessToken);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Authorization 헤더에서 Bearer 토큰 추출
+     */
+    private String extractTokenFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 }

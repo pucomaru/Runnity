@@ -7,6 +7,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.runnity.global.service.TokenBlacklistService;
 import com.runnity.member.domain.Member;
 import com.runnity.member.dto.LoginResponseDto;
 import com.runnity.member.dto.TokenResponse;
@@ -14,6 +15,7 @@ import com.runnity.member.repository.MemberRepository;
 import com.runnity.member.util.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +36,7 @@ import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -41,6 +44,7 @@ public class AuthService {
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${GOOGLE_CLIENT_ID}") private String GOOGLE_CLIENT_ID;
     @Value("${KAKAO_CLIENT_ID}")  private String KAKAO_CLIENT_ID;
@@ -161,5 +165,17 @@ public class AuthService {
         String newAccess = jwtTokenProvider.createAccessToken(member);
         String newRefresh = jwtTokenProvider.createRefreshToken(member.getEmail());
         return new TokenResponse(newAccess, newRefresh);
+    }
+
+    @Transactional
+    public void logout(Long memberId, String accessToken) {
+        try {
+            // Redis에 토큰 블랙리스트 등록
+            tokenBlacklistService.addToBlacklist(accessToken);
+            log.info("로그아웃 완료: memberId={}", memberId);
+        } catch (Exception e) {
+            log.error("로그아웃 처리 실패: memberId={}", memberId, e);
+            throw new RuntimeException("Logout failed", e);
+        }
     }
 }
