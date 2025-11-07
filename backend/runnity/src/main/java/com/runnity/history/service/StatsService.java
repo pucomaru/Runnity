@@ -66,13 +66,13 @@ public class StatsService {
                 .count();
 
         List<RunRecordResponse> personals = runRecordRepository
-                .findTop5ByMember_MemberIdAndRunTypeOrderByStartAtDesc(memberId, RunRecordType.PERSONAL)
+                .findTop5ByMember_MemberIdAndRunTypeAndIsDeletedFalseOrderByStartAtDesc(memberId, RunRecordType.PERSONAL)
                 .stream()
                 .map(RunRecordResponse::from)
                 .toList();
 
         List<RunRecordResponse> challenges = runRecordRepository
-                .findTop5ByMember_MemberIdAndRunTypeOrderByStartAtDesc(memberId, RunRecordType.CHALLENGE)
+                .findTop5ByMember_MemberIdAndRunTypeAndIsDeletedFalseOrderByStartAtDesc(memberId, RunRecordType.CHALLENGE)
                 .stream()
                 .map(RunRecordResponse::from)
                 .toList();

@@ -16,6 +16,7 @@ public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
             "WHERE r.member.memberId = :memberId " +
             "AND r.startAt >= :startDate " +
             "AND r.startAt < :endDate " +
+            "AND r.isDeleted = false " +
             "ORDER BY r.startAt DESC")
     List<RunRecord> findByMemberIdAndPeriod(
             @Param("memberId") Long memberId,
@@ -23,7 +24,7 @@ public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
             @Param("endDate") LocalDateTime endDate
     );
 
-    List<RunRecord> findTop5ByMember_MemberIdAndRunTypeOrderByStartAtDesc(Long memberId, RunRecordType runType);
+    List<RunRecord> findTop5ByMember_MemberIdAndRunTypeAndIsDeletedFalseOrderByStartAtDesc(Long memberId, RunRecordType runType);
 
     @Query("SELECT r FROM RunRecord r " +
             "JOIN FETCH r.member " +
