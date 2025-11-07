@@ -1,6 +1,7 @@
 volumes:
   mysql_data:
-  redis_data:
+  redis_cache_data:
+  redis_pubsub_data:
 
 networks:
   local_net:
@@ -20,8 +21,16 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-runnity}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-ssafy}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ssafy1234}
-      SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
-      SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
+
+
+ 
+      # ===== Redis 분리: Cache / PubSub =====
+      REDIS_CACHE_HOST: ${REDIS_CACHE_HOST:-redis_cache}
+      REDIS_CACHE_PORT: ${REDIS_CACHE_PORT:-6379}
+      REDIS_PUBSUB_HOST: ${REDIS_PUBSUB_HOST:-redis_pubsub}
+      REDIS_PUBSUB_PORT: ${REDIS_PUBSUB_PORT:-6379}
+
+
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP:-kafka:9092}
 
       # Google OAuth
@@ -36,7 +45,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-jwtSecretKetAbcdefghijklmnop1234567890===}
     depends_on:
       - mysql
-      - redis
+      - redis_cache
+      - redis_pubsub
       - kafka
     networks: [local_net]
     restart: unless-stopped
@@ -55,16 +65,36 @@ services:
       - mysql_data:/var/lib/mysql
     networks: [local_net]
     restart: unless-stopped
-
-  redis:
+  # =====================
+  # Redis 1: Cache 용
+  # =====================
+  redis_cache:
     image: redis:7-alpine
-    container_name: redis
+    container_name: redis_cache
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_cache_data:/data
     networks: [local_net]
     restart: unless-stopped
+  # =====================
+  # Redis 2: Pub/Sub 용
+  # =====================
+  redis_pubsub:
+    image: redis:7-alpine
+    container_name: redis_pubsub
+    # Host에서는 6380으로 접근, 컨테이너 내부 포트는 6379
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_pubsub_data:/data
+    networks: [local_net]
+    restart: unless-stopped
+
+  # =====================
+  # Zookeeper
+  # =====================
+
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -76,7 +106,9 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     networks: [local_net]
     restart: unless-stopped
-
+  # =====================
+  # Kafka
+  # =====================
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
