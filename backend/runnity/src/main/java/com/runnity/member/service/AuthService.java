@@ -9,6 +9,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.runnity.global.service.TokenBlacklistService;
 import com.runnity.member.domain.Member;
+import com.runnity.member.dto.AddInfoRequestDto;
 import com.runnity.member.dto.LoginResponseDto;
 import com.runnity.member.dto.TokenResponse;
 import com.runnity.member.repository.MemberRepository;
@@ -21,19 +22,25 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -50,6 +57,8 @@ public class AuthService {
     @Value("${KAKAO_CLIENT_ID}")  private String KAKAO_CLIENT_ID;
     @Value("${KAKAO_ISS}")        private String KAKAO_ISS;
     @Value("${KAKAO_JWKS_URI}")   private String KAKAO_JWKS_URI;
+
+    @Value("${UPLOAD_PATH}") private String uploadPath;
 
     @Transactional
     public LoginResponseDto googleLogin(String idToken) {
@@ -152,6 +161,104 @@ public class AuthService {
                 (email == null || email.isBlank()) ? (socialUid + "@kakao.local") : email
         );
         return new LoginResponseDto(accessToken, refreshToken, isNew);
+    }
+
+    @Transactional
+    public void addAdditionalInfo(
+            Long memberId,
+            AddInfoRequestDto request,
+            MultipartFile profileImage
+    ) {
+        try {
+            // 회원 조회
+            Member member = memberRepository.findById(memberId)
+                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
+
+            log.info("회원 조회 완료: memberId={}", memberId);
+
+            // 프로필 사진 저장 (있을 경우)
+            String profileImagePath = null;
+            if (profileImage != null && !profileImage.isEmpty()) {
+                profileImagePath = saveProfileImage(profileImage, memberId);
+                log.info("프로필 사진 저장: {}", profileImagePath);
+            }
+
+            // 회원 정보 업데이트
+            member.updateProfile(
+                    request.getNickname(),
+                    request.getHeight(),
+                    request.getWeight(),
+                    request.getGender(),
+                    request.getBirth()
+            );
+
+            if (profileImagePath != null) {
+                member.setProfileImage(profileImagePath);
+            }
+
+            log.info("회원 정보 업데이트 완료: memberId={}", memberId);
+        } catch (IllegalArgumentException e) {
+            log.error("추가 정보 입력 실패 (잘못된 요청): {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("추가 정보 입력 실패 (서버 에러): {}", e.getMessage(), e);
+            throw new RuntimeException("추가 정보 입력 중 오류가 발생했습니다", e);
+        }
+    }
+
+    private String saveProfileImage(MultipartFile file, Long memberId) {
+        try {
+            // 1. 파일 확장자 확인
+            String originalFileName = file.getOriginalFilename();
+            if (originalFileName == null) {
+                throw new IllegalArgumentException("파일명이 없습니다.");
+            }
+
+            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+
+            // 2. 유효한 이미지 파일 확장자 검증
+            String fileExtensionLower = fileExtension.toLowerCase();
+            if (!fileExtensionLower.matches("\\.(jpg|jpeg|png|gif|webp)")) {
+                throw new IllegalArgumentException("지원하지 않는 파일 형식입니다. (jpg, jpeg, png, gif, webp만 지원)");
+            }
+
+            // 3. 파일 크기 검증 (5MB 제한)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                throw new IllegalArgumentException("파일 크기는 5MB 이하여야 합니다.");
+            }
+
+            // 4. 안전성을 위해 UUID를 사용하여 새로운 파일명 생성
+            String newFileName = UUID.randomUUID().toString() + fileExtension;
+
+            // 5. 파일 저장 경로 설정 (memberId별 디렉토리 생성)
+            Path uploadDir = Paths.get(uploadPath).resolve(memberId.toString());
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            Path filePath = uploadDir.resolve(newFileName);
+            Files.write(filePath, file.getBytes());
+
+            // 6. 기존 프로필 사진 삭제 (있을 경우)
+            Member member = memberRepository.findById(memberId).orElse(null);
+            if (member != null && member.getProfileImage() != null && !member.getProfileImage().isEmpty()) {
+                try {
+                    Path oldFilePath = uploadDir.resolve(member.getProfileImage());
+                    Files.deleteIfExists(oldFilePath);
+                } catch (IOException e) {
+                    // 기존 파일 삭제 실패는 무시 (새 파일은 저장되었음)
+                    System.err.println("기존 프로필 사진 삭제 실패: " + e.getMessage());
+                }
+            }
+
+            // 7. 저장된 파일명 반환
+            String relativeFilePath = memberId + "/" + newFileName;
+            System.out.println("✅ 프로필 사진 저장 완료: " + relativeFilePath);
+            return relativeFilePath;
+
+        } catch (IOException e) {
+            throw new RuntimeException("파일 업로드 중 오류가 발생했습니다.", e);
+        }
     }
 
     public TokenResponse refreshAccessToken(String refreshToken) {
