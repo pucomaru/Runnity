@@ -43,10 +43,6 @@ public enum ParticipationStatus {
     /**
      * 챌린지가 아직 진행 중인 상태인지 확인
      */
-    public boolean isActive() {
-        return this == WAITING || this == RUNNING;
-    }
-
     public boolean isRejoinable() {
         return REJOINABLE_STATUSES.contains(this);
     }
