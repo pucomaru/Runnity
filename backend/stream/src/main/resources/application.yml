@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: stream
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    consumer:
+      group-id: runnity-stream-group
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000
+
+server:
+  address: 0.0.0.0
+  port: ${SERVER_PORT:8084}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.kafka: INFO
+    org.springframework.web: INFO
+    com.runnity.stream: DEBUG
