@@ -1,5 +1,6 @@
 package com.runnity.global.config;
 
+import com.runnity.global.service.TokenBlacklistService;
 import com.runnity.member.config.JwtAuthenticationFilter;
 import com.runnity.member.util.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +24,10 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtTokenProvider);
+        return new JwtAuthenticationFilter(jwtTokenProvider, tokenBlacklistService);
     }
 
     @Bean
@@ -46,8 +48,7 @@ public class SecurityConfig {
                                 "api/v1/me/**",
                                 "api/v1/stats/**",
                                 "/api/v1/auth/login/**",
-                                "/api/v1/auth/token",
-                                "/api/v1/auth/logout"
+                                "/api/v1/auth/token"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );

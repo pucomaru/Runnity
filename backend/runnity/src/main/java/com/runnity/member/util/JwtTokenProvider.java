@@ -1,5 +1,6 @@
 package com.runnity.member.util;
 
+import com.auth0.jwt.algorithms.Algorithm;
 import com.runnity.member.domain.Member;
 import com.runnity.member.dto.UserPrincipal;
 import io.jsonwebtoken.Claims;
@@ -21,13 +22,18 @@ import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
-
     private final SecretKey key;
-    private final long accessTokenValidityInMs = 3_600_000;     // 1h
-    private final long refreshTokenValidityInMs = 86_400_000;   // 24h
+    private final long accessTokenValidityInMs;
+    private final long refreshTokenValidityInMs;
 
-    public JwtTokenProvider(@Value("${JWT_SECRET}") String secretKey) {
+    public JwtTokenProvider(
+            @Value("${JWT_SECRET}") String secretKey,                    // ✅ secret 읽음
+            @Value("${jwt.access-token-expiration:900}") long accessTokenExpiration,        // ✅ 사용
+            @Value("${jwt.refresh-token-expiration:604800}") long refreshTokenExpiration    // ✅ 사용
+    ) {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        this.accessTokenValidityInMs = accessTokenExpiration * 1000;     // 초 → 밀리초 변환
+        this.refreshTokenValidityInMs = refreshTokenExpiration * 1000;   // 초 → 밀리초 변환
     }
 
     public String createAccessToken(Member member) {
@@ -77,9 +83,5 @@ public class JwtTokenProvider {
             // 로그 필요 시 추가
         }
         return false;
-    }
-
-    public SecretKey getSecretKey() {
-        return key;
     }
 }
