@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+application-*.yml
+!application.yml    # 기본 application.yml은 예외로 포함
+docker-compose.yml
