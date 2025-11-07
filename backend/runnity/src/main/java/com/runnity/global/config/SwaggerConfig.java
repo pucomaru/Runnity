@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @OpenAPIDefinition(
-        info = @Info(title = "HAERUHAND",
-                description = "A405_SSAFY",
+        info = @Info(title = "RUNNITY",
+                description = "A703_SSAFY",
                 version = "v1"),
         servers = {
                 @Server(url = "http://localhost",

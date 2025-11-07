@@ -1,7 +1,9 @@
 package com.runnity.challenge.controller;
 
-import com.runnity.challenge.dto.ChallengeCreateRequest;
-import com.runnity.challenge.dto.ChallengeResponse;
+import com.runnity.challenge.request.ChallengeCreateRequest;
+import com.runnity.challenge.request.ChallengeListRequest;
+import com.runnity.challenge.response.ChallengeListResponse;
+import com.runnity.challenge.response.ChallengeResponse;
 import com.runnity.challenge.service.ChallengeService;
 import com.runnity.global.status.SuccessStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,8 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/challenges")
@@ -41,6 +41,28 @@ public class ChallengeController {
         ChallengeResponse response = challengeService.createChallenge(request, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.CHALLENGE_CREATED,
+                response
+        );
+    }
+
+    @GetMapping
+    @Operation(
+            summary = "챌린지 목록 조회",
+            description = "챌린지 목록을 조회합니다. (검색, 필터링, 정렬, 페이징 모두 지원)"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeListResponse>> getChallenges(
+            @ModelAttribute ChallengeListRequest request
+    ) {
+        Long memberId = getCurrentUserId();
+        ChallengeListResponse response = challengeService.getChallenges(request, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.OK,
                 response
         );
     }

@@ -1,4 +1,4 @@
-package com.runnity.challenge.dto;
+package com.runnity.challenge.request;
 
 import com.runnity.challenge.domain.Challenge;
 import com.runnity.challenge.domain.ChallengeDistance;

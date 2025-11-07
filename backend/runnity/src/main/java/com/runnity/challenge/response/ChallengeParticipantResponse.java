@@ -1,4 +1,4 @@
-package com.runnity.challenge.dto;
+package com.runnity.challenge.response;
 
 import com.runnity.member.domain.Member;
 import io.swagger.v3.oas.annotations.media.Schema;
