@@ -15,7 +15,7 @@ public record RunRecordDetailResponse(
         Integer durationSec,
         String startAt,
         String endAt,
-        Float pace,
+        Integer pace,
         Integer bpm,
         RunRecordType runType,
         Float calories,
@@ -33,7 +33,7 @@ public record RunRecordDetailResponse(
                 .endAt(record.getEndAt()
                         .atOffset(ZoneOffset.UTC)
                         .format(DateTimeFormatter.ISO_INSTANT))
-                .pace(record.getPace().floatValue())
+                .pace(record.getPace())
                 .bpm(record.getBpm())
                 .runType(record.getRunType())
                 .calories(record.getCalories())

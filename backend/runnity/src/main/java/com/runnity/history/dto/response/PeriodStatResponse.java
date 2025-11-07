@@ -7,7 +7,7 @@ public record PeriodStatResponse(
         String label,
         Float distance,
         Integer time,
-        Float pace,
+        Integer pace,
         Integer count
 ) {
 }

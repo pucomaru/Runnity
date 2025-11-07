@@ -36,7 +36,7 @@ public class StatsService {
                                 .label(label)
                                 .distance(0.0f)
                                 .time(0)
-                                .pace(0.0f)
+                                .pace(0)
                                 .count(0)
                                 .build(),
                         (a, b) -> a, LinkedHashMap::new
@@ -54,7 +54,7 @@ public class StatsService {
                 .map(RunRecord::getDurationSec)
                 .reduce(0, Integer::sum);
 
-        float avgPace = (float) records.stream()
+        int avgPace = (int) records.stream()
                 .map(RunRecord::getPace)
                 .mapToInt(Integer::intValue)
                 .average()
@@ -140,7 +140,7 @@ public class StatsService {
             float newDistance = current.distance() + record.getDistance();
             int newTime = current.time() + record.getDurationSec();
             int newCount = current.count() + 1;
-            float newPaceSum = current.pace() + record.getPace(); // ⚙️ pace 누적 합계로 사용
+            int newPaceSum = current.pace() + record.getPace(); // ⚙️ pace 누적 합계로 사용
 
             statsMap.put(label, PeriodStatResponse.builder()
                     .label(label)
@@ -152,7 +152,7 @@ public class StatsService {
         }
 
         statsMap.replaceAll((label, cur) -> {
-            float avgPace = cur.count() > 0 ? cur.pace() / cur.count() : 0f;
+            int avgPace = (int) (cur.count() > 0 ? cur.pace() / cur.count() : 0);
             return PeriodStatResponse.builder()
                     .label(label)
                     .distance(cur.distance())

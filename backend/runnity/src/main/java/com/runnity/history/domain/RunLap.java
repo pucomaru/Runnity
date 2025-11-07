@@ -27,7 +27,7 @@ public class RunLap extends BaseEntity {
     private Integer durationSec;
 
     @Column(nullable = false)
-    private Float pace;
+    private Integer pace;
 
     @Column(nullable = false)
     private Integer bpm;
