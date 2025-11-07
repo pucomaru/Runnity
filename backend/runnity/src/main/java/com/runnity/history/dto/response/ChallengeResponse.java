@@ -1,4 +1,4 @@
-package com.runnity.history.dto;
+package com.runnity.history.dto.response;
 
 import com.runnity.challenge.domain.Challenge;
 import lombok.Builder;

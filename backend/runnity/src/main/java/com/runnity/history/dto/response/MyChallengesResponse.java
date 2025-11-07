@@ -1,4 +1,4 @@
-package com.runnity.history.dto;
+package com.runnity.history.dto.response;
 
 import lombok.Builder;
 

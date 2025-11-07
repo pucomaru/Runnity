@@ -1,6 +1,7 @@
 package com.runnity.challenge.domain;
 
 import com.runnity.global.domain.BaseEntity;
+import com.runnity.history.domain.RunRecord;
 import com.runnity.member.domain.Member;
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,9 +40,9 @@ public class ChallengeParticipation extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false, foreignKey = @ForeignKey(name = "fk_participation_member"))
     private Member member;
 
-    // TODO: 추후 RunRecord Entity와 연관관계 매핑 필요
-    @Column(name = "run_record_id")
-    private Long runRecordId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "run_record_id", foreignKey = @ForeignKey(name = "fk_participation_run_record"))
+    private RunRecord runRecord;
 
     @Builder
     public ChallengeParticipation(
