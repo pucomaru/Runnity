@@ -30,8 +30,9 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 2000
 
+
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:29092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -53,7 +54,12 @@ oauth:
     client-id: ${KAKAO_CLIENT_ID}
     issuer: ${KAKAO_ISS:https://kauth.kakao.com}
     jwks-uri: ${KAKAO_JWKS_URI:https://kauth.kakao.com/.well-known/jwks.json}
-
+runnity:
+  redis:
+    pubsub:
+      host: ${REDIS_CACHE_HOST:localhost}
+      port: ${REDIS_PUBSUB_PORT:6380}
+      channel: runnity.pubsub
 # JWT 설정
 jwt:
   secret: ${JWT_SECRET}
