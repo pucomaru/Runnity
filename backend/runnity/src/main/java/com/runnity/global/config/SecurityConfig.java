@@ -46,6 +46,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/login/**",
                                 "/api/v1/auth/token",
                                 "/api/v1/auth/logout"
+                                "api/v1/me/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );
