@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,9 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
@@ -106,11 +110,12 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 로고 (텍스트로 표시, 추후 이미지로 변경 가능)
-            Text(
-                text = "Runnity",
-                style = Typography.Title,
-                color = Color.White
+            // 로고 (이미지)
+            Image(
+                painter = painterResource(id = R.drawable.runnity_logo),
+                contentDescription = "Runnity Logo",
+                modifier = Modifier.height(32.dp),
+                contentScale = ContentScale.Fit
             )
 
             // 알람 아이콘
