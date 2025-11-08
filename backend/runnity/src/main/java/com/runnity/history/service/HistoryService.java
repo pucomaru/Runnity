@@ -2,9 +2,16 @@ package com.runnity.history.service;
 
 import com.runnity.challenge.domain.Challenge;
 import com.runnity.challenge.domain.ParticipationStatus;
-import com.runnity.history.dto.ChallengeResponse;
-import com.runnity.history.dto.MyChallengesResponse;
+import com.runnity.global.exception.GlobalException;
+import com.runnity.global.status.ErrorStatus;
+import com.runnity.history.domain.RunRecord;
+import com.runnity.history.dto.response.ChallengeResponse;
+import com.runnity.history.dto.response.MyChallengesResponse;
+import com.runnity.history.dto.response.RunLapResponse;
+import com.runnity.history.dto.response.RunRecordDetailResponse;
 import com.runnity.history.repository.HistoryChallengeParticipationRepository;
+import com.runnity.history.repository.RunLapRepository;
+import com.runnity.history.repository.RunRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +30,8 @@ import java.util.stream.Collectors;
 public class HistoryService {
 
     private final HistoryChallengeParticipationRepository repository;
+    private final RunRecordRepository runRecordRepository;
+    private final RunLapRepository runLapRepository;
 
     private static final int ENTERABLE_MINUTES_BEFORE_START = 5;
 
@@ -95,5 +104,21 @@ public class HistoryService {
     private boolean isEnterable(Challenge challenge) {
         long minutes = ChronoUnit.MINUTES.between(LocalDateTime.now(), challenge.getStartAt());
         return minutes <= ENTERABLE_MINUTES_BEFORE_START;
+    }
+
+    public RunRecordDetailResponse getRunRecordDetail(Long memberId, Long runRecordId) {
+        RunRecord record = runRecordRepository.findDetailById(runRecordId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.RUN_RECORD_NOT_FOUND));
+
+        if (!record.getMember().getMemberId().equals(memberId)) {
+            throw new GlobalException(ErrorStatus.RUN_RECORD_FORBIDDEN);
+        }
+
+        List<RunLapResponse> laps = runLapRepository.findByRunRecord_RunRecordIdAndIsDeletedFalseOrderBySequence(runRecordId)
+                .stream()
+                .map(RunLapResponse::from)
+                .toList();
+
+        return RunRecordDetailResponse.from(record, laps);
     }
 }
