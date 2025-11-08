@@ -1,11 +1,14 @@
 package com.runnity.challenge.service;
 
-import com.runnity.challenge.domain.Challenge;
-import com.runnity.challenge.domain.ChallengeParticipation;
-import com.runnity.challenge.domain.ParticipationStatus;
-import com.runnity.challenge.dto.ChallengeCreateRequest;
-import com.runnity.challenge.dto.ChallengeParticipantResponse;
-import com.runnity.challenge.dto.ChallengeResponse;
+import com.runnity.challenge.domain.*;
+import com.runnity.challenge.request.ChallengeCreateRequest;
+import com.runnity.challenge.request.ChallengeListRequest;
+import com.runnity.challenge.request.ChallengeSortType;
+import com.runnity.challenge.request.ChallengeVisibility;
+import com.runnity.challenge.response.ChallengeListItemResponse;
+import com.runnity.challenge.response.ChallengeListResponse;
+import com.runnity.challenge.response.ChallengeParticipantResponse;
+import com.runnity.challenge.response.ChallengeResponse;
 import com.runnity.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.challenge.repository.ChallengeRepository;
 import com.runnity.global.exception.GlobalException;
@@ -14,11 +17,14 @@ import com.runnity.member.domain.Member;
 import com.runnity.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -58,6 +64,47 @@ public class ChallengeService {
                 true,
                 List.of(hostResponse)
         );
+    }
+
+    public ChallengeListResponse getChallenges(ChallengeListRequest request, Pageable pageable, Long memberId) {
+        Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
+
+        Page<Object[]> result = request.sort() == ChallengeSortType.POPULAR
+                ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
+                        request.keyword(),
+                        request.distance(),
+                        request.startAt(),
+                        request.endAt(),
+                        isPrivateFilter,
+                        pageable
+                )
+                : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
+                        request.keyword(),
+                        request.distance(),
+                        request.startAt(),
+                        request.endAt(),
+                        isPrivateFilter,
+                        pageable
+                );
+
+        // 챌린지 ID 추출
+        List<Long> challengeIds = result.stream()
+                .map(arr -> ((Challenge) arr[0]).getChallengeId())
+                .toList();
+
+        // 사용자 참가 여부 조회
+        Set<Long> joinedIds = Set.copyOf(participationRepository.findJoinedChallengeIds(challengeIds, memberId));
+
+        // DTO 변환
+        Page<ChallengeListItemResponse> items = result.map(arr ->
+                ChallengeListItemResponse.from(
+                        (Challenge) arr[0],
+                        ((Long) arr[1]).intValue(),
+                        joinedIds.contains(((Challenge) arr[0]).getChallengeId())
+                )
+        );
+
+        return ChallengeListResponse.from(items);
     }
 
     private void validateTimeOverlap(Long memberId, LocalDateTime startAt, LocalDateTime endAt) {

@@ -1,4 +1,4 @@
-package com.runnity.challenge.dto;
+package com.runnity.challenge.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.runnity.challenge.domain.Challenge;
