@@ -21,6 +21,7 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
         JOIN cp.challenge c
         WHERE cp.member.memberId = :memberId
             AND cp.isDeleted = false
+            AND c.isDeleted = false
             AND cp.status IN :statuses
             AND c.startAt < :endAt
             AND c.endAt > :startAt
@@ -35,11 +36,13 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
      * 사용자가 참가한 챌린지 ID 목록 조회
      */
     @Query("""
-        SELECT cp.challenge.challengeId
+        SELECT c.challengeId
         FROM ChallengeParticipation cp
-        WHERE cp.challenge.challengeId IN :challengeIds
+        JOIN cp.challenge c
+        WHERE c.challengeId IN :challengeIds
         AND cp.member.memberId = :memberId
         AND cp.isDeleted = false
+        AND c.isDeleted = false
         AND cp.status NOT IN ('QUIT', 'KICKED', 'LEFT')
     """)
     List<Long> findJoinedChallengeIds(
