@@ -43,7 +43,7 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
         AND cp.member.memberId = :memberId
         AND cp.isDeleted = false
         AND c.isDeleted = false
-        AND cp.status NOT IN ('QUIT', 'KICKED', 'LEFT')
+        AND cp.status != 'LEFT'
     """)
     List<Long> findJoinedChallengeIds(
             @Param("challengeIds") List<Long> challengeIds,

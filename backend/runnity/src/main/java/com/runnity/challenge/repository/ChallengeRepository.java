@@ -22,7 +22,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         LEFT JOIN ChallengeParticipation cp 
             ON cp.challenge.challengeId = c.challengeId
             AND cp.isDeleted = false
-            AND cp.status NOT IN ('QUIT', 'KICKED', 'LEFT')
+            AND cp.status != 'LEFT'
         WHERE c.isDeleted = false
         AND (:keyword IS NULL OR c.title LIKE %:keyword%)
         AND (:distance IS NULL OR c.distance = :distance)
