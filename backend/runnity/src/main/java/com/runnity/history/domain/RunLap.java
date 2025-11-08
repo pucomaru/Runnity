@@ -3,6 +3,7 @@ package com.runnity.history.domain;
 import com.runnity.global.domain.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -35,4 +36,21 @@ public class RunLap extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "run_record_id", nullable = false, foreignKey = @ForeignKey(name = "fk_run_lap_run_record"))
     private RunRecord runRecord;
+
+    @Builder
+    public RunLap(
+            RunRecord runRecord,
+            Integer sequence,
+            Float distance,
+            Integer durationSec,
+            Integer pace,
+            Integer bpm
+    ) {
+        this.runRecord = runRecord;
+        this.sequence = sequence;
+        this.distance = distance;
+        this.durationSec = durationSec;
+        this.pace = pace;
+        this.bpm = bpm;
+    }
 }

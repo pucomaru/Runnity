@@ -2,10 +2,12 @@ package com.runnity.history.controller;
 
 import com.runnity.global.response.ApiResponse;
 import com.runnity.global.status.SuccessStatus;
+import com.runnity.history.dto.request.RunRecordCreateRequest;
 import com.runnity.history.dto.response.MyChallengesResponse;
 import com.runnity.history.dto.response.RunRecordDetailResponse;
 import com.runnity.history.dto.response.RunRecordMonthlyResponse;
 import com.runnity.history.service.HistoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,5 +51,15 @@ public class HistoryController {
                 service.getRunRecordsByMonth(memberId, year, month);
 
         return ApiResponse.success(SuccessStatus.OK, response);
+    }
+
+    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
+    @PostMapping("/runs")
+    public ResponseEntity<ApiResponse<Void>> createRunRecord(
+            @Valid @RequestBody RunRecordCreateRequest request
+    ) {
+        long memberId = 1L;
+        service.createRunRecord(memberId, request);
+        return ApiResponse.success(SuccessStatus.OK);
     }
 }
