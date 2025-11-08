@@ -18,8 +18,7 @@ import com.runnity.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,30 +66,26 @@ public class ChallengeService {
         );
     }
 
-    public ChallengeListResponse getChallenges(ChallengeListRequest request, Long memberId) {
-        // 정렬 기준
-        Sort sort = request.sort() == ChallengeSortType.POPULAR
-                ? Sort.by(Sort.Direction.DESC, "participantCount", "c.createdAt")
-                : Sort.by(Sort.Direction.DESC, "c.createdAt");
-
-        PageRequest pageRequest = PageRequest.of(request.page(), request.size(), sort);
-
-        // 필터 조건
+    public ChallengeListResponse getChallenges(ChallengeListRequest request, Pageable pageable, Long memberId) {
         Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
 
-        // 챌린지 + 참가자 수 조회
-        Page<Object[]> result = challengeRepository.findChallengesWithParticipantCount(
-                request.keyword(),
-                request.distance(),
-                request.startAt(),
-                request.endAt(),
-                isPrivateFilter,
-                pageRequest
-        );
-
-        if (result.isEmpty()) {
-            return ChallengeListResponse.empty(pageRequest);
-        }
+        Page<Object[]> result = request.sort() == ChallengeSortType.POPULAR
+                ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
+                        request.keyword(),
+                        request.distance(),
+                        request.startAt(),
+                        request.endAt(),
+                        isPrivateFilter,
+                        pageable
+                )
+                : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
+                        request.keyword(),
+                        request.distance(),
+                        request.startAt(),
+                        request.endAt(),
+                        isPrivateFilter,
+                        pageable
+                );
 
         // 챌린지 ID 추출
         List<Long> challengeIds = result.stream()

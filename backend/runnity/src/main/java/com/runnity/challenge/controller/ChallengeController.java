@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -57,10 +59,11 @@ public class ChallengeController {
             @ApiResponse(responseCode = "500", description = "서버 오류")
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeListResponse>> getChallenges(
-            @ModelAttribute ChallengeListRequest request
+            @ModelAttribute ChallengeListRequest request,
+            @PageableDefault(size = 10, page = 0) Pageable pageable
     ) {
         Long memberId = getCurrentUserId();
-        ChallengeListResponse response = challengeService.getChallenges(request, memberId);
+        ChallengeListResponse response = challengeService.getChallenges(request, pageable, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.OK,
                 response

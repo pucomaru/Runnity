@@ -28,19 +28,11 @@ public record ChallengeListRequest(
         ChallengeVisibility visibility,
 
         @Schema(description = "정렬 기준 (POPULAR: 인기순, LATEST: 최신순)", implementation = ChallengeSortType.class, defaultValue = "LATEST")
-        ChallengeSortType sort,
-
-        @Schema(description = "페이지 번호 (0부터 시작)", example = "0", defaultValue = "0")
-        Integer page,
-
-        @Schema(description = "페이지 크기", example = "10", defaultValue = "10")
-        Integer size
+        ChallengeSortType sort
 ) {
 
     public ChallengeListRequest {
         visibility = Objects.requireNonNullElse(visibility, ChallengeVisibility.PUBLIC);
         sort = Objects.requireNonNullElse(sort, ChallengeSortType.LATEST);
-        page = (page == null || page < 0) ? 0 : page;
-        size = (size == null || size <= 0) ? 10 : size;
     }
 }

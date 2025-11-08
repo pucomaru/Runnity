@@ -3,7 +3,7 @@ package com.runnity.challenge.response;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Collections;
 import java.util.List;
@@ -29,8 +29,6 @@ public record ChallengeListResponse(
 ) {
 
     public static ChallengeListResponse from(Page<ChallengeListItemResponse> page) {
-        if (page == null) return empty(PageRequest.of(0, 10));
-
         return ChallengeListResponse.builder()
                 .content(Collections.unmodifiableList(page.getContent()))
                 .totalElements(page.getTotalElements())
@@ -40,13 +38,13 @@ public record ChallengeListResponse(
                 .build();
     }
 
-    public static ChallengeListResponse empty(PageRequest pageRequest) {
+    public static ChallengeListResponse empty(Pageable pageable) {
         return ChallengeListResponse.builder()
                 .content(Collections.emptyList())
                 .totalElements(0L)
                 .totalPages(0)
-                .page(pageRequest.getPageNumber())
-                .size(pageRequest.getPageSize())
+                .page(pageable.getPageNumber())
+                .size(pageable.getPageSize())
                 .build();
     }
 }
