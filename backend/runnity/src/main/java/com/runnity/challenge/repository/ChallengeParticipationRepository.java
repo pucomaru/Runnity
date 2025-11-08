@@ -7,17 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 public interface ChallengeParticipationRepository extends JpaRepository<ChallengeParticipation, Long> {
 
     /**
      * 특정 회원이 특정 시간대에 특정 상태의 챌린지에 참가 중인지 확인
-     * @param memberId 회원 ID
-     * @param startAt 챌린지 시작 시간
-     * @param endAt 챌린지 종료 시간
-     * @param statuses 참여 상태 집합
-     * @return 시간 중복되는 참가 내역이 있으면 true
      */
     @Query("""
         SELECT COUNT(cp) > 0
@@ -34,4 +30,20 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("statuses") Set<ParticipationStatus> statuses);
+
+    /**
+     * 사용자가 참가한 챌린지 ID 목록 조회
+     */
+    @Query("""
+        SELECT cp.challenge.challengeId
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId IN :challengeIds
+        AND cp.member.memberId = :memberId
+        AND cp.isDeleted = false
+        AND cp.status NOT IN ('QUIT', 'KICKED', 'LEFT')
+    """)
+    List<Long> findJoinedChallengeIds(
+            @Param("challengeIds") List<Long> challengeIds,
+            @Param("memberId") Long memberId
+    );
 }

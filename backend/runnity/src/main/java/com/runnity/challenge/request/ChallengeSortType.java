@@ -1,17 +1,17 @@
-package com.runnity.challenge.domain;
+package com.runnity.challenge.request;
 
 import java.util.Arrays;
 import java.util.Optional;
 
-public enum ChallengePhase {
+public enum ChallengeSortType {
 
-    RECRUITING("RECRUITING", "모집 중"),
-    ALL("ALL", "전체");
+    POPULAR("POPULAR", "인기순 (참가자 수 기준)"),
+    LATEST("LATEST", "최신순 (생성일 기준)");
 
     private final String code;
     private final String label;
 
-    ChallengePhase(String code, String label) {
+    ChallengeSortType(String code, String label) {
         this.code = code;
         this.label = label;
     }
@@ -24,9 +24,9 @@ public enum ChallengePhase {
         return label;
     }
 
-    public static Optional<ChallengePhase> fromCode(String code) {
+    public static Optional<ChallengeSortType> fromCode(String code) {
         return Arrays.stream(values())
-                .filter(phase -> phase.code.equalsIgnoreCase(code))
+                .filter(type -> type.code.equalsIgnoreCase(code))
                 .findFirst();
     }
 

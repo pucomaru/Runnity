@@ -30,7 +30,7 @@ public record ChallengeCreateRequest(
         LocalDateTime startAt,
 
         @NotNull(message = "거리는 필수입니다")
-        @Schema(description = "거리 (ENUM 값: ONE, TWO, FIVE, HALF 등)", example = "FIVE")
+        @Schema(description = "거리 (ENUM 값: ONE, TWO, FIVE, HALF 등)", implementation = ChallengeDistance.class, example = "FIVE")
         ChallengeDistance distance,
 
         @NotNull(message = "비밀방 여부는 필수입니다")
@@ -46,12 +46,14 @@ public record ChallengeCreateRequest(
 ) {
 
     @AssertTrue(message = "시작일시는 현재 시점으로부터 1주일 이내여야 합니다")
+    @Schema(hidden = true)
     public boolean isStartWithinAWeek() {
         LocalDateTime now = LocalDateTime.now();
         return !startAt.isAfter(now.plusWeeks(1));
     }
 
     @AssertTrue(message = "비밀방일 경우 비밀번호를 입력해야 합니다")
+    @Schema(hidden = true)
     public boolean isPasswordValidForPrivateChallenge() {
         if (isPrivate) {
             return password != null && !password.isBlank();

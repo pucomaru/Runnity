@@ -3,6 +3,8 @@ package com.runnity.challenge.service;
 import com.runnity.challenge.domain.*;
 import com.runnity.challenge.request.ChallengeCreateRequest;
 import com.runnity.challenge.request.ChallengeListRequest;
+import com.runnity.challenge.request.ChallengeSortType;
+import com.runnity.challenge.request.ChallengeVisibility;
 import com.runnity.challenge.response.ChallengeListItemResponse;
 import com.runnity.challenge.response.ChallengeListResponse;
 import com.runnity.challenge.response.ChallengeParticipantResponse;
@@ -17,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,7 +77,6 @@ public class ChallengeService {
 
         // 필터 조건
         Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
-        ChallengeStatus statusFilter = request.phase() == ChallengePhase.RECRUITING ? ChallengeStatus.RECRUITING : null;
 
         // 챌린지 + 참가자 수 조회
         Page<Object[]> result = challengeRepository.findChallengesWithParticipantCount(
@@ -85,7 +85,6 @@ public class ChallengeService {
                 request.startAt(),
                 request.endAt(),
                 isPrivateFilter,
-                statusFilter,
                 pageRequest
         );
 
