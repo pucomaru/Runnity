@@ -45,6 +45,14 @@ public record ChallengeCreateRequest(
         Boolean isBroadcast
 ) {
 
+    @AssertTrue(message = "시작일시는 현재 시점으로부터 최소 10분 후여야 합니다")
+    @Schema(hidden = true)
+    public boolean isStartAtAtLeastTenMinutesLater() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime minStartAt = now.plusMinutes(10);
+        return !startAt.isBefore(minStartAt);
+    }
+
     @AssertTrue(message = "시작일시는 현재 시점으로부터 1주일 이내여야 합니다")
     @Schema(hidden = true)
     public boolean isStartWithinAWeek() {
