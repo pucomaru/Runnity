@@ -31,7 +31,11 @@ public enum ErrorStatus implements BaseErrorStatus {
     USER_CREATE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 500, "사용자 생성에 실패했습니다."),
 
     // challenge
-    CHALLENGE_TIME_OVERLAP(HttpStatus.BAD_REQUEST, 400, "같은 시간대에 이미 참여 중인 챌린지가 있습니다.");
+    CHALLENGE_TIME_OVERLAP(HttpStatus.BAD_REQUEST, 400, "같은 시간대에 이미 참여 중인 챌린지가 있습니다."),
+
+    //history
+    RUN_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 운동 기록입니다."),
+    RUN_RECORD_FORBIDDEN(HttpStatus.FORBIDDEN, 403, "본인의 운동 기록만 조회할 수 있습니다.");
 
     private final HttpStatus httpStatus;
     private final Integer code;

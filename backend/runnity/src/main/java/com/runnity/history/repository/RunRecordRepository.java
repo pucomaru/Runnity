@@ -27,7 +27,6 @@ public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
     List<RunRecord> findTop5ByMember_MemberIdAndRunTypeAndIsDeletedFalseOrderByStartAtDesc(Long memberId, RunRecordType runType);
 
     @Query("SELECT r FROM RunRecord r " +
-            "JOIN FETCH r.member " +
             "WHERE r.runRecordId = :runRecordId " +
             "AND r.isDeleted = false")
     Optional<RunRecord> findDetailById(@Param("runRecordId") Long runRecordId);
