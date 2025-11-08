@@ -5,10 +5,8 @@ import com.runnity.challenge.domain.ParticipationStatus;
 import com.runnity.global.exception.GlobalException;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.history.domain.RunRecord;
-import com.runnity.history.dto.response.ChallengeResponse;
-import com.runnity.history.dto.response.MyChallengesResponse;
-import com.runnity.history.dto.response.RunLapResponse;
-import com.runnity.history.dto.response.RunRecordDetailResponse;
+import com.runnity.history.domain.RunRecordType;
+import com.runnity.history.dto.response.*;
 import com.runnity.history.repository.HistoryChallengeParticipationRepository;
 import com.runnity.history.repository.RunLapRepository;
 import com.runnity.history.repository.RunRecordRepository;
@@ -17,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -65,19 +64,16 @@ public class HistoryService {
                         arr -> ((Long) arr[1]).intValue() // count
                 ));
 
-        // 3. 입장 가능한 챌린지 찾기
         Challenge first = waitingChallenges.get(0);
         ChallengeResponse enterableChallenge = null;
         List<ChallengeResponse> joinedChallenges;
 
         if (isEnterable(first)) {
-            // 첫 번째가 입장 가능
             enterableChallenge = ChallengeResponse.from(
                     first,
                     participantCountMap.getOrDefault(first.getChallengeId(), 0)
             );
 
-            // 나머지 챌린지들
             joinedChallenges = waitingChallenges.stream()
                     .skip(1)
                     .map(c -> ChallengeResponse.from(
@@ -86,7 +82,6 @@ public class HistoryService {
                     ))
                     .toList();
         } else {
-            // 입장 가능한 챌린지 없음
             joinedChallenges = waitingChallenges.stream()
                     .map(c -> ChallengeResponse.from(
                             c,
@@ -120,5 +115,25 @@ public class HistoryService {
                 .toList();
 
         return RunRecordDetailResponse.from(record, laps);
+    }
+
+    public RunRecordMonthlyResponse getRunRecordsByMonth(Long memberId, int year, int month) {
+
+        LocalDateTime startDate = LocalDate.of(year, month, 1).atStartOfDay();
+        LocalDateTime endDate = startDate.plusMonths(1);
+
+        List<RunRecord> records = runRecordRepository.findByMemberIdAndPeriod(memberId, startDate, endDate);
+
+        List<RunRecordResponse> personals = records.stream()
+                .filter(r -> r.getRunType() == RunRecordType.PERSONAL)
+                .map(RunRecordResponse::from)
+                .toList();
+
+        List<RunRecordResponse> challenges = records.stream()
+                .filter(r -> r.getRunType() == RunRecordType.CHALLENGE)
+                .map(RunRecordResponse::from)
+                .toList();
+
+        return RunRecordMonthlyResponse.of(personals, challenges);
     }
 }
