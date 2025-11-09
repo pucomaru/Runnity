@@ -10,10 +10,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.runnity.global.service.TokenBlacklistService;
 import com.runnity.global.storage.FileStorage;
 import com.runnity.member.domain.Member;
-import com.runnity.member.dto.AddInfoRequestDto;
-import com.runnity.member.dto.AddInfoResponseDto;
-import com.runnity.member.dto.LoginResponseDto;
-import com.runnity.member.dto.TokenResponseDto;
+import com.runnity.member.dto.*;
 import com.runnity.member.repository.MemberRepository;
 import com.runnity.member.util.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
@@ -217,6 +214,13 @@ public class AuthService {
             log.error("추가 정보 입력 실패 (서버 에러): {}", e.getMessage(), e);
             throw new RuntimeException("추가 정보 입력 중 오류가 발생했습니다", e);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileResponseDto getProfile(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+        return ProfileResponseDto.from(member);
     }
 
     public TokenResponseDto refreshAccessToken(String refreshToken) {
