@@ -33,6 +33,7 @@ import com.example.runnity.ui.screens.mypage.MyPageScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
+import com.example.runnity.ui.screens.workout.CountdownScreen
 
 /**
  * 메인 탭 화면
@@ -169,6 +170,25 @@ fun MainTabScreen(
                     StartRunScreen(
                         navController = navController,
                         parentNavController = parentNavController
+                    )
+                }
+                // 카운트다운 화면 (개인)
+                composable(
+                    route = "countdown/personal?type={type}&km={km}&min={min}",
+                    arguments = listOf(
+                        navArgument("type") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("km") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("min") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    )
+                ) { backStackEntry ->
+                    val type = backStackEntry.arguments?.getString("type")
+                    val km = backStackEntry.arguments?.getString("km")
+                    val min = backStackEntry.arguments?.getString("min")
+                    CountdownScreen(
+                        navController = navController,
+                        type = type,
+                        km = km,
+                        min = min
                     )
                 }
                 // 운동 화면 (개인)
