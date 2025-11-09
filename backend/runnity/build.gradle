@@ -56,6 +56,9 @@ dependencies {
 
     // JSON 파싱 (org.json.JSONObject, JSONArray 사용)
     implementation 'org.json:json:20231013'
+
+    //aws
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.678'
 }
 
 tasks.named('test') {

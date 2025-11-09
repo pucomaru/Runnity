@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -70,7 +69,7 @@ public class AuthController {
     }
 
     @PostMapping(
-            value = "/auth/addInfo",
+            value = "/addInfo",
             consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
     )
     @Operation(
@@ -115,11 +114,11 @@ public class AuthController {
 
     @PostMapping("/token")
     @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
-    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponse>> refreshToken(
-            @RequestBody TokenRequest request
+    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponseDto>> refreshToken(
+            @RequestBody TokenRequestDto request
     ) {
         try {
-            TokenResponse resp = authService.refreshAccessToken(request.getRefreshToken());
+            TokenResponseDto resp = authService.refreshAccessToken(request.getRefreshToken());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, resp);
         } catch (IllegalArgumentException e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);

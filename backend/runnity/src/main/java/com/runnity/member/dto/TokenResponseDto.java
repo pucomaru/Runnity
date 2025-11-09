@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TokenResponse {
+public class TokenResponseDto {
 
     @Schema(description = "새로 발급된 Access Token", example = "eyJhbGciOiJIUzUxMiJ9...")
     private String accessToken;

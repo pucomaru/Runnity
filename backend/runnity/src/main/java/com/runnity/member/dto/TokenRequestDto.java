@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TokenRequest {
+public class TokenRequestDto {
 
     @Schema(description = "Refresh Token", example = "eyJhbGciOiJIUzUxMiJ9...")
     private String refreshToken;
