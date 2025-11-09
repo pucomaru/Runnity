@@ -19,14 +19,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/v1")
 @Tag(name = "Auth", description = "소셜 로그인, 토큰 재발급 API")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/login/google")
+    @PostMapping("/auth/login/google")
     @Operation(summary = "구글 로그인", description = "구글 ID 토큰으로 로그인합니다")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
@@ -47,7 +47,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/login/kakao")
+    @PostMapping("/auth/login/kakao")
     @Operation(summary = "카카오 로그인", description = "카카오 ID 토큰으로 로그인합니다")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
@@ -69,7 +69,7 @@ public class AuthController {
     }
 
     @PostMapping(
-            value = "/addInfo",
+            value = "/auth/addInfo",
             consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
     )
     @Operation(
@@ -112,7 +112,35 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/token")
+    @Operation(
+            summary = "내 프로필 조회",
+            description = "로그인한 사용자의 프로필 정보를 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "프로필 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "404", description = "회원 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PostMapping("/me/profile")
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ProfileResponseDto>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            ProfileResponseDto profile = authService.getProfile(userPrincipal.getMemberId());
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, profile);
+
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/auth/token")
     @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
     public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponseDto>> refreshToken(
             @RequestBody TokenRequestDto request
@@ -127,7 +155,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/logout")
+    @PostMapping("/auth/logout")
     @Operation(
             summary = "로그아웃",
             description = "현재 Access Token을 블랙리스트에 등록하여 로그아웃합니다. " +
