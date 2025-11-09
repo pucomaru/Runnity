@@ -120,6 +120,29 @@ public class ChallengeController {
         );
     }
 
+    @DeleteMapping("/{challengeId}/join")
+    @Operation(
+            summary = "챌린지 참가 취소",
+            description = "챌린지 참가를 취소합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "참가 취소가 정상적으로 완료된 경우"),
+            @ApiResponse(responseCode = "400", description = "이미 참가 취소했거나, 참가하지 않은 챌린지인 경우"),
+            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자가 요청한 경우"),
+            @ApiResponse(responseCode = "404", description = "해당 챌린지가 존재하지 않는 경우"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeJoinResponse>> cancelChallenge(
+            @PathVariable Long challengeId
+    ) {
+        Long memberId = getCurrentUserId();
+        ChallengeJoinResponse response = challengeService.cancelParticipation(challengeId, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.CHALLENGE_LEFT,
+                response
+        );
+    }
+
     private Long getCurrentUserId() {
         // TODO: 추후 인증 로직이 추가되면 수정 필요
         return 2L;

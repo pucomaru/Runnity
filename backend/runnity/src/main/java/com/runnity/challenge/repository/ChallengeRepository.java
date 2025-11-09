@@ -2,9 +2,11 @@ package com.runnity.challenge.repository;
 
 import com.runnity.challenge.domain.Challenge;
 import com.runnity.challenge.domain.ChallengeDistance;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -69,4 +71,13 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             @Param("isPrivate") Boolean isPrivate,
             Pageable pageable
     );
+
+    /**
+     * 챌린지 조회 (비관적 락 적용 - SELECT FOR UPDATE)
+     * 동시성 제어를 위해 사용
+     * 참가 신청 시 최대 인원 체크와 저장을 원자적으로 처리
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Challenge c WHERE c.challengeId = :challengeId AND c.isDeleted = false")
+    java.util.Optional<Challenge> findByIdWithLock(@Param("challengeId") Long challengeId);
 }
