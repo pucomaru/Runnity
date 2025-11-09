@@ -51,8 +51,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-
-
+import com.kakao.vectormap.label.Label
+import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelStyle
+import com.kakao.vectormap.label.LabelStyles
 
 /**
  * 개인 러닝 시작 화면
@@ -69,18 +71,21 @@ fun StartRunScreen(
     val activity = context as Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 권한/다이얼로그/지도 참조/현재 위치 상태 보관
+    // 권한 다이얼로그
     var showLocationRationale by remember { mutableStateOf(false) }
     var showLocationSettings by remember { mutableStateOf(false) }
     var showNotificationDialog by remember { mutableStateOf(false) }
+    // 카카오 맵 실제 객체
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
+    // 내 현재 좌표
     var myLatLng by remember { mutableStateOf<LatLng?>(null) }
+    // 카카오 맵 ui
     var mapView by remember { mutableStateOf<MapView?>(null) }
+    // 내 위치 표시
+    var myLocationLabel by remember { mutableStateOf<Label?>(null) }
 
-    
-    // 현재 위치 1회 획득(GMS) 후 지도 카메라 이동
-    // - HIGH_ACCURACY로 정확도 우선 테스트
-    // - 성공 시 myLatLng 업데이트 및 카메라 이동(줌 16)
+    // 현재 위치 1회 획득후 카카오 지도 카메라 이동
+    // 성공 시 내 위치 업데이트 및 카메라 이동(줌 16)
     @SuppressLint("MissingPermission")
     fun moveCameraToCurrentLocation() {
         if (!PermissionUtils.hasLocationPermission(context)) return
@@ -96,6 +101,23 @@ fun StartRunScreen(
                     kakaoMap?.let { mapRef ->
                         mapRef.moveCamera(CameraUpdateFactory.newCenterPosition(target))
                         mapRef.moveCamera(CameraUpdateFactory.zoomTo(16))
+                    }
+
+                    // 내 위치 라벨 생성/업데이트
+                    val ll = kakaoMap?.getLabelManager()?.getLayer()
+                    if (ll != null) {
+                        if (myLocationLabel == null) {
+                            val styles = kakaoMap?.getLabelManager()
+                                ?.addLabelStyles(LabelStyles.from(LabelStyle.from(com.example.runnity.R.drawable.ic_my_location_dot)))
+                            if (styles != null) {
+                                val opts = LabelOptions.from(target).setStyles(styles)
+                                myLocationLabel = ll.addLabel(opts)
+                                myLocationLabel?.scaleTo(0.15f, 0.15f)
+                            }
+                        } else {
+                            myLocationLabel?.moveTo(target)
+                            myLocationLabel?.scaleTo(0.15f, 0.15f)
+                        }
                     }
                 } else {
                     Log.d("Location", "result is NULL")
@@ -165,6 +187,7 @@ fun StartRunScreen(
                             object : KakaoMapReadyCallback() {
                                 override fun onMapReady(map: KakaoMap) {
                                     kakaoMap = map
+                                    // label은 생성 시점에 레이어를 지역에서 확보하여 사용
                                     // 권한 허용 시 현재 위치 요청 → 성공하면 카메라 이동
                                     if (PermissionUtils.hasLocationPermission(context)) {
                                         moveCameraToCurrentLocation()
