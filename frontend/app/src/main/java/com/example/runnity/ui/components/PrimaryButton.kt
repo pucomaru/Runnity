@@ -1,8 +1,11 @@
 package com.example.runnity.ui.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonColors
@@ -27,11 +30,13 @@ fun PrimaryButton(
         contentColor = Color.White,
         disabledContainerColor = ColorPalette.Common.accent.copy(alpha = 0.4f),
         disabledContentColor = Color.White.copy(alpha = 0.6f)
-    )
+    ),
+    border: BorderStroke? = null
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .height(74.dp)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Button(
@@ -39,7 +44,8 @@ fun PrimaryButton(
             enabled = enabled,
             colors = colors,
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            border = border,
+            modifier = Modifier.fillMaxSize()
         ) {
             Text(text = text, style = Typography.Subtitle)
         }

@@ -114,6 +114,8 @@ dependencies {
 
     // 카카오 지도 API
     implementation("com.kakao.maps.open:android:2.12.18")
+    // Splash Screen API (Android 12+)
+    implementation("androidx.core:core-splashscreen:1.0.1")
 
     //  테스트 라이브러리
     testImplementation(libs.junit)

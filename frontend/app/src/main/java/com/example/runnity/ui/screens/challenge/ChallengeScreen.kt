@@ -4,12 +4,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -84,78 +87,106 @@ fun ChallengeScreen(
         )
     )
 
-    // 전체 레이아웃
-    Column(
+    // 전체 레이아웃 (Box로 FAB 배치)
+    Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // 1. 상단 헤더 (챌린지 타이틀)
-        PageHeader(
-            title = "챌린지",
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-        )
-
-        // 2. 검색바 + 필터 버튼
-        SearchBarWithFilter(
-            searchQuery = searchQuery,
-            onSearchChange = { searchQuery = it },
-            onFilterClick = {
-                // TODO: 필터 페이지로 이동
-            },
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-
-        // 3. 새로고침 + 정렬 드롭다운
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // 새로고침 버튼
-            IconButton(
-                onClick = {
-                    // TODO: 챌린지 목록 새로고침
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 1. 상단 헤더 (챌린지 타이틀)
+            PageHeader(title = "챌린지")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. 검색바 + 필터 버튼
+            SearchBarWithFilter(
+                searchQuery = searchQuery,
+                onSearchChange = { searchQuery = it },
+                onFilterClick = {
+                    // 필터 페이지로 이동
+                    navController?.navigate("challenge_filter")
                 }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3. 새로고침 + 정렬 드롭다운
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Refresh,
-                    contentDescription = "새로고침",
-                    tint = ColorPalette.Light.component
+                // 새로고침 버튼
+                IconButton(
+                    onClick = {
+                        // TODO: 챌린지 목록 새로고침
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "새로고침",
+                        tint = ColorPalette.Light.component
+                    )
+                }
+
+                // 정렬 드롭다운 (오른쪽 정렬)
+                SortDropdown(
+                    selectedSort = selectedSort,
+                    onSortSelected = { selectedSort = it }
                 )
             }
 
-            // 정렬 드롭다운 (오른쪽 정렬)
-            SortDropdown(
-                selectedSort = selectedSort,
-                onSortSelected = { selectedSort = it }
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4. 챌린지 리스트 (LazyColumn)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)  // FAB 공간 확보
+            ) {
+                items(challenges.size) { index ->
+                    ChallengeCard(
+                        distance = challenges[index].distance,
+                        title = challenges[index].title,
+                        startDateTime = challenges[index].startDateTime,
+                        participants = challenges[index].participants,
+                        buttonState = challenges[index].buttonState,
+                        onCardClick = {
+                            // 세부 화면으로 이동
+                            navController?.navigate("challenge_detail/${challenges[index].id}")
+                        },
+                        onButtonClick = {
+                            // TODO: 예약하기/참가하기 버튼 클릭 처리
+                        }
+                    )
+                }
+            }
         }
 
-        // 4. 챌린지 리스트 (LazyColumn)
-        LazyColumn(
+        // 5. FloatingActionButton (챌린지 생성)
+        FloatingActionButton(
+            onClick = {
+                // 챌린지 생성 페이지로 이동
+                navController?.navigate("challenge_create")
+            },
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = ColorPalette.Common.accent,
+            contentColor = Color.White
         ) {
-            items(challenges.size) { index ->
-                ChallengeCard(
-                    distance = challenges[index].distance,
-                    title = challenges[index].title,
-                    startDateTime = challenges[index].startDateTime,
-                    participants = challenges[index].participants,
-                    buttonState = challenges[index].buttonState,
-                    onCardClick = {
-                        // 세부 화면으로 이동
-                        navController?.navigate("challenge_detail/${challenges[index].id}")
-                    },
-                    onButtonClick = {
-                        // TODO: 예약하기/참가하기 버튼 클릭 처리
-                    }
-                )
-            }
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "챌린지 생성",
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
