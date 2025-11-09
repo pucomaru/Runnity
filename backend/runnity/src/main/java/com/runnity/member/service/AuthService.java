@@ -33,9 +33,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
-import java.util.Base64;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -154,11 +152,14 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.createRefreshToken(
                 (email == null || email.isBlank()) ? (socialUid + "@kakao.local") : email
         );
-        return new LoginResponseDto(accessToken, refreshToken, isNew);
+
+        boolean needAdditionalInfo = member.getNickname() == null || member.getNickname().isBlank();
+
+        return new LoginResponseDto(accessToken, refreshToken, isNew, needAdditionalInfo);
     }
 
     @Transactional
-    public AddInfoResponseDto addAdditionalInfo(
+    public void addAdditionalInfo(
             Long memberId,
             AddInfoRequestDto request,
             MultipartFile profileImage
@@ -166,19 +167,24 @@ public class AuthService {
         try {
             // 회원 조회
             Member member = memberRepository.findById(memberId)
-                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
-
-            log.info("회원 조회 완료: memberId={}", memberId);
+                    .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
 
             if (request == null || request.getNickname() == null || request.getNickname().isBlank()) {
-                throw new IllegalArgumentException("닉네임은 필수 입력입니다.");
+                throw new IllegalArgumentException("NICKNAME_REQUIRED");
+            }
+
+            String nick = normalize(request.getNickname());
+            validateFormat(nick);
+
+            // 닉네임 중복 검사
+            if (memberRepository.nicknameCheckWithMemberId(nick, null)) {
+                throw new IllegalArgumentException("NICKNAME_CONFLICT");
             }
 
             String prefix = "profile-photos/" + memberId;
 
             // 프로필 사진 저장 (있을 경우)
             if (profileImage != null && !profileImage.isEmpty()) {
-                log.info("프로필 사진 저장 시작");
 
                 // 이전 파일 삭제(있는 경우)
                 if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
@@ -194,7 +200,6 @@ public class AuthService {
                         request.getGender(),
                         request.getBirth()
                 );
-                log.info("정보: {}, 프로필 사진 저장: {}", member, profileImagePath);
             } else {
                 member.updateProfile(
                         request.getNickname(),
@@ -203,11 +208,9 @@ public class AuthService {
                         request.getGender(),
                         request.getBirth()
                 );
-                log.info("회원 정보 저장(이미지 없음)");
             }
 
-            log.info("회원 정보 업데이트 완료: memberId={}", memberId);
-            return new AddInfoResponseDto("신규 회원 정보가 저장되었습니다.");
+            new AddInfoResponseDto("신규 회원 정보가 저장되었습니다.");
         } catch (IllegalArgumentException e) {
             log.error("추가 정보 입력 실패 (잘못된 요청): {}", e.getMessage());
             throw e;
@@ -218,9 +221,52 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
+    public NicknameCheckResponseDto checkNicknameAvailability(String rawNickname, Long selfMemberId) {
+        String normalized = normalize(rawNickname);
+
+        // 포맷 검증(길이/허용 문자)
+        validateFormat(normalized);
+
+        // 자기 자신 닉네임 허용
+        Optional<Member> owner = memberRepository.findById(selfMemberId == null ? -1L : selfMemberId);
+        if (owner.isPresent() && equalsNormalized(owner.get().getNickname(), normalized)) {
+            return NicknameCheckResponseDto.builder()
+                    .available(true)
+                    .build();
+        }
+
+        boolean exists = memberRepository.nicknameCheckWithMemberId(normalized, selfMemberId);
+        if (!exists) {
+            return NicknameCheckResponseDto.builder()
+                    .available(true)
+                    .build();
+        }
+
+        return NicknameCheckResponseDto.builder()
+                .available(false)
+                .build();
+    }
+
+    private String normalize(String s) {
+        if (s == null) throw new IllegalArgumentException("NICKNAME_REQUIRED");
+        return s.trim();
+    }
+
+    private boolean equalsNormalized(String a, String b) {
+        if (a == null) return false;
+        return a.trim().equalsIgnoreCase(b);
+    }
+
+    private void validateFormat(String nick) {
+        if (nick.length() < 2 || nick.length() > 50) {
+            throw new IllegalArgumentException("NICKNAME_FORMAT_INVALID");
+        }
+    }
+
+    @Transactional(readOnly = true)
     public ProfileResponseDto getProfile(Long memberId) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
         return ProfileResponseDto.from(member);
     }
 
@@ -228,12 +274,17 @@ public class AuthService {
     public void updateProfile(Long memberId, ProfileUpdateRequestDto request, MultipartFile profileImage) {
         // 회원 조회
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
+                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
 
-        log.info("회원 조회 완료: memberId={}", memberId);
-
-        if (request == null || request.getNickname() == null || request.getNickname().isBlank()) {
-            throw new IllegalArgumentException("닉네임은 필수 입력입니다.");
+        if (request != null && request.getNickname() != null) {
+            String nick = request.getNickname().trim();
+            if (!nick.isBlank()) {
+                validateFormat(nick);
+                if (memberRepository.nicknameCheckWithMemberId(nick, memberId)) {
+                    throw new IllegalArgumentException("NICKNAME_CONFLICT");
+                }
+                member.setNickname(nick);
+            }
         }
 
         // 이미지 교체 처리
@@ -248,25 +299,22 @@ public class AuthService {
         }
 
         // 부분 업데이트(전달된 필드만 변경)
-        if (request.getNickname() != null && !request.getNickname().isBlank()) {
-            member.setNickname(request.getNickname().trim());
-        }
-        if (request.getHeight() != null && request.getHeight() > 0) {
+        if (request != null && request.getHeight() != null && request.getHeight() > 0) {
             member.setHeight(request.getHeight());
         }
-        if (request.getWeight() != null && request.getWeight() > 0) {
+        if (request != null && request.getWeight() != null && request.getWeight() > 0) {
             member.setWeight(request.getWeight());
         }
     }
 
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new IllegalArgumentException("유효하지 않은 Refresh Token입니다.");
+            throw new IllegalArgumentException("INVALID_TOKEN");
         }
         Claims claims = jwtTokenProvider.parseClaims(refreshToken);
         String email = claims.getSubject();
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
         String newAccess = jwtTokenProvider.createAccessToken(member);
         String newRefresh = jwtTokenProvider.createRefreshToken(member.getEmail());
         return new TokenResponseDto(newAccess, newRefresh);

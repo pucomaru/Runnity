@@ -15,6 +15,11 @@ public enum SuccessStatus implements BaseSuccessStatus {
     // auth
     LOGIN_SUCCESS(HttpStatus.OK, 200, "로그인이 성공적으로 완료되었습니다."),
 
+    //member
+    PROFILE_FETCH_OK(HttpStatus.OK, 200, "프로필 조회 성공"),
+    PROFILE_UPDATE_OK(HttpStatus.OK, 200, "프로필 수정 성공"),
+    NICKNAME_CHECK_OK(HttpStatus.OK, 200, "닉네임 검사 성공"),
+
     // challenge
     CHALLENGE_CREATED(HttpStatus.CREATED, 201, "챌린지가 성공적으로 생성되었습니다."),
     CHALLENGE_JOINED(HttpStatus.CREATED, 201, "챌린지 참가 신청이 완료되었습니다.");

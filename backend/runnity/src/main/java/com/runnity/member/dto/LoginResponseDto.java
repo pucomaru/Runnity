@@ -19,4 +19,7 @@ public class LoginResponseDto {
 
     @Schema(description = "신규 가입 여부", example = "true")
     private boolean isNewUser;
+
+    @Schema(description = "추가 정보 입력 필요 여부", example = "true")
+    private boolean needAdditionalInfo;
 }
