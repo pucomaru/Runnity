@@ -4,36 +4,32 @@ pipeline {
   environment {
     DOCKERHUB_USERNAME = 'daum0604'
     IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-backend"
-    // GIT_COMMIT이 없을 때 대비해서 안전하게 태그 계산
-    TAG = ''
   }
 
   options { disableConcurrentBuilds(); timestamps() }
 
   stages {
-
     stage('Checkout') {
       steps {
         checkout scm
         script {
-          // 안전한 TAG 생성
-          def shortSha = sh(returnStdout: true, script: "git rev-parse --short=7 HEAD").trim()
-          env.TAG = shortSha ?: 'manual'
+          env.TAG = sh(returnStdout: true, script: "git rev-parse --short=7 HEAD").trim()
+          if (!env.TAG) { env.TAG = 'manual' }
           echo "Using TAG: ${env.TAG}"
         }
       }
     }
 
     stage('Docker Build & Push') {
-      when { branch 'backend' }   // ✅ backend 브랜치에서만
       steps {
-        dir('backend') {          // ✅ backend 폴더 안에서 실행
+        dir('backend') {
           sh "pwd && ls -al"
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
+              set -euxo pipefail
               echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-              docker build -t ${IMAGE}:${TAG} -t ${IMAGE}:latest -f Dockerfile .
-              docker push ${IMAGE}:${TAG}
+              docker build -t ${IMAGE}:${env.TAG} -t ${IMAGE}:latest -f Dockerfile .
+              docker push ${IMAGE}:${env.TAG}
               docker push ${IMAGE}:latest
               docker logout || true
             """
@@ -43,82 +39,54 @@ pipeline {
     }
 
     stage('Bundle compose') {
-      when { branch 'backend' }
       steps {
-        dir('backend') {          // ✅ backend 폴더 안에서 번들 생성
+        dir('backend') {
           sh """
+            set -euxo pipefail
             mkdir -p deploy_bundle
             cp -f docker-compose.yml deploy_bundle/
             [ -f .env ] && cp -f .env deploy_bundle/ || true
             tar czf deploy_bundle.tgz -C deploy_bundle .
-            ls -al
             ls -al deploy_bundle
           """
-          archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
         }
+        // workspace 기준 경로 주의: backend/ 안에 파일이 있음
+        archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
     stage('Deploy to servers') {
-      when { branch 'backend' }
       parallel {
         stage('Deploy 13.209.87.132') {
           steps {
             sshagent (credentials: ['ssh_deploy_key']) {
               withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
                 sh """
-                  # 번들 존재 확인 (workspace 기준 경로 주의!)
+                  set -euxo pipefail
                   test -f backend/deploy_bundle.tgz
 
                   ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 'set -eux; mkdir -p ~/app'
                   scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@13.209.87.132:~/app/
-                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 '
-                    set -euxo pipefail
-                    cd ~/app
-                    ls -al
-                    tar xzf deploy_bundle.tgz
-                    test -f docker-compose.yml
 
-                    echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-                    export TAG=${TAG}
-                    docker compose pull
-                    docker compose up -d
-                    docker logout || true
-                    docker image prune -f || true
-
-                    docker compose ps
-                  '
+                  # 원격에서 TAG를 inline으로 주입해서 compose가 확실히 받게 함
+                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 "set -euxo pipefail; cd ~/app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
                 """
               }
             }
           }
         }
-
         stage('Deploy 15.164.230.99') {
           steps {
             sshagent (credentials: ['ssh_deploy_key']) {
               withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
                 sh """
+                  set -euxo pipefail
                   test -f backend/deploy_bundle.tgz
 
                   ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 'set -eux; mkdir -p ~/app'
                   scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@15.164.230.99:~/app/
-                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 '
-                    set -euxo pipefail
-                    cd ~/app
-                    ls -al
-                    tar xzf deploy_bundle.tgz
-                    test -f docker-compose.yml
 
-                    echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-                    export TAG=${TAG}
-                    docker compose pull
-                    docker compose up -d
-                    docker logout || true
-                    docker image prune -f || true
-
-                    docker compose ps
-                  '
+                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 "set -euxo pipefail; cd ~/app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
                 """
               }
             }
