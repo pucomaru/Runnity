@@ -39,3 +39,7 @@ backend/.env.local
 .vscode/
 .env.local
 .env
+
+### file_upload ###
+/uploads/
+

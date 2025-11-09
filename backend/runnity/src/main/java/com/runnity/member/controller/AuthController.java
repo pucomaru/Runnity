@@ -7,25 +7,30 @@ import com.runnity.member.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.NoSuchElementException;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/v1")
 @Tag(name = "Auth", description = "소셜 로그인, 토큰 재발급 API")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/login/google")
+    @PostMapping("/auth/login/google")
     @Operation(summary = "구글 로그인", description = "구글 ID 토큰으로 로그인합니다")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
@@ -46,7 +51,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/login/kakao")
+    @PostMapping("/auth/login/kakao")
     @Operation(summary = "카카오 로그인", description = "카카오 ID 토큰으로 로그인합니다")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
@@ -67,13 +72,126 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/token")
-    @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
-    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponse>> refreshToken(
-            @RequestBody TokenRequest request
+    @PostMapping(
+            value = "/auth/addInfo",
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
+    )
+    @Operation(
+            summary = "추가 정보 입력 (신규 회원)",
+            description = "로그인 후 닉네임, 키, 몸무게, 성별, 생년월일을 입력합니다. 프로필 사진은 선택사항입니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "추가 정보 입력 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<AddInfoResponseDto>> addAdditionalInfo(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestPart("data") AddInfoRequestDto request,
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
     ) {
         try {
-            TokenResponse resp = authService.refreshAccessToken(request.getRefreshToken());
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            if (request == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            if (request.getNickname() == null || request.getNickname().trim().isEmpty()) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            // 서비스 호출
+            authService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
+
+            AddInfoResponseDto response = new AddInfoResponseDto("추가 정보가 성공적으로 저장되었습니다");
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, response);
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(
+            summary = "내 프로필 조회",
+            description = "로그인한 사용자의 프로필 정보를 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "프로필 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "404", description = "회원 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PostMapping("/me/profile")
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ProfileResponseDto>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        try {
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            ProfileResponseDto profile = authService.getProfile(userPrincipal.getMemberId());
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, profile);
+
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(
+            summary = "내 프로필 수정",
+            description = "multipart/form-data로 data(JSON) + profileImage(File, 선택)을 전송합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "프로필 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "404", description = "회원 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PutMapping(
+            value = "/me/profile",
+            consumes = { MediaType.MULTIPART_FORM_DATA_VALUE}
+    )
+    public ResponseEntity<com.runnity.global.response.ApiResponse<Void>> updateMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestPart(value = "data", required = false) ProfileUpdateRequestDto request,
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
+    ) {
+        try {
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            if (request == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            authService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, null);
+
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (NoSuchElementException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/auth/token")
+    @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
+    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponseDto>> refreshToken(
+            @RequestBody TokenRequestDto request
+    ) {
+        try {
+            TokenResponseDto resp = authService.refreshAccessToken(request.getRefreshToken());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, resp);
         } catch (IllegalArgumentException e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
@@ -82,7 +200,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/logout")
+    @PostMapping("/auth/logout")
     @Operation(
             summary = "로그아웃",
             description = "현재 Access Token을 블랙리스트에 등록하여 로그아웃합니다. " +

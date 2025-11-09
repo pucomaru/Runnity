@@ -1,7 +1,9 @@
 package com.runnity.challenge.controller;
 
 import com.runnity.challenge.request.ChallengeCreateRequest;
+import com.runnity.challenge.request.ChallengeJoinRequest;
 import com.runnity.challenge.request.ChallengeListRequest;
+import com.runnity.challenge.response.ChallengeJoinResponse;
 import com.runnity.challenge.response.ChallengeListResponse;
 import com.runnity.challenge.response.ChallengeResponse;
 import com.runnity.challenge.service.ChallengeService;
@@ -70,8 +72,56 @@ public class ChallengeController {
         );
     }
 
+    @GetMapping("/{challengeId}")
+    @Operation(
+            summary = "챌린지 상세 조회",
+            description = "특정 챌린지의 상세 정보와 참가자 목록을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "챌린지 없음"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeResponse>> getChallenge(
+            @PathVariable Long challengeId
+    ) {
+        Long memberId = getCurrentUserId();
+        ChallengeResponse response = challengeService.getChallenge(challengeId, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.OK,
+                response
+        );
+    }
+
+    @PostMapping("/{challengeId}/join")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(
+            summary = "챌린지 참가 신청",
+            description = "챌린지에 참가 신청합니다. 비밀방인 경우 비밀번호가 필요합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "참가 신청이 정상적으로 완료된 경우"),
+            @ApiResponse(responseCode = "400", description = "이미 참가 중이거나, 비밀번호가 일치하지 않는 경우"),
+            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자가 요청한 경우"),
+            @ApiResponse(responseCode = "403", description = "모집 중이 아닌 챌린지이거나, 참가 제한 조건에 해당하는 경우"),
+            @ApiResponse(responseCode = "404", description = "해당 챌린지가 존재하지 않는 경우"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeJoinResponse>> joinChallenge(
+            @PathVariable Long challengeId,
+            @RequestBody(required = false) ChallengeJoinRequest request
+    ) {
+        Long memberId = getCurrentUserId();
+        ChallengeJoinResponse response = challengeService.joinChallenge(challengeId, request, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.CHALLENGE_JOINED,
+                response
+        );
+    }
+
     private Long getCurrentUserId() {
         // TODO: 추후 인증 로직이 추가되면 수정 필요
-        return 1L;
+        return 2L;
     }
 }

@@ -1,5 +1,6 @@
 package com.runnity.member.domain;
 
+import com.runnity.global.domain.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,7 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "member")
-public class Member {
+public class Member extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,6 +50,15 @@ public class Member {
     // 추가 정보 업데이트 메서드
     public void updateProfile(String nickname, Float height, Float weight, String gender, String birth) {
         this.nickname = nickname;
+        this.height = height;
+        this.weight = weight;
+        this.gender = gender;
+        this.birth = birth;
+    }
+
+    public void updateProfileWithImage(String nickname, String profileImage, Float height, Float weight, String gender, String birth) {
+        this.nickname = nickname;
+        this.profileImage = profileImage;
         this.height = height;
         this.weight = weight;
         this.gender = gender;
