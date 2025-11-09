@@ -34,6 +34,7 @@ import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -221,6 +222,41 @@ public class AuthService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
         return ProfileResponseDto.from(member);
+    }
+
+    @Transactional
+    public void updateProfile(Long memberId, ProfileUpdateRequestDto request, MultipartFile profileImage) {
+        // 회원 조회
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
+
+        log.info("회원 조회 완료: memberId={}", memberId);
+
+        if (request == null || request.getNickname() == null || request.getNickname().isBlank()) {
+            throw new IllegalArgumentException("닉네임은 필수 입력입니다.");
+        }
+
+        // 이미지 교체 처리
+        if (profileImage != null && !profileImage.isEmpty()) {
+            // 기존 이미지 있으면 삭제
+            if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
+                fileStorage.delete(member.getProfileImage());
+            }
+            String prefix = "profile-photos/" + memberId;
+            String newUrl = fileStorage.upload(prefix, profileImage);
+            member.setProfileImage(newUrl);
+        }
+
+        // 부분 업데이트(전달된 필드만 변경)
+        if (request.getNickname() != null && !request.getNickname().isBlank()) {
+            member.setNickname(request.getNickname().trim());
+        }
+        if (request.getHeight() != null && request.getHeight() > 0) {
+            member.setHeight(request.getHeight());
+        }
+        if (request.getWeight() != null && request.getWeight() > 0) {
+            member.setWeight(request.getWeight());
+        }
     }
 
     public TokenResponseDto refreshAccessToken(String refreshToken) {
