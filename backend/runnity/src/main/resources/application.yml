@@ -71,3 +71,8 @@ logging:
     root: INFO
     org.hibernate.SQL: DEBUG
     com.runnity: DEBUG
+
+
+stream:
+  server:
+    url: ${STREAM_SERVER_URL:http://localhost:8084}

@@ -37,3 +37,5 @@ backend/.env.local
 
 ### VS Code ###
 .vscode/
+.env.local
+.env
