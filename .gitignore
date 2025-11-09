@@ -6,3 +6,4 @@
 
 # Environment files
 .env.local
+.env
