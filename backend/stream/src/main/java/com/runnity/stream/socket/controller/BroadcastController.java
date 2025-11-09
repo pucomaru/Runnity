@@ -1,6 +1,7 @@
 package com.runnity.stream.socket.controller;
 
 import com.runnity.stream.socket.BroadcastService;
+import com.runnity.stream.socket.dto.BroadcastResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +25,7 @@ public class BroadcastController {
 
     // 현재 방송 중인 챌린지 목록 조회
     @GetMapping("/active")
-    public ResponseEntity<List<Map<Object, Object>>> getActiveBroadcasts() {
+    public ResponseEntity<List<BroadcastResponse>> getActiveBroadcasts() {
         return ResponseEntity.ok(broadcastService.getActiveBroadcasts());
     }
 
