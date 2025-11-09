@@ -4,12 +4,16 @@ import com.runnity.challenge.domain.Challenge;
 import com.runnity.challenge.domain.ParticipationStatus;
 import com.runnity.global.exception.GlobalException;
 import com.runnity.global.status.ErrorStatus;
+import com.runnity.history.domain.RunLap;
 import com.runnity.history.domain.RunRecord;
 import com.runnity.history.domain.RunRecordType;
+import com.runnity.history.dto.request.RunRecordCreateRequest;
 import com.runnity.history.dto.response.*;
 import com.runnity.history.repository.HistoryChallengeParticipationRepository;
 import com.runnity.history.repository.RunLapRepository;
 import com.runnity.history.repository.RunRecordRepository;
+import com.runnity.member.domain.Member;
+import com.runnity.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +35,7 @@ public class HistoryService {
     private final HistoryChallengeParticipationRepository repository;
     private final RunRecordRepository runRecordRepository;
     private final RunLapRepository runLapRepository;
+    private final MemberRepository memberRepository;
 
     private static final int ENTERABLE_MINUTES_BEFORE_START = 5;
 
@@ -135,5 +140,40 @@ public class HistoryService {
                 .toList();
 
         return RunRecordMonthlyResponse.of(personals, challenges);
+    }
+
+    @Transactional
+    public void createRunRecord(Long memberId, RunRecordCreateRequest request) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+
+        RunRecord runRecord = RunRecord.builder()
+                .member(member)
+                .runType(request.runType())
+                .distance(request.distance())
+                .durationSec(request.durationSec())
+                .startAt(request.startAt())
+                .endAt(request.endAt())
+                .pace(request.pace())
+                .bpm(request.bpm())
+                .calories(request.calories())
+                .route(request.route())
+                .build();
+
+        RunRecord savedRecord = runRecordRepository.save(runRecord);
+
+        List<RunLap> laps = request.laps().stream()
+                .map(lapReq -> RunLap.builder()
+                        .runRecord(savedRecord)
+                        .sequence(lapReq.sequence())
+                        .distance(lapReq.distance())
+                        .durationSec(lapReq.durationSec())
+                        .pace(lapReq.pace())
+                        .bpm(lapReq.bpm())
+                        .build())
+                .toList();
+
+        runLapRepository.saveAll(laps);
     }
 }

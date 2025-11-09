@@ -49,4 +49,29 @@ public class RunRecord extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false, foreignKey = @ForeignKey(name = "fk_run_record_member"))
     private Member member;
+
+    @Builder
+    public RunRecord(
+            Float distance,
+            Integer durationSec,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            Integer pace,
+            Integer bpm,
+            RunRecordType runType,
+            Float calories,
+            String route,
+            Member member
+    ) {
+        this.distance = distance;
+        this.durationSec = durationSec;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.pace = pace;
+        this.bpm = bpm;
+        this.runType = runType;
+        this.calories = calories;
+        this.route = route;
+        this.member = member;
+    }
 }
