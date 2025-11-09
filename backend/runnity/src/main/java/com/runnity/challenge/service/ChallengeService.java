@@ -157,14 +157,8 @@ public class ChallengeService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
-        // 2. Challenge를 비관적 락으로 조회 (SELECT FOR UPDATE)
-        // 여러 명이 동시에 참가 신청할 때 순차적으로 처리되어 동시성 문제 방지
-        Challenge challenge = challengeRepository.findByIdWithLock(challengeId)
-                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
-        
-        if (challenge.isDeleted()) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
-        }
+        // 2. 챌린지 검증
+        Challenge challenge = validateAndGetChallenge(challengeId);
         
         if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
             throw new GlobalException(ErrorStatus.CHALLENGE_NOT_RECRUITING);
@@ -177,9 +171,9 @@ public class ChallengeService {
         validateTimeOverlap(memberId, challenge.getStartAt(), challenge.getEndAt());
         validateParticipantLimit(challenge);
 
-        // 5. 참가 정보 조회 또는 생성 (낙관적 락 적용)
+        // 5. 참가 정보 조회 또는 생성
         ChallengeParticipation participation = participationRepository
-                .findByChallengeIdAndMemberIdWithLock(challengeId, memberId)
+                .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElse(null);
 
         if (participation != null) {
@@ -193,8 +187,11 @@ public class ChallengeService {
             log.info("챌린지 재참가 신청 완료: challengeId={}, memberId={}, participantId={}",
                     challengeId, memberId, participation.getParticipantId());
         } else {
-            // 새로운 참가 신청 (도메인 팩토리 메서드 사용)
-            participation = ChallengeParticipation.join(challenge, member);
+            // 새로운 참가 신청
+            participation = ChallengeParticipation.builder()
+                    .challenge(challenge)
+                    .member(member)
+                    .build();
             participation = participationRepository.save(participation);
             log.info("챌린지 참가 신청 완료: challengeId={}, memberId={}, participantId={}",
                     challengeId, memberId, participation.getParticipantId());
@@ -220,18 +217,13 @@ public class ChallengeService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
-        // 3. 참가 정보 조회 (비관적 락 적용)
+        // 3. 참가 정보 조회
         ChallengeParticipation participation = participationRepository
-                .findByChallengeIdAndMemberIdWithLock(challengeId, memberId)
+                .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
 
         // 4. 참가 취소 처리 (도메인 로직 활용)
-        try {
-            participation.cancel();
-        } catch (IllegalStateException e) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_LEFT);
-        }
-        
+        participation.cancel();
         participationRepository.save(participation);
 
         log.info("챌린지 참가 취소 완료: challengeId={}, memberId={}, participantId={}",
@@ -281,9 +273,6 @@ public class ChallengeService {
 
     /**
      * 참가 인원 제한 검증
-     * 
-     * 주의: 동시성 문제가 있을 수 있음. 
-     * 실제 운영 환경에서는 DB 제약조건이나 비관적 락을 고려해야 함.
      */
     private void validateParticipantLimit(Challenge challenge) {
         long currentCount = participationRepository.findByChallengeIdAndActiveStatus(

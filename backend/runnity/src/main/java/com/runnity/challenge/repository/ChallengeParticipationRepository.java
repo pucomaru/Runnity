@@ -2,9 +2,7 @@ package com.runnity.challenge.repository;
 
 import com.runnity.challenge.domain.ChallengeParticipation;
 import com.runnity.challenge.domain.ParticipationStatus;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -101,23 +99,6 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
         AND cp.isDeleted = false
     """)
     java.util.Optional<ChallengeParticipation> findByChallengeIdAndMemberId(
-            @Param("challengeId") Long challengeId,
-            @Param("memberId") Long memberId
-    );
-
-    /**
-     * 특정 챌린지와 회원으로 참가 정보 조회 (비관적 락 적용 - SELECT FOR UPDATE)
-     * 동시성 제어를 위해 사용
-     */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-        SELECT cp
-        FROM ChallengeParticipation cp
-        WHERE cp.challenge.challengeId = :challengeId
-        AND cp.member.memberId = :memberId
-        AND cp.isDeleted = false
-    """)
-    java.util.Optional<ChallengeParticipation> findByChallengeIdAndMemberIdWithLock(
             @Param("challengeId") Long challengeId,
             @Param("memberId") Long memberId
     );

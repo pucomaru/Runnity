@@ -36,8 +36,9 @@ public enum ErrorStatus implements BaseErrorStatus {
     CHALLENGE_ALREADY_JOINED(HttpStatus.BAD_REQUEST, 400, "이미 참가 중인 챌린지입니다."),
     CHALLENGE_NOT_JOINED(HttpStatus.BAD_REQUEST, 400, "참가하지 않은 챌린지입니다."),
     CHALLENGE_ALREADY_LEFT(HttpStatus.BAD_REQUEST, 400, "이미 참가 취소한 챌린지입니다."),
+    CHALLENGE_CANCEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, 400, "대기 중인 상태에서만 참가 취소할 수 있습니다."),
+    CHALLENGE_REJOIN_NOT_ALLOWED(HttpStatus.BAD_REQUEST, 400, "참가 취소한 상태에서만 재참가할 수 있습니다."),
     CHALLENGE_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, 400, "비밀번호가 일치하지 않습니다."),
-    CHALLENGE_CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, 409, "동시에 수정된 데이터입니다. 다시 시도해주세요."),
     CHALLENGE_NOT_RECRUITING(HttpStatus.FORBIDDEN, 403, "모집 중이 아닌 챌린지입니다."),
     CHALLENGE_PARTICIPANT_LIMIT_EXCEEDED(HttpStatus.FORBIDDEN, 403, "참가 인원이 가득 찼습니다."),
 

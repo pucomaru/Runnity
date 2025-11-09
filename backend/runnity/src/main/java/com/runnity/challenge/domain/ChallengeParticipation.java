@@ -1,6 +1,8 @@
 package com.runnity.challenge.domain;
 
 import com.runnity.global.domain.BaseEntity;
+import com.runnity.global.exception.GlobalException;
+import com.runnity.global.status.ErrorStatus;
 import com.runnity.history.domain.RunRecord;
 import com.runnity.member.domain.Member;
 import jakarta.persistence.*;
@@ -55,27 +57,17 @@ public class ChallengeParticipation extends BaseEntity {
     }
 
     /**
-     * 챌린지 참가 처리
-     * 새로운 참가 신청 시 사용
-     */
-    public static ChallengeParticipation join(Challenge challenge, Member member) {
-        return ChallengeParticipation.builder()
-                .challenge(challenge)
-                .member(member)
-                .build();
-    }
-
-    /**
      * 참가 취소 처리
+     * WAITING 상태에서만 취소 가능
      * 
-     * @throws IllegalStateException 이미 취소한 상태이거나 취소할 수 없는 상태인 경우
+     * @throws GlobalException WAITING 상태가 아닌 경우
      */
     public void cancel() {
         if (this.status == ParticipationStatus.LEFT) {
-            throw new IllegalStateException("이미 참가 취소한 상태입니다.");
+            throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_LEFT);
         }
-        if (!canCancel()) {
-            throw new IllegalStateException("현재 상태에서는 참가 취소할 수 없습니다. 현재 상태: " + this.status);
+        if (this.status != ParticipationStatus.WAITING) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_CANCEL_NOT_ALLOWED);
         }
         this.status = ParticipationStatus.LEFT;
     }
@@ -83,22 +75,13 @@ public class ChallengeParticipation extends BaseEntity {
     /**
      * 재참가 처리 (LEFT 상태에서 WAITING으로 변경)
      * 
-     * @throws IllegalStateException LEFT 상태가 아닌 경우
+     * @throws GlobalException LEFT 상태가 아닌 경우
      */
     public void rejoin() {
         if (this.status != ParticipationStatus.LEFT) {
-            throw new IllegalStateException("재참가할 수 없는 상태입니다. 현재 상태: " + this.status);
+            throw new GlobalException(ErrorStatus.CHALLENGE_REJOIN_NOT_ALLOWED);
         }
         this.status = ParticipationStatus.WAITING;
-    }
-
-    /**
-     * 참가 취소 가능 여부 확인
-     */
-    private boolean canCancel() {
-        // RUNNING, COMPLETED 등은 취소 불가능할 수 있음
-        // 현재는 모든 상태에서 취소 가능하도록 설정
-        return this.status != ParticipationStatus.LEFT;
     }
 
     /**
