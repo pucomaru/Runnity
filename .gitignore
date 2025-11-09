@@ -7,3 +7,10 @@
 # Environment files
 .env.local
 .env
+
+**/.git
+**/.gradle
+**/build
+**/.idea
+**/*.iml
+**/node_modules
