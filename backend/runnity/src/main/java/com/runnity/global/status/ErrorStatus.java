@@ -16,8 +16,16 @@ public enum ErrorStatus implements BaseErrorStatus {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, 405, "허용되지 않은 메소드입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 500, "서버 내부 오류입니다."),
 
+    //auth
+    INVALID_TOKEN(HttpStatus.BAD_REQUEST, 400, "유효하지 않은 Refresh Token입니다."),
+
     // member
-    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 회원입니다."),
+    MEMBER_NOT_FOUND(HttpStatus.BAD_REQUEST, 404, "존재하지 않는 회원입니다."),
+    NICKNAME_REQUIRED(HttpStatus.BAD_REQUEST, 400, "닉네임을 입력해주세요."),
+    NICKNAME_FORMAT_INVALID(HttpStatus.BAD_REQUEST, 400, "닉네임 길이는 2~50자 입니다."),
+    NICKNAME_CONFLICT(HttpStatus.BAD_REQUEST, 400, "사용할 수 없는 닉네임입니다."),
+    INVALID_INPUT(HttpStatus.BAD_REQUEST, 400, "유효하지 않은 입력입니다."),
+
 
     // email
     EMAIL_FORMAT_INVALID(HttpStatus.BAD_REQUEST, 400, "올바르지 않은 이메일 형식입니다."),

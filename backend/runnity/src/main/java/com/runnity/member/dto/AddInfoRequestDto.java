@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class AddInfoRequestDto {
-    @Schema(description = "닉네임", example = "러너상경", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "닉네임", example = "러니티1", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "닉네임은 필수입니다.")
     private String nickname;
 

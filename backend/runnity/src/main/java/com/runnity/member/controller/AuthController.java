@@ -7,7 +7,6 @@ import com.runnity.member.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -100,17 +99,58 @@ public class AuthController {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
             }
 
-            if (request.getNickname() == null || request.getNickname().trim().isEmpty()) {
-                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
-            }
-
             // 서비스 호출
             authService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
 
             AddInfoResponseDto response = new AddInfoResponseDto("추가 정보가 성공적으로 저장되었습니다");
-            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, response);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.CREATED, response);
         } catch (IllegalArgumentException e) {
+            String key = e.getMessage();
+
+            if("NICKNAME_REQUIRED".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_REQUIRED);
+            } else if ("MEMBER_NOT_FOUND".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.MEMBER_NOT_FOUND);
+            } else if ("NICKNAME_CONFLICT".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_CONFLICT);
+            } else if ("NICKNAME_FORMAT_INVALID".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_FORMAT_INVALID);
+            }
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(
+            summary = "닉네임 중복 체크",
+            description = "닉네임 사용 가능 여부를 확인합니다. 대소문자/양끝 공백을 무시하여 비교합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "검사 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @GetMapping("/me/nicknameCheck")
+    public ResponseEntity<com.runnity.global.response.ApiResponse<NicknameCheckResponseDto>> checkNickname(
+            @RequestParam("nickname") String nickname,
+            @AuthenticationPrincipal UserPrincipal principal // 자신의 닉네임 허용 처리
+    ) {
+        try {
+            NicknameCheckResponseDto result =
+                    authService.checkNicknameAvailability(nickname, principal != null ? principal.getMemberId() : null);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.NICKNAME_CHECK_OK, result);
+        } catch (IllegalArgumentException e) {
+            String key = e.getMessage();
+
+            if ("NICKNAME_REQUIRED".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_REQUIRED);
+            } else if ("NICKNAME_FORMAT_INVALID".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_FORMAT_INVALID);
+            } else if ("NICKNAME_CONFLICT".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_CONFLICT);
+            }
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INVALID_INPUT);
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
@@ -135,7 +175,7 @@ public class AuthController {
             }
 
             ProfileResponseDto profile = authService.getProfile(userPrincipal.getMemberId());
-            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, profile);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.PROFILE_FETCH_OK, profile);
 
         } catch (IllegalArgumentException e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
@@ -169,17 +209,24 @@ public class AuthController {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
             }
 
-            if (request == null) {
-                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
-            }
-
             authService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
-            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, null);
+
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.PROFILE_UPDATE_OK, null);
 
         } catch (IllegalArgumentException e) {
+            String key = e.getMessage();
+            if("NICKNAME_REQUIRED".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_REQUIRED);
+            } else if ("MEMBER_NOT_FOUND".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.MEMBER_NOT_FOUND);
+            } else if ("NICKNAME_CONFLICT".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_CONFLICT);
+            } else if ("NICKNAME_FORMAT_INVALID".equals(key)){
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.NICKNAME_FORMAT_INVALID);
+            }
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
         } catch (NoSuchElementException e) {
-            return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.MEMBER_NOT_FOUND);
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
@@ -194,6 +241,12 @@ public class AuthController {
             TokenResponseDto resp = authService.refreshAccessToken(request.getRefreshToken());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, resp);
         } catch (IllegalArgumentException e) {
+            String key = e.getMessage();
+            if ("MEMBER_NOT_FOUND".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.MEMBER_NOT_FOUND);
+            } else if ("INVALID_TOKEN".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.INVALID_TOKEN);
+            }
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
