@@ -3,7 +3,9 @@ package com.example.runnity.ui.screens.startrun
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +39,11 @@ import android.Manifest
 import android.app.Activity
 import android.os.Build
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
 import com.kakao.vectormap.MapLifeCycleCallback
@@ -56,14 +64,13 @@ import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 
-/**
- * 개인 러닝 시작 화면
- * - 러닝 시작 준비 화면
- * - 목표 설정, 경로 선택 등
- */
+
+// 개인 러닝 시작 화면
 @Suppress("UNUSED_PARAMETER")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartRunScreen(
+    navController: NavController? = null,
     parentNavController: NavController? = null, // 러닝 화면 이동 시 사용 예정
     viewModel: StartRunViewModel = viewModel()
 ) {
@@ -83,6 +90,13 @@ fun StartRunScreen(
     var mapView by remember { mutableStateOf<MapView?>(null) }
     // 내 위치 표시
     var myLocationLabel by remember { mutableStateOf<Label?>(null) }
+
+    // 목표 설정 관련
+    var showGoalSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val activeTab by viewModel.activeTab.collectAsState()
+    val distanceText by viewModel.distanceText.collectAsState()
+    val timeText by viewModel.timeMinutesText.collectAsState()
 
     // 현재 위치 1회 획득후 카카오 지도 카메라 이동!
     // 성공 시 내 위치 업데이트 및 카메라 이동(줌 16)
@@ -240,7 +254,13 @@ fun StartRunScreen(
                                 showNotificationDialog = true
                             }
                             else -> {
-                                // TODO: 권한 모두 OK → 러닝 시작 처리 (서비스 시작 등)
+                                val goal = viewModel.resolveGoal()
+                                val route = when (goal) {
+                                    is Goal.Distance -> "workout/personal?type=distance&km=${String.format("%.1f", goal.km)}"
+                                    is Goal.Time -> "workout/personal?type=time&min=${goal.minutes}"
+                                    is Goal.FreeRun -> "workout/personal"
+                                }
+                                navController?.navigate(route)
                             }
                         }
                     },
@@ -249,7 +269,7 @@ fun StartRunScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 SmallPillButton(
                     text = "목표 설정",
-                    onClick = { /* TODO: 목표 설정 화면 이동 */ }
+                    onClick = { showGoalSheet = true }
                 )
             }
         }
@@ -282,4 +302,92 @@ fun StartRunScreen(
             }
         }
     )
+
+    // 목표 설정 다이얼로그
+    if (showGoalSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showGoalSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SmallPillButton(
+                        text = "거리",
+                        selected = activeTab == StartRunViewModel.GoalTab.Distance,
+                        onClick = { viewModel.setActiveTab(StartRunViewModel.GoalTab.Distance) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    SmallPillButton(
+                        text = "시간",
+                        selected = activeTab == StartRunViewModel.GoalTab.Time,
+                        onClick = { viewModel.setActiveTab(StartRunViewModel.GoalTab.Time) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 목표 설정
+                when (activeTab) {
+                    StartRunViewModel.GoalTab.Distance -> {
+                        OutlinedTextField(
+                            value = distanceText,
+                            onValueChange = { new ->
+                                val filtered = new.filter { it.isDigit() || it == '.' }
+                                val parts = filtered.split('.')
+                                val normalized = when (parts.size) {
+                                    1 -> parts[0]
+                                    2 -> parts[0].take(3) + "." + parts[1].take(1)
+                                    else -> parts[0] + "." + parts[1]
+                                }
+                                viewModel.setDistanceText(normalized)
+                            },
+                            label = { Text("거리 (km)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    StartRunViewModel.GoalTab.Time -> {
+                        OutlinedTextField(
+                            value = timeText,
+                            onValueChange = { new ->
+                                val filtered = new.filter { it.isDigit() }
+                                viewModel.setTimeMinutesText(filtered)
+                            },
+                            label = { Text("시간 (분)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                PrimaryButton(
+                    text = "운동하기",
+                    onClick = {
+                        val goal = viewModel.resolveGoal()
+                        val route = when (goal) {
+                            is Goal.Distance -> "workout/personal?type=distance&km=${String.format("%.1f", goal.km)}"
+                            is Goal.Time -> "workout/personal?type=time&min=${goal.minutes}"
+                            is Goal.FreeRun -> "workout/personal"
+                        }
+                        showGoalSheet = false
+                        navController?.navigate(route)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
 }

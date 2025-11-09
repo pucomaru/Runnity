@@ -30,6 +30,9 @@ import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
 import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
+import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 
 /**
  * 메인 탭 화면
@@ -163,9 +166,25 @@ fun MainTabScreen(
                 route = BottomNavItem.StartRun.graphRoute
             ) {
                 composable(BottomNavItem.StartRun.route) {
-                    StartRunScreen(parentNavController = parentNavController)
+                    StartRunScreen(
+                        navController = navController,
+                        parentNavController = parentNavController
+                    )
                 }
-                // TODO: 러닝 관련 세부 화면 추가 가능
+                // 운동 화면 (개인)
+                composable(
+                    route = "workout/personal?type={type}&km={km}&min={min}",
+                    arguments = listOf(
+                        navArgument("type") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("km") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("min") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    )
+                ) { backStackEntry ->
+                    val type = backStackEntry.arguments?.getString("type")
+                    val km = backStackEntry.arguments?.getString("km")
+                    val min = backStackEntry.arguments?.getString("min")
+                    WorkoutPersonalScreen(type = type, km = km, min = min)
+                }
             }
 
             // ========== 챌린지 그래프 ==========
