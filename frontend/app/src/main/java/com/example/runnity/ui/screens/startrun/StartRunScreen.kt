@@ -84,7 +84,7 @@ fun StartRunScreen(
     // 내 위치 표시
     var myLocationLabel by remember { mutableStateOf<Label?>(null) }
 
-    // 현재 위치 1회 획득후 카카오 지도 카메라 이동
+    // 현재 위치 1회 획득후 카카오 지도 카메라 이동!
     // 성공 시 내 위치 업데이트 및 카메라 이동(줌 16)
     @SuppressLint("MissingPermission")
     fun moveCameraToCurrentLocation() {
