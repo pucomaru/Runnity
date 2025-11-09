@@ -256,9 +256,9 @@ fun StartRunScreen(
                             else -> {
                                 val goal = viewModel.resolveGoal()
                                 val route = when (goal) {
-                                    is Goal.Distance -> "workout/personal?type=distance&km=${String.format("%.1f", goal.km)}"
-                                    is Goal.Time -> "workout/personal?type=time&min=${goal.minutes}"
-                                    is Goal.FreeRun -> "workout/personal"
+                                    is Goal.Distance -> "countdown/personal?type=distance&km=${String.format("%.1f", goal.km)}"
+                                    is Goal.Time -> "countdown/personal?type=time&min=${goal.minutes}"
+                                    is Goal.FreeRun -> "countdown/personal"
                                 }
                                 navController?.navigate(route)
                             }
@@ -378,9 +378,9 @@ fun StartRunScreen(
                     onClick = {
                         val goal = viewModel.resolveGoal()
                         val route = when (goal) {
-                            is Goal.Distance -> "workout/personal?type=distance&km=${String.format("%.1f", goal.km)}"
-                            is Goal.Time -> "workout/personal?type=time&min=${goal.minutes}"
-                            is Goal.FreeRun -> "workout/personal"
+                            is Goal.Distance -> "countdown/personal?type=distance&km=${String.format("%.1f", goal.km)}"
+                            is Goal.Time -> "countdown/personal?type=time&min=${goal.minutes}"
+                            is Goal.FreeRun -> "countdown/personal"
                         }
                         showGoalSheet = false
                         navController?.navigate(route)
