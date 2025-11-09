@@ -1,0 +1,95 @@
+pipeline {
+  agent any
+
+  environment {
+    DOCKERHUB_USERNAME = 'daum0604'
+    IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-backend"
+    TAG   = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'manual'}"
+  }
+
+  options { disableConcurrentBuilds(); timestamps() }
+
+  stages {
+    stage('Checkout'){ steps { checkout scm } }
+
+    stage('Docker Build & Push'){
+      when { branch 'backend' }
+      steps {
+        withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+          sh """
+            echo "${DOCKERHUB_TOKEN}" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+            docker build -t ${IMAGE}:${TAG} -t ${IMAGE}:latest -f Dockerfile .
+            docker push ${IMAGE}:${TAG}
+            docker push ${IMAGE}:latest
+            docker logout || true
+          """
+        }
+      }
+    }
+
+    stage('Bundle compose'){
+      when { branch 'backend' }
+      steps {
+        sh """
+          mkdir -p deploy_bundle
+          cp -f docker-compose.yml deploy_bundle/
+          [ -f .env ] && cp -f .env deploy_bundle/ || true
+          tar czf deploy_bundle.tgz -C deploy_bundle .
+        """
+        archiveArtifacts artifacts: 'deploy_bundle.tgz', fingerprint: true
+      }
+    }
+
+    stage('Deploy to servers'){
+      when { branch 'backend' }
+      parallel {
+        stage('13.209.87.132'){
+          steps {
+            sshagent (credentials: ['ssh_deploy_key']) {
+              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+                sh """
+                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 'mkdir -p ~/app'
+                  scp -o StrictHostKeyChecking=no deploy_bundle.tgz ubuntu@13.209.87.132:~/app/
+                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 '
+                    set -e
+                    cd ~/app
+                    tar xzf deploy_bundle.tgz
+                    echo "${DOCKERHUB_TOKEN}" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+                    export TAG=${TAG}
+                    docker compose pull
+                    docker compose up -d
+                    docker logout || true
+                    docker image prune -f || true
+                  '
+                """
+              }
+            }
+          }
+        }
+        stage('15.164.230.99'){
+          steps {
+            sshagent (credentials: ['ssh_deploy_key']) {
+              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+                sh """
+                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 'mkdir -p ~/app'
+                  scp -o StrictHostKeyChecking=no deploy_bundle.tgz ubuntu@15.164.230.99:~/app/
+                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 '
+                    set -e
+                    cd ~/app
+                    tar xzf deploy_bundle.tgz
+                    echo "${DOCKERHUB_TOKEN}" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+                    export TAG=${TAG}
+                    docker compose pull
+                    docker compose up -d
+                    docker logout || true
+                    docker image prune -f || true
+                  '
+                """
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
