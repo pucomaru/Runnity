@@ -1,9 +1,17 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize") // ✅ Parcelable data class 용 (Intent 등에서 사용)
 
+}
+
+// 추가
+val properties = Properties().apply {
+    load(FileInputStream(rootProject.file("local.properties")))
 }
 
 android {
@@ -18,6 +26,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 추가: Kakao Map Key를 BuildConfig와 Manifest 모두에 주입
+        // BuildConfig(String) 값에는 반드시 따옴표가 포함되어야 합니다.
+        buildConfigField(
+            "String",
+            "KAKAO_MAP_KEY",
+            "\"${properties.getProperty("KAKAO_MAP_KEY")}\""
+        )
+        // AndroidManifest.xml의 ${KAKAO_MAP_KEY} 치환용
+        manifestPlaceholders["KAKAO_MAP_KEY"] = properties.getProperty("KAKAO_MAP_KEY")
     }
 
     buildTypes {
@@ -79,6 +97,9 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 
+    // Google Play Services - Fused Location Provider (현재 위치 획득)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     // Coil
     implementation(libs.coil.compose)
 
@@ -91,6 +112,8 @@ dependencies {
     // Timber (로깅)
     implementation(libs.timber)
 
+    // 카카오 지도 API
+    implementation("com.kakao.maps.open:android:2.12.18")
     // Splash Screen API (Android 12+)
     implementation("androidx.core:core-splashscreen:1.0.1")
 
@@ -102,3 +125,5 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+

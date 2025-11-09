@@ -4,12 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +35,26 @@ import com.example.runnity.utils.hasNotificationPermission
 import android.Manifest
 import android.app.Activity
 import android.os.Build
+import androidx.compose.ui.viewinterop.AndroidView
+import com.kakao.vectormap.KakaoMap
+import com.kakao.vectormap.KakaoMapReadyCallback
+import com.kakao.vectormap.MapLifeCycleCallback
+import com.kakao.vectormap.MapView
+import com.kakao.vectormap.LatLng
+import com.kakao.vectormap.camera.CameraUpdateFactory
+import android.annotation.SuppressLint
+import android.util.Log
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.kakao.vectormap.label.Label
+import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelStyle
+import com.kakao.vectormap.label.LabelStyles
 
 /**
  * 개인 러닝 시작 화면
@@ -51,16 +69,71 @@ fun StartRunScreen(
 ) {
     val context = LocalContext.current
     val activity = context as Activity
+    val lifecycleOwner = LocalLifecycleOwner.current
 
+    // 권한 다이얼로그
     var showLocationRationale by remember { mutableStateOf(false) }
     var showLocationSettings by remember { mutableStateOf(false) }
     var showNotificationDialog by remember { mutableStateOf(false) }
+    // 카카오 맵 실제 객체
+    var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
+    // 내 현재 좌표
+    var myLatLng by remember { mutableStateOf<LatLng?>(null) }
+    // 카카오 맵 ui
+    var mapView by remember { mutableStateOf<MapView?>(null) }
+    // 내 위치 표시
+    var myLocationLabel by remember { mutableStateOf<Label?>(null) }
+
+    // 현재 위치 1회 획득후 카카오 지도 카메라 이동!
+    // 성공 시 내 위치 업데이트 및 카메라 이동(줌 16)
+    @SuppressLint("MissingPermission")
+    fun moveCameraToCurrentLocation() {
+        if (!PermissionUtils.hasLocationPermission(context)) return
+        val fused = LocationServices.getFusedLocationProviderClient(context)
+        val cts = CancellationTokenSource()
+        Log.d("Location", "request getCurrentLocation start (HIGH_ACCURACY)")
+        fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+            .addOnSuccessListener { loc ->
+                if (loc != null) {
+                    Log.d("Location", "success lat=${loc.latitude}, lng=${loc.longitude}")
+                    val target = LatLng.from(loc.latitude, loc.longitude)
+                    myLatLng = target
+                    kakaoMap?.let { mapRef ->
+                        mapRef.moveCamera(CameraUpdateFactory.newCenterPosition(target))
+                        mapRef.moveCamera(CameraUpdateFactory.zoomTo(16))
+                    }
+
+                    // 내 위치 라벨 생성/업데이트
+                    val ll = kakaoMap?.getLabelManager()?.getLayer()
+                    if (ll != null) {
+                        if (myLocationLabel == null) {
+                            val styles = kakaoMap?.getLabelManager()
+                                ?.addLabelStyles(LabelStyles.from(LabelStyle.from(com.example.runnity.R.drawable.ic_my_location_dot)))
+                            if (styles != null) {
+                                val opts = LabelOptions.from(target).setStyles(styles)
+                                myLocationLabel = ll.addLabel(opts)
+                                myLocationLabel?.scaleTo(0.15f, 0.15f)
+                            }
+                        } else {
+                            myLocationLabel?.moveTo(target)
+                            myLocationLabel?.scaleTo(0.15f, 0.15f)
+                        }
+                    }
+                } else {
+                    Log.d("Location", "result is NULL")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Location", "getCurrentLocation failure: ${e.message}", e)
+            }
+    }
 
     val locationLauncher = rememberLocationPermissionLauncher { granted ->
         if (granted) {
             if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)) {
                 showNotificationDialog = true
             }
+            moveCameraToCurrentLocation()
         } else {
             // 거절됨: 다시 묻지 않음 여부 확인
             val shouldShow = PermissionUtils.shouldShowLocationRationale(activity)
@@ -93,18 +166,56 @@ fun StartRunScreen(
             title = "개인 러닝"
         )
 
-        // 지도 영역 Placeholder (SDK 연동 전까지 임시 박스)
+        // 지도 영역
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            // 지도 배경 대체
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(ColorPalette.Light.containerBackground)
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        mapView = this
+                        // Kakao 지도 시작: 생명주기/준비 콜백 등록
+                        start(
+                            object : MapLifeCycleCallback() {
+                                override fun onMapDestroy() { }
+                                // 인증 실패/지도 오류 시 여기로 전달됨
+                                override fun onMapError(error: Exception) { }
+                            },
+                            object : KakaoMapReadyCallback() {
+                                override fun onMapReady(map: KakaoMap) {
+                                    kakaoMap = map
+                                    // label은 생성 시점에 레이어를 지역에서 확보하여 사용
+                                    // 권한 허용 시 현재 위치 요청 → 성공하면 카메라 이동
+                                    if (PermissionUtils.hasLocationPermission(context)) {
+                                        moveCameraToCurrentLocation()
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
             )
+
+            // Compose에서 MapView 생명주기 연동
+            // - ON_RESUME → resume(), ON_PAUSE → pause()
+            DisposableEffect(lifecycleOwner, mapView) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> mapView?.resume()
+                        Lifecycle.Event.ON_PAUSE -> mapView?.pause()
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
+
 
             // 지도 위에 떠 있는 하단 액션 버튼 영역
             Column(
