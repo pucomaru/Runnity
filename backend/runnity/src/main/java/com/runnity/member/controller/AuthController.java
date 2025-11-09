@@ -11,10 +11,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
@@ -67,13 +68,57 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/token")
-    @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
-    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponse>> refreshToken(
-            @RequestBody TokenRequest request
+    @PostMapping(
+            value = "/addInfo",
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
+    )
+    @Operation(
+            summary = "추가 정보 입력 (신규 회원)",
+            description = "로그인 후 닉네임, 키, 몸무게, 성별, 생년월일을 입력합니다. 프로필 사진은 선택사항입니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "추가 정보 입력 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<AddInfoResponseDto>> addAdditionalInfo(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestPart("data") AddInfoRequestDto request,
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
     ) {
         try {
-            TokenResponse resp = authService.refreshAccessToken(request.getRefreshToken());
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            if (request == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            if (request.getNickname() == null || request.getNickname().trim().isEmpty()) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            // 서비스 호출
+            authService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
+
+            AddInfoResponseDto response = new AddInfoResponseDto("추가 정보가 성공적으로 저장되었습니다");
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, response);
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/token")
+    @Operation(summary = "Access Token 재발급", description = "Refresh Token으로 새로운 Access/Refresh Token을 발급합니다")
+    public ResponseEntity<com.runnity.global.response.ApiResponse<TokenResponseDto>> refreshToken(
+            @RequestBody TokenRequestDto request
+    ) {
+        try {
+            TokenResponseDto resp = authService.refreshAccessToken(request.getRefreshToken());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, resp);
         } catch (IllegalArgumentException e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);

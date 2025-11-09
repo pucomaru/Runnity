@@ -8,9 +8,12 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.runnity.global.service.TokenBlacklistService;
+import com.runnity.global.storage.FileStorage;
 import com.runnity.member.domain.Member;
+import com.runnity.member.dto.AddInfoRequestDto;
+import com.runnity.member.dto.AddInfoResponseDto;
 import com.runnity.member.dto.LoginResponseDto;
-import com.runnity.member.dto.TokenResponse;
+import com.runnity.member.dto.TokenResponseDto;
 import com.runnity.member.repository.MemberRepository;
 import com.runnity.member.util.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
@@ -21,6 +24,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigInteger;
 import java.net.URI;
@@ -45,6 +49,7 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenBlacklistService tokenBlacklistService;
+    private final FileStorage fileStorage;
 
     @Value("${GOOGLE_CLIENT_ID}") private String GOOGLE_CLIENT_ID;
     @Value("${KAKAO_CLIENT_ID}")  private String KAKAO_CLIENT_ID;
@@ -154,7 +159,67 @@ public class AuthService {
         return new LoginResponseDto(accessToken, refreshToken, isNew);
     }
 
-    public TokenResponse refreshAccessToken(String refreshToken) {
+    @Transactional
+    public AddInfoResponseDto addAdditionalInfo(
+            Long memberId,
+            AddInfoRequestDto request,
+            MultipartFile profileImage
+    ) {
+        try {
+            // 회원 조회
+            Member member = memberRepository.findById(memberId)
+                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
+
+            log.info("회원 조회 완료: memberId={}", memberId);
+
+            if (request == null || request.getNickname() == null || request.getNickname().isBlank()) {
+                throw new IllegalArgumentException("닉네임은 필수 입력입니다.");
+            }
+
+            String prefix = "profile-photos/" + memberId;
+
+            // 프로필 사진 저장 (있을 경우)
+            if (profileImage != null && !profileImage.isEmpty()) {
+                log.info("프로필 사진 저장 시작");
+
+                // 이전 파일 삭제(있는 경우)
+                if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
+                    fileStorage.delete(member.getProfileImage());
+                }
+
+                String profileImagePath = fileStorage.upload(prefix, profileImage);
+                member.updateProfileWithImage(
+                        request.getNickname(),
+                        profileImagePath,
+                        request.getHeight(),
+                        request.getWeight(),
+                        request.getGender(),
+                        request.getBirth()
+                );
+                log.info("정보: {}, 프로필 사진 저장: {}", member, profileImagePath);
+            } else {
+                member.updateProfile(
+                        request.getNickname(),
+                        request.getHeight(),
+                        request.getWeight(),
+                        request.getGender(),
+                        request.getBirth()
+                );
+                log.info("회원 정보 저장(이미지 없음)");
+            }
+
+            log.info("회원 정보 업데이트 완료: memberId={}", memberId);
+            return new AddInfoResponseDto("신규 회원 정보가 저장되었습니다.");
+        } catch (IllegalArgumentException e) {
+            log.error("추가 정보 입력 실패 (잘못된 요청): {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("추가 정보 입력 실패 (서버 에러): {}", e.getMessage(), e);
+            throw new RuntimeException("추가 정보 입력 중 오류가 발생했습니다", e);
+        }
+    }
+
+    public TokenResponseDto refreshAccessToken(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new IllegalArgumentException("유효하지 않은 Refresh Token입니다.");
         }
@@ -164,7 +229,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
         String newAccess = jwtTokenProvider.createAccessToken(member);
         String newRefresh = jwtTokenProvider.createRefreshToken(member.getEmail());
-        return new TokenResponse(newAccess, newRefresh);
+        return new TokenResponseDto(newAccess, newRefresh);
     }
 
     @Transactional
