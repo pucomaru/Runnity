@@ -1,5 +1,6 @@
 package com.runnity.challenge.response;
 
+import com.runnity.challenge.domain.ChallengeParticipation;
 import com.runnity.member.domain.Member;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -30,6 +31,18 @@ public record ChallengeParticipantResponse(
                         member.getProfileImage(),
                         null,
                         "WAITING",
+                        member.getAveragePace()
+                );
+        }
+
+        public static ChallengeParticipantResponse from(ChallengeParticipation participation) {
+                Member member = participation.getMember();
+                return new ChallengeParticipantResponse(
+                        member.getMemberId(),
+                        member.getNickname(),
+                        member.getProfileImage(),
+                        participation.getRanking(),
+                        participation.getStatus().code(),
                         member.getAveragePace()
                 );
         }

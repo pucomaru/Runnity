@@ -70,6 +70,28 @@ public class ChallengeController {
         );
     }
 
+    @GetMapping("/{challengeId}")
+    @Operation(
+            summary = "챌린지 상세 조회",
+            description = "특정 챌린지의 상세 정보와 참가자 목록을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "챌린지 없음"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeResponse>> getChallenge(
+            @PathVariable Long challengeId
+    ) {
+        Long memberId = getCurrentUserId();
+        ChallengeResponse response = challengeService.getChallenge(challengeId, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.OK,
+                response
+        );
+    }
+
     private Long getCurrentUserId() {
         // TODO: 추후 인증 로직이 추가되면 수정 필요
         return 1L;

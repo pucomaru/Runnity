@@ -43,10 +43,48 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
         AND cp.member.memberId = :memberId
         AND cp.isDeleted = false
         AND c.isDeleted = false
-        AND cp.status != 'LEFT'
+        AND cp.status IN :activeStatuses
     """)
     List<Long> findJoinedChallengeIds(
             @Param("challengeIds") List<Long> challengeIds,
-            @Param("memberId") Long memberId
+            @Param("memberId") Long memberId,
+            @Param("activeStatuses") Set<com.runnity.challenge.domain.ParticipationStatus> activeStatuses
+    );
+
+    /**
+     * 챌린지의 참가자 목록 조회 (LEFT 제외)
+     * 랭킹 순으로 정렬
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId = :challengeId
+        AND cp.isDeleted = false
+        AND cp.status IN :activeStatuses
+        ORDER BY 
+            CASE WHEN cp.ranking IS NULL THEN 1 ELSE 0 END,
+            cp.ranking ASC,
+            cp.createdAt ASC
+    """)
+    List<ChallengeParticipation> findByChallengeIdAndActiveStatus(
+            @Param("challengeId") Long challengeId,
+            @Param("activeStatuses") Set<com.runnity.challenge.domain.ParticipationStatus> activeStatuses
+    );
+
+    /**
+     * 특정 챌린지에 특정 회원이 참가했는지 확인 (LEFT 제외)
+     */
+    @Query("""
+        SELECT COUNT(cp) > 0
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId = :challengeId
+        AND cp.member.memberId = :memberId
+        AND cp.isDeleted = false
+        AND cp.status IN :activeStatuses
+    """)
+    boolean existsByChallengeIdAndMemberIdAndActiveStatus(
+            @Param("challengeId") Long challengeId,
+            @Param("memberId") Long memberId,
+            @Param("activeStatuses") Set<com.runnity.challenge.domain.ParticipationStatus> activeStatuses
     );
 }

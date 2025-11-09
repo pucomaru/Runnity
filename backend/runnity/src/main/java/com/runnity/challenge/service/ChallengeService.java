@@ -93,7 +93,13 @@ public class ChallengeService {
                 .toList();
 
         // 사용자 참가 여부 조회
-        Set<Long> joinedIds = Set.copyOf(participationRepository.findJoinedChallengeIds(challengeIds, memberId));
+        Set<Long> joinedIds = challengeIds.isEmpty()
+                ? Set.of()
+                : Set.copyOf(participationRepository.findJoinedChallengeIds(
+                        challengeIds,
+                        memberId,
+                        ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ));
 
         // DTO 변환
         Page<ChallengeListItemResponse> items = result.map(arr ->
@@ -105,6 +111,42 @@ public class ChallengeService {
         );
 
         return ChallengeListResponse.from(items);
+    }
+
+    public ChallengeResponse getChallenge(Long challengeId, Long memberId) {
+        Challenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+
+        if (challenge.isDeleted()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
+        }
+
+        // 참가자 목록 조회 (LEFT 제외)
+        List<ChallengeParticipation> participations = participationRepository.findByChallengeIdAndActiveStatus(
+                challengeId,
+                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+        );
+
+        int currentParticipants = participations.size();
+
+        // 참가 여부 확인
+        boolean joined = participationRepository.existsByChallengeIdAndMemberIdAndActiveStatus(
+                challengeId,
+                memberId,
+                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+        );
+
+        // 참가자 DTO 변환
+        List<ChallengeParticipantResponse> participants = participations.stream()
+                .map(ChallengeParticipantResponse::from)
+                .toList();
+
+        return ChallengeResponse.from(
+                challenge,
+                currentParticipants,
+                joined,
+                participants
+        );
     }
 
     private void validateTimeOverlap(Long memberId, LocalDateTime startAt, LocalDateTime endAt) {
