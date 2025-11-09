@@ -2,6 +2,7 @@ package com.runnity.stream.socket;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runnity.stream.socket.dto.BroadcastResponse;
 import com.runnity.stream.socket.dto.RunningDataDto;
 import com.runnity.stream.socket.util.BroadcastRedisUtil;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -81,8 +83,22 @@ public class BroadcastService {
     }
 
     // 현재 활성 방송 목록 조회
-    public List<Map<Object, Object>> getActiveBroadcasts() {
-        return redisUtil.getActiveSessions();
+    public List<BroadcastResponse> getActiveBroadcasts() {
+        List<Map<Object, Object>> rawList = redisUtil.getActiveSessions();
+        List<BroadcastResponse> result = new ArrayList<>();
+
+        for (Map<Object, Object> map : rawList) {
+            BroadcastResponse response = new BroadcastResponse(
+                    Long.parseLong(map.get("challengeId").toString()),
+                    map.get("title").toString(),
+                    Integer.parseInt(map.get("viewerCount").toString()),
+                    Integer.parseInt(map.get("participantCount").toString()),
+                    map.get("createdAt").toString()
+            );
+            result.add(response);
+        }
+
+        return result;
     }
 
 
