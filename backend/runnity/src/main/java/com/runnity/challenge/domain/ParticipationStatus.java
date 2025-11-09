@@ -57,6 +57,9 @@ public enum ParticipationStatus {
     public static final EnumSet<ParticipationStatus> TIME_OVERLAP_STATUSES =
             EnumSet.of(WAITING, RUNNING, TIMEOUT, DISCONNECTED, ERROR);
 
+    public static final EnumSet<ParticipationStatus> ACTIVE_PARTICIPATION_STATUSES =
+            EnumSet.of(WAITING, RUNNING, COMPLETED, QUIT, TIMEOUT, DISCONNECTED, KICKED, ERROR, EXPIRED, NOT_STARTED);
+
     @Override
     public String toString() {
         return label + " (" + code + ")";
