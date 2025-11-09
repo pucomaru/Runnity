@@ -5,6 +5,8 @@ import com.runnity.challenge.request.ChallengeCreateRequest;
 import com.runnity.challenge.request.ChallengeListRequest;
 import com.runnity.challenge.request.ChallengeSortType;
 import com.runnity.challenge.request.ChallengeVisibility;
+import com.runnity.challenge.request.ChallengeJoinRequest;
+import com.runnity.challenge.response.ChallengeJoinResponse;
 import com.runnity.challenge.response.ChallengeListItemResponse;
 import com.runnity.challenge.response.ChallengeListResponse;
 import com.runnity.challenge.response.ChallengeParticipantResponse;
@@ -146,6 +148,82 @@ public class ChallengeService {
                 currentParticipants,
                 joined,
                 participants
+        );
+    }
+
+    @Transactional
+    public ChallengeJoinResponse joinChallenge(Long challengeId, ChallengeJoinRequest request, Long memberId) {
+        // 1. 챌린지 존재 확인
+        Challenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+
+        if (challenge.isDeleted()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
+        }
+
+        // 2. 챌린지가 모집 중인지 확인
+        if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_RECRUITING);
+        }
+
+        // 3. 회원 존재 확인
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+
+        // 4. 이미 참가 중인지 확인
+        boolean alreadyJoined = participationRepository.existsByChallengeIdAndMemberIdAndActiveStatus(
+                challengeId,
+                memberId,
+                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+        );
+
+        if (alreadyJoined) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_JOINED);
+        }
+
+        // 5. 비밀번호 확인 (비밀방인 경우)
+        if (challenge.getIsPrivate()) {
+            String password = request != null ? request.password() : null;
+            if (password == null || password.isBlank()) {
+                throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
+            }
+            if (!challenge.getPassword().equals(password)) {
+                throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
+            }
+        }
+
+        // 6. 참가 제한 조건 확인 (시간 중복)
+        validateTimeOverlap(memberId, challenge.getStartAt(), challenge.getEndAt());
+
+        // 7. 최대 인원 확인
+        List<ChallengeParticipation> currentParticipations = participationRepository.findByChallengeIdAndActiveStatus(
+                challengeId,
+                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+        );
+
+        if (currentParticipations.size() >= challenge.getMaxParticipants()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_PARTICIPANT_LIMIT_EXCEEDED);
+        }
+
+        // 8. ChallengeParticipation 생성
+        ChallengeParticipation participation = ChallengeParticipation.builder()
+                .challenge(challenge)
+                .member(member)
+                .build();
+
+        ChallengeParticipation savedParticipation = participationRepository.save(participation);
+
+        log.info("챌린지 참가 신청 완료: challengeId={}, memberId={}, participantId={}",
+                challengeId, memberId, savedParticipation.getParticipantId());
+
+        // 9. Response 반환
+        return new ChallengeJoinResponse(
+                savedParticipation.getParticipantId(),
+                challenge.getChallengeId(),
+                member.getMemberId(),
+                savedParticipation.getStatus().code(),
+                savedParticipation.getRanking(),
+                member.getAveragePace()
         );
     }
 

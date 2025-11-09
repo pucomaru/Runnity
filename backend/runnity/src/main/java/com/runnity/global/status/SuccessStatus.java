@@ -16,7 +16,8 @@ public enum SuccessStatus implements BaseSuccessStatus {
     LOGIN_SUCCESS(HttpStatus.OK, 200, "로그인이 성공적으로 완료되었습니다."),
 
     // challenge
-    CHALLENGE_CREATED(HttpStatus.CREATED, 201, "챌린지가 성공적으로 생성되었습니다.");
+    CHALLENGE_CREATED(HttpStatus.CREATED, 201, "챌린지가 성공적으로 생성되었습니다."),
+    CHALLENGE_JOINED(HttpStatus.CREATED, 201, "챌린지 참가 신청이 완료되었습니다.");
 
     private final HttpStatus httpStatus;
     private final Integer code;
