@@ -63,9 +63,6 @@ public class ChallengeParticipation extends BaseEntity {
      * @throws GlobalException WAITING 상태가 아닌 경우
      */
     public void cancel() {
-        if (this.status == ParticipationStatus.LEFT) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_LEFT);
-        }
         if (this.status != ParticipationStatus.WAITING) {
             throw new GlobalException(ErrorStatus.CHALLENGE_CANCEL_NOT_ALLOWED);
         }
