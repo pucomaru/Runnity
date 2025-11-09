@@ -7,8 +7,10 @@ import com.runnity.member.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -16,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.NoSuchElementException;
 
 @Slf4j
 @RestController
@@ -134,6 +138,47 @@ public class AuthController {
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, profile);
 
         } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Operation(
+            summary = "내 프로필 수정",
+            description = "multipart/form-data로 data(JSON) + profileImage(File, 선택)을 전송합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "프로필 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 정보 없음"),
+            @ApiResponse(responseCode = "404", description = "회원 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PutMapping(
+            value = "/me/profile",
+            consumes = { MediaType.MULTIPART_FORM_DATA_VALUE}
+    )
+    public ResponseEntity<com.runnity.global.response.ApiResponse<Void>> updateMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestPart(value = "data", required = false) ProfileUpdateRequestDto request,
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
+    ) {
+        try {
+            if (userPrincipal == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
+            }
+
+            if (request == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            authService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, null);
+
+        } catch (IllegalArgumentException e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (NoSuchElementException e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.NOT_FOUND);
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
