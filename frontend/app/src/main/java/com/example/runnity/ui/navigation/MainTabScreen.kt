@@ -203,7 +203,25 @@ fun MainTabScreen(
                     val type = backStackEntry.arguments?.getString("type")
                     val km = backStackEntry.arguments?.getString("km")
                     val min = backStackEntry.arguments?.getString("min")
-                    WorkoutPersonalScreen(type = type, km = km, min = min)
+                    WorkoutPersonalScreen(type = type, km = km, min = min, navController = navController)
+                }
+                composable(
+                    route = "workout/result?type={type}&km={km}&min={min}",
+                    arguments = listOf(
+                        navArgument("type") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("km") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("min") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    )
+                ) { backStackEntry ->
+                    val type = backStackEntry.arguments?.getString("type")
+                    val km = backStackEntry.arguments?.getString("km")
+                    val min = backStackEntry.arguments?.getString("min")
+                    com.example.runnity.ui.screens.workout.WorkoutResultScreen(
+                        type = type,
+                        km = km,
+                        min = min,
+                        onClose = { navController.navigate("start_run") }
+                    )
                 }
             }
 
