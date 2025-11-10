@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
                 description = "A703_SSAFY",
                 version = "v1"),
         servers = {
-                @Server(url = "http://localhost",
+                @Server(url = "https://runnity.p-e.kr/",
                         description = "서버 URL"),
         }
 )
