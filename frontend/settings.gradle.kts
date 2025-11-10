@@ -31,3 +31,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Runnity"
 include(":app")
+include(":watch")
