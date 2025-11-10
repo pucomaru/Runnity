@@ -17,6 +17,8 @@ import com.runnity.global.exception.GlobalException;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.member.domain.Member;
 import com.runnity.member.repository.MemberRepository;
+import com.runnity.scheduler.domain.ScheduleOutbox;
+import com.runnity.scheduler.repository.ScheduleOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 
@@ -37,6 +40,7 @@ public class ChallengeService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeParticipationRepository participationRepository;
     private final MemberRepository memberRepository;
+    private final ScheduleOutboxRepository scheduleOutboxRepository;
 
     @Transactional
     public ChallengeResponse createChallenge(ChallengeCreateRequest request, Long memberId) {
@@ -53,6 +57,14 @@ public class ChallengeService {
                 .challenge(challenge)
                 .build();
         participationRepository.save(hostParticipation);
+
+        String payload = createSchedulePayload(challenge.getChallengeId(), startAt, endAt);
+        ScheduleOutbox outbox = ScheduleOutbox.builder()
+                .challengeId(challenge.getChallengeId())
+                .eventType("SCHEDULE_CREATE")
+                .payload(payload)
+                .build();
+        scheduleOutboxRepository.save(outbox);
 
         ChallengeParticipantResponse hostResponse = ChallengeParticipantResponse.fromHost(member);
         log.info("챌린지 생성 완료: id={}, title={}, host={}",
@@ -148,6 +160,16 @@ public class ChallengeService {
                 currentParticipants,
                 joined,
                 participants
+        );
+    }
+
+    private String createSchedulePayload(Long challengeId, LocalDateTime startAt, LocalDateTime endAt) {
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        return String.format(
+                "{\"challengeId\":%d,\"startAt\":\"%s\",\"endAt\":\"%s\"}",
+                challengeId,
+                startAt.format(formatter),
+                endAt.format(formatter)
         );
     }
 
