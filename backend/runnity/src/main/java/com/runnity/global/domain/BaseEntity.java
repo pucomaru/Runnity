@@ -29,4 +29,5 @@ public abstract class BaseEntity {
         this.isDeleted = true;
     }
 
+    public void recover() {this.isDeleted = false;}
 }

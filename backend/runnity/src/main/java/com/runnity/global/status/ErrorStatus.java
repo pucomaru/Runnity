@@ -51,7 +51,10 @@ public enum ErrorStatus implements BaseErrorStatus {
 
     //history
     RUN_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 운동 기록입니다."),
-    RUN_RECORD_FORBIDDEN(HttpStatus.FORBIDDEN, 403, "본인의 운동 기록만 조회할 수 있습니다.");
+    RUN_RECORD_FORBIDDEN(HttpStatus.FORBIDDEN, 403, "본인의 운동 기록만 조회할 수 있습니다."),
+
+    //fcm
+    FCM_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 fcm 토큰입니다.");
 
     private final HttpStatus httpStatus;
     private final Integer code;
