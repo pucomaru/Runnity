@@ -19,7 +19,7 @@ public class ProfileResponseDto {
     @Schema(description = "이메일")
     private String email;
     @Schema(description = "프로필 이미지 URL")
-    private String profileImage;
+    private String profileImageUrl;
     @Schema(description = "닉네임", example = "러너1")
     private String nickname;
     @Schema(description = "성별", example = "MALE")
@@ -35,12 +35,23 @@ public class ProfileResponseDto {
         return ProfileResponseDto.builder()
                 .memberId(m.getMemberId())
                 .email(m.getEmail())
-                .profileImage(m.getProfileImage())
+                .profileImageUrl(buildProxyUrl(m.getMemberId(), m.getProfileImage()))
                 .nickname(m.getNickname())
                 .gender(m.getGender())
                 .height(m.getHeight())
                 .weight(m.getWeight())
                 .birth(m.getBirth())
                 .build();
+    }
+
+    /**
+     * S3 키 → 프록시 URL 변환
+     */
+    private static String buildProxyUrl(Long memberId, String s3Key) {
+        if (s3Key == null || s3Key.isBlank()) {
+            return null;  // 프로필 이미지 없음
+        }
+        // 프록시 API 경로 반환
+        return "/api/v1/images/profile/" + memberId;
     }
 }

@@ -331,4 +331,14 @@ public class AuthService {
             throw new RuntimeException("Logout failed", e);
         }
     }
+
+    /**
+     * 프로필 이미지 S3 키 조회 (프록시 엔드포인트에서 사용)
+     */
+    @Transactional(readOnly = true)
+    public String getProfileImageKey(Long memberId) {
+        return memberRepository.findById(memberId)
+                .map(Member::getProfileImage)
+                .orElse(null);
+    }
 }
