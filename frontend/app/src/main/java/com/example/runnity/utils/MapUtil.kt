@@ -45,15 +45,41 @@ object MapUtil {
         return layer.addRouteLine(options)?.also { it.show() }
     }
 
-    // 경로 전체가 보이도록 카메라를 맞춤 (간단한 중심/줌)
+    // 경로 전체가 보이도록 카메라를 맞춤 (경로 범위 기반 근사 확대 레벨)
     fun moveCameraToRoute(
         kakaoMap: KakaoMap,
         latLngs: List<LatLng>,
         fallbackZoom: Int = DEFAULT_ZOOM_LEVEL
     ) {
         if (latLngs.isEmpty()) return
-        val center = latLngs.first()
+        // 경로의 경계 박스 계산
+        var minLat = latLngs.first().latitude
+        var maxLat = latLngs.first().latitude
+        var minLon = latLngs.first().longitude
+        var maxLon = latLngs.first().longitude
+        for (p in latLngs) {
+            if (p.latitude < minLat) minLat = p.latitude
+            if (p.latitude > maxLat) maxLat = p.latitude
+            if (p.longitude < minLon) minLon = p.longitude
+            if (p.longitude > maxLon) maxLon = p.longitude
+        }
+        val centerLat = (minLat + maxLat) / 2.0
+        val centerLon = (minLon + maxLon) / 2.0
+        val center = LatLng.from(centerLat, centerLon)
+
+        // 위경도 범위에 따른 근사 줌 결정
+        val latSpan = (maxLat - minLat).coerceAtLeast(1e-6)
+        val lonSpan = (maxLon - minLon).coerceAtLeast(1e-6)
+        val maxSpan = maxOf(latSpan, lonSpan)
+        val zoom = when {
+            maxSpan < 0.002 -> 17 // ~200m
+            maxSpan < 0.005 -> 16 // ~500m
+            maxSpan < 0.01 -> 15  // ~1km
+            maxSpan < 0.05 -> 13  // ~5km
+            maxSpan < 0.1 -> 12   // ~10km
+            else -> fallbackZoom
+        }
         kakaoMap.moveCamera(CameraUpdateFactory.newCenterPosition(center))
-        kakaoMap.moveCamera(CameraUpdateFactory.zoomTo(fallbackZoom))
+        kakaoMap.moveCamera(CameraUpdateFactory.zoomTo(zoom))
     }
 }

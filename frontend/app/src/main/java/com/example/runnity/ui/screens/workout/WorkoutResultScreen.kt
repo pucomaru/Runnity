@@ -2,6 +2,7 @@ package com.example.runnity.ui.screens.workout
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,6 +83,7 @@ fun WorkoutResultScreen(
             .fillMaxSize()
             .background(Color.White)
     ) {
+        BackHandler(enabled = true) { /* consume back */ }
         PageHeader(title = "러닝 결과", onClose = onClose)
         HorizontalDivider(color = Color(0xFFDDDDDD))
 
@@ -124,7 +127,7 @@ fun WorkoutResultScreen(
                                         } else if (latLngs.size == 1) {
                                             val p = latLngs.first()
                                             map.moveCamera(CameraUpdateFactory.newCenterPosition(p))
-                                            map.moveCamera(CameraUpdateFactory.zoomTo(MapUtil.DEFAULT_ZOOM_LEVEL))
+                                            map.moveCamera(CameraUpdateFactory.zoomTo(16))
                                             val layer = markerLayer
                                             val styles = markerStyles
                                             if (layer != null && styles != null && startPointLabel == null) {
@@ -137,14 +140,14 @@ fun WorkoutResultScreen(
                                             if (curr != null) {
                                                 val target = LatLng.from(curr.latitude, curr.longitude)
                                                 map.moveCamera(CameraUpdateFactory.newCenterPosition(target))
-                                                map.moveCamera(CameraUpdateFactory.zoomTo(MapUtil.DEFAULT_ZOOM_LEVEL))
+                                                map.moveCamera(CameraUpdateFactory.zoomTo(16))
                                             } else {
                                                 val fused = LocationServices.getFusedLocationProviderClient(ctx)
                                                 fused.lastLocation.addOnSuccessListener { loc ->
                                                     loc?.let {
                                                         val target = LatLng.from(it.latitude, it.longitude)
                                                         map.moveCamera(CameraUpdateFactory.newCenterPosition(target))
-                                                        map.moveCamera(CameraUpdateFactory.zoomTo(MapUtil.DEFAULT_ZOOM_LEVEL))
+                                                        map.moveCamera(CameraUpdateFactory.zoomTo(16))
                                                     }
                                                 }
                                             }
@@ -209,17 +212,20 @@ fun WorkoutResultScreen(
                         if (type == "time") {
                             Text(text = "총 시간", style = Typography.Subtitle, color = ColorPalette.Light.secondary)
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text(text = formatElapsed(metrics.totalElapsedMs), style = Typography.LargeTitle.copy(fontSize = 72.sp), color = ColorPalette.Light.primary)
+                            Text(text = formatElapsedHM(metrics.totalElapsedMs), style = Typography.LargeTitle.copy(fontSize = 72.sp), color = ColorPalette.Light.primary)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                    val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
-                                    Text(paceText, style = Typography.Title)
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("거리", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                    Text(formatDistanceKm(metrics.distanceMeters), style = Typography.Title)
+                            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                                val half = this.maxWidth / 2
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
+                                        Text(paceText, style = Typography.Title)
+                                    }
+                                    Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("거리", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                        Text(formatDistanceKm(metrics.distanceMeters), style = Typography.Title)
+                                    }
                                 }
                             }
                         } else {
@@ -227,27 +233,33 @@ fun WorkoutResultScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(text = formatDistanceKm(metrics.distanceMeters), style = Typography.LargeTitle.copy(fontSize = 72.sp), color = ColorPalette.Light.primary)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                    val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
-                                    Text(paceText, style = Typography.Title)
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("시간", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                    Text(formatElapsed(metrics.totalElapsedMs), style = Typography.Title)
+                            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                                val half = this.maxWidth / 2
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
+                                        Text(paceText, style = Typography.Title)
+                                    }
+                                    Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("시간", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                        Text(formatElapsedHM(metrics.totalElapsedMs), style = Typography.Title)
+                                    }
                                 }
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("평균 심박수", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                Text(metrics.avgHeartRate?.toString() ?: "--", style = Typography.Title)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("칼로리", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                Text(formatCalories(metrics.caloriesKcal), style = Typography.Title)
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val half = this.maxWidth / 2
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("평균 심박수", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                    Text(metrics.avgHeartRate?.toString() ?: "--", style = Typography.Title)
+                                }
+                                Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("칼로리", style = Typography.Caption, color = ColorPalette.Light.secondary)
+                                    Text(formatCalories(metrics.caloriesKcal), style = Typography.Title)
+                                }
                             }
                         }
                     }
@@ -269,6 +281,13 @@ private fun formatElapsed(ms: Long): String {
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
     return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+}
+
+private fun formatElapsedHM(ms: Long): String {
+    val totalSec = (ms / 1000).toInt()
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    return String.format("%02d:%02d", h, m)
 }
 
 private fun formatPace(secPerKm: Double): String {

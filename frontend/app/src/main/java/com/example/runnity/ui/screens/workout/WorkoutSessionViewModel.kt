@@ -53,7 +53,7 @@ class WorkoutSessionViewModel : ViewModel() {
     private val _phase = MutableStateFlow(WorkoutPhase.Idle)
     val phase: StateFlow<WorkoutPhase> = _phase.asStateFlow()
 
-    // 누적 메트릭
+    // 누적 메트릭 
     private val _metrics = MutableStateFlow(WorkoutMetrics())
     val metrics: StateFlow<WorkoutMetrics> = _metrics.asStateFlow()
 
@@ -77,6 +77,21 @@ class WorkoutSessionViewModel : ViewModel() {
     private var activeBaseOnResumeMs: Long = 0L
     private var tickerJob: Job? = null
 
+    // 목표 관련 상태
+    data class Goal(
+        val type: String, // "time" | "distance"
+        val targetTimeMs: Long? = null,
+        val targetDistanceMeters: Double? = null
+    )
+    private val _goal = MutableStateFlow<Goal?>(null)
+    val goal: StateFlow<Goal?> = _goal.asStateFlow()
+    private val _goalProgress = MutableStateFlow<Float?>(null)
+    val goalProgress: StateFlow<Float?> = _goalProgress.asStateFlow()
+    private val _remainingTimeMs = MutableStateFlow<Long?>(null)
+    val remainingTimeMs: StateFlow<Long?> = _remainingTimeMs.asStateFlow()
+    private val _remainingDistanceMeters = MutableStateFlow<Double?>(null)
+    val remainingDistanceMeters: StateFlow<Double?> = _remainingDistanceMeters.asStateFlow()
+
     // 누적 계산용 내부 상태
     private var lastPoint: GeoPoint? = null
     private var lastPointTimeMs: Long? = null
@@ -96,6 +111,56 @@ class WorkoutSessionViewModel : ViewModel() {
         activeBaseOnResumeMs = 0L
         _phase.value = WorkoutPhase.Running
         startTicker()
+    }
+
+    // 새로운 세션을 시작하기 전에 이전 상태를 완전히 초기화
+    fun resetSession() {
+        stopTicker()
+        _phase.value = WorkoutPhase.Idle
+        _metrics.value = WorkoutMetrics()
+        _route.value = emptyList()
+        _currentLocation.value = null
+        _currentPaceSecPerKm.value = null
+        sessionStartMs = null
+        _sessionStartTime.value = null
+        activeStartMs = null
+        activeBaseOnResumeMs = 0L
+        lastPoint = null
+        lastPointTimeMs = null
+        totalDistanceMetersInternal = 0.0
+        segmentDistanceMeters = 0.0
+        segmentTimeMs = 0L
+        _goal.value = null
+        _goalProgress.value = null
+        _remainingTimeMs.value = null
+        _remainingDistanceMeters.value = null
+    }
+
+    // 외부에서 목표 설정 (null이면 자유 달리기)
+    fun setGoal(type: String?, km: String?, min: String?) {
+        if (type == null) {
+            _goal.value = null
+            _goalProgress.value = null
+            _remainingTimeMs.value = null
+            _remainingDistanceMeters.value = null
+            return
+        }
+        when (type) {
+            "time" -> {
+                val minutes = min?.toLongOrNull() ?: 0L
+                val target = minutes * 60_000L
+                _goal.value = Goal(type = "time", targetTimeMs = target)
+            }
+            "distance" -> {
+                val kmVal = km?.toDoubleOrNull() ?: 0.0
+                val target = kmVal * 1000.0
+                _goal.value = Goal(type = "distance", targetDistanceMeters = target)
+            }
+            else -> {
+                _goal.value = null
+            }
+        }
+        _goalProgress.value = 0f
     }
 
     // 일시정지: 지금까지의 active 시간을 누적 저장하고 시간 잠시 중단
@@ -127,10 +192,8 @@ class WorkoutSessionViewModel : ViewModel() {
     fun stop() {
         val now = System.currentTimeMillis()
         val total = sessionStartMs?.let { now - it } ?: _metrics.value.totalElapsedMs
-        val active = when {
-            _phase.value == WorkoutPhase.Running && activeStartMs != null -> _metrics.value.activeElapsedMs + (now - (activeStartMs ?: now))
-            else -> _metrics.value.activeElapsedMs
-        }
+        // Use currentActiveElapsedMs to avoid double-counting the last slice on stop
+        val active = currentActiveElapsedMs()
         _metrics.value = _metrics.value.copy(totalElapsedMs = total, activeElapsedMs = active)
         _phase.value = WorkoutPhase.Ended
         stopTicker()
@@ -228,6 +291,20 @@ class WorkoutSessionViewModel : ViewModel() {
             caloriesKcal = caloriesKcal,
             avgPaceSecPerKm = pace
         )
+
+        // 목표가 거리일 때 진행도/잔여 갱신 및 자동 종료
+        val g = _goal.value
+        if (g?.type == "distance") {
+            val target = g.targetDistanceMeters ?: 0.0
+            if (target > 0.0) {
+                val progress = (distanceMeters / target).toFloat().coerceIn(0f, 1f)
+                _goalProgress.value = progress
+                _remainingDistanceMeters.value = (target - distanceMeters).coerceAtLeast(0.0)
+                if (progress >= 1f && _phase.value == WorkoutPhase.Running) {
+                    stop()
+                }
+            }
+        }
     }
 
     // 현재 시점의 활동 시간(일시정지 제외)을 계산
@@ -246,6 +323,20 @@ class WorkoutSessionViewModel : ViewModel() {
                 val total = sessionStartMs?.let { now - it } ?: 0L
                 val active = currentActiveElapsedMs()
                 _metrics.value = _metrics.value.copy(totalElapsedMs = total, activeElapsedMs = active)
+
+                // 목표가 시간일 때 진행도/잔여 갱신 및 자동 종료
+                val g = _goal.value
+                if (g?.type == "time") {
+                    val target = g.targetTimeMs ?: 0L
+                    if (target > 0L) {
+                        val progress = (total.toFloat() / target.toFloat()).coerceIn(0f, 1f)
+                        _goalProgress.value = progress
+                        _remainingTimeMs.value = (target - total).coerceAtLeast(0L)
+                        if (progress >= 1f && _phase.value == WorkoutPhase.Running) {
+                            stop()
+                        }
+                    }
+                }
                 delay(1000L)
             }
         }

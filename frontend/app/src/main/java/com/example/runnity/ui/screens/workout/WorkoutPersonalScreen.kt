@@ -1,6 +1,7 @@
 package com.example.runnity.ui.screens.workout
 
 import android.annotation.SuppressLint
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,16 +75,42 @@ fun WorkoutPersonalScreen(
     val phase by sessionViewModel.phase.collectAsState()
     val currentPace by sessionViewModel.currentPaceSecPerKm.collectAsState()
     val currentLoc by sessionViewModel.currentLocation.collectAsState()
+    val goal by sessionViewModel.goal.collectAsState()
+    val goalProgress by sessionViewModel.goalProgress.collectAsState()
+    val remainingTimeMs by sessionViewModel.remainingTimeMs.collectAsState()
+    val remainingDistanceMeters by sessionViewModel.remainingDistanceMeters.collectAsState()
 
     // 화면 범위 트래커
     val tracker = remember(context) { WorkoutLocationTracker(context) }
 
 
     // 시작/정지 바인딩 (한 번만)
+    var hasStarted by remember { mutableStateOf(false) }
+    var hasSeenRunning by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        // 이전 세션 상태 초기화 후 목표 설정 및 시작
+        sessionViewModel.resetSession()
+        sessionViewModel.setGoal(type, km, min)
         sessionViewModel.start()
+        hasStarted = true
         tracker.start { lat, lon, elapsedMs, acc, speed ->
             sessionViewModel.ingestLocation(lat, lon, elapsedMs, acc, speed)
+        }
+    }
+
+    // 목표 달성 등으로 Ended가 되면 자동으로 결과 화면으로 이동
+    LaunchedEffect(phase) {
+        if (phase == WorkoutPhase.Running) {
+            hasSeenRunning = true
+        }
+        if (hasStarted && hasSeenRunning && phase == WorkoutPhase.Ended) {
+            val route = buildString {
+                append("workout/result?")
+                if (type != null) append("type=$type&")
+                if (km != null) append("km=$km&")
+                if (min != null) append("min=$min&")
+            }.trimEnd('&')
+            navController?.navigate(route)
         }
     }
 
@@ -91,8 +118,15 @@ fun WorkoutPersonalScreen(
     DisposableEffect(Unit) {
         onDispose {
             tracker.stop()
-            sessionViewModel.stop()
+            if (phase != WorkoutPhase.Ended) {
+                sessionViewModel.stop()
+            }
         }
+    }
+
+    // 시스템 뒤로가기 방지 (운동 중 뒤로가기 금지)
+    BackHandler(enabled = true) {
+        // consume back press
     }
 
     var selectedTab by remember { mutableStateOf(0) } // 0=통계, 1=지도
@@ -287,7 +321,7 @@ fun WorkoutPersonalScreen(
                             else -> "킬로미터"
                         }
                         val mainText = when {
-                            isGoalTime -> formatElapsed(metrics.activeElapsedMs)
+                            isGoalTime -> formatElapsedHM(metrics.activeElapsedMs)
                             else -> formatDistanceKm(metrics.distanceMeters)
                         }
                         Text(
@@ -306,8 +340,9 @@ fun WorkoutPersonalScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         if (!isFreeRun) {
+                            val p = goalProgress ?: 0f
                             LinearProgressIndicator(
-                                progress = { 0.35f },
+                                progress = { p.coerceIn(0f, 1f) },
                                 trackColor = Color(0xFFEAEAEA),
                                 color = ColorPalette.Common.accent,
                                 modifier = Modifier
@@ -441,6 +476,14 @@ private fun formatElapsed(ms: Long): String {
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
     return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+}
+
+// 시간:분(HH:MM)만 표시 (메인 타이머용)
+private fun formatElapsedHM(ms: Long): String {
+    val totalSec = (ms / 1000).toInt()
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    return String.format("%02d:%02d", h, m)
 }
 
 // 페이스 포맷팅
