@@ -153,80 +153,141 @@ public class ChallengeService {
 
     @Transactional
     public ChallengeJoinResponse joinChallenge(Long challengeId, ChallengeJoinRequest request, Long memberId) {
-        // 1. 챌린지 존재 확인
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+        // 1. 회원 조회 (평균 페이스 필요)
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
-        if (challenge.isDeleted()) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
-        }
-
-        // 2. 챌린지가 모집 중인지 확인
+        // 2. 챌린지 검증
+        Challenge challenge = validateAndGetChallenge(challengeId);
+        
         if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
             throw new GlobalException(ErrorStatus.CHALLENGE_NOT_RECRUITING);
         }
 
-        // 3. 회원 존재 확인
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+        // 3. 비밀번호 검증
+        validatePassword(challenge, request);
 
-        // 4. 이미 참가 중인지 확인
-        boolean alreadyJoined = participationRepository.existsByChallengeIdAndMemberIdAndActiveStatus(
-                challengeId,
-                memberId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
-        );
-
-        if (alreadyJoined) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_JOINED);
-        }
-
-        // 5. 비밀번호 확인 (비밀방인 경우)
-        if (challenge.getIsPrivate()) {
-            String password = request != null ? request.password() : null;
-            if (password == null || password.isBlank()) {
-                throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
-            }
-            if (!challenge.getPassword().equals(password)) {
-                throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
-            }
-        }
-
-        // 6. 참가 제한 조건 확인 (시간 중복)
+        // 4. 참가 제한 조건 검증
         validateTimeOverlap(memberId, challenge.getStartAt(), challenge.getEndAt());
+        validateParticipantLimit(challenge);
 
-        // 7. 최대 인원 확인
-        List<ChallengeParticipation> currentParticipations = participationRepository.findByChallengeIdAndActiveStatus(
-                challengeId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
-        );
+        // 5. 참가 정보 조회 또는 생성
+        ChallengeParticipation participation = participationRepository
+                .findByChallengeIdAndMemberId(challengeId, memberId)
+                .orElse(null);
 
-        if (currentParticipations.size() >= challenge.getMaxParticipants()) {
-            throw new GlobalException(ErrorStatus.CHALLENGE_PARTICIPANT_LIMIT_EXCEEDED);
+        if (participation != null) {
+            // 기존 참가 정보가 있는 경우
+            if (participation.isActive()) {
+                throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_JOINED);
+            }
+            // LEFT 상태인 경우 재참가
+            participation.rejoin();
+            participation = participationRepository.save(participation);
+            log.info("챌린지 재참가 신청 완료: challengeId={}, memberId={}, participantId={}",
+                    challengeId, memberId, participation.getParticipantId());
+        } else {
+            // 새로운 참가 신청
+            participation = ChallengeParticipation.builder()
+                    .challenge(challenge)
+                    .member(member)
+                    .build();
+            participation = participationRepository.save(participation);
+            log.info("챌린지 참가 신청 완료: challengeId={}, memberId={}, participantId={}",
+                    challengeId, memberId, participation.getParticipantId());
         }
 
-        // 8. ChallengeParticipation 생성
-        ChallengeParticipation participation = ChallengeParticipation.builder()
-                .challenge(challenge)
-                .member(member)
-                .build();
-
-        ChallengeParticipation savedParticipation = participationRepository.save(participation);
-
-        log.info("챌린지 참가 신청 완료: challengeId={}, memberId={}, participantId={}",
-                challengeId, memberId, savedParticipation.getParticipantId());
-
-        // 9. Response 반환
+        // 6. Response 반환
         return new ChallengeJoinResponse(
-                savedParticipation.getParticipantId(),
+                participation.getParticipantId(),
                 challenge.getChallengeId(),
                 member.getMemberId(),
-                savedParticipation.getStatus().code(),
-                savedParticipation.getRanking(),
+                participation.getStatus().code(),
+                participation.getRanking(),
                 member.getAveragePace()
         );
     }
 
+    @Transactional
+    public ChallengeJoinResponse cancelParticipation(Long challengeId, Long memberId) {
+        // 1. 챌린지 검증
+        Challenge challenge = validateAndGetChallenge(challengeId);
+
+        // 2. 회원 조회 (평균 페이스 필요)
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+
+        // 3. 참가 정보 조회
+        ChallengeParticipation participation = participationRepository
+                .findByChallengeIdAndMemberId(challengeId, memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
+
+        // 4. 참가 취소 처리 (도메인 로직 활용)
+        participation.cancel();
+        participationRepository.save(participation);
+
+        log.info("챌린지 참가 취소 완료: challengeId={}, memberId={}, participantId={}",
+                challengeId, memberId, participation.getParticipantId());
+
+        // 5. Response 반환
+        return new ChallengeJoinResponse(
+                participation.getParticipantId(),
+                challenge.getChallengeId(),
+                member.getMemberId(),
+                participation.getStatus().code(),
+                participation.getRanking(),
+                member.getAveragePace()
+        );
+    }
+
+    /**
+     * 챌린지 존재 및 삭제 여부 검증
+     */
+    private Challenge validateAndGetChallenge(Long challengeId) {
+        Challenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+        
+        if (challenge.isDeleted()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
+        }
+        
+        return challenge;
+    }
+
+    /**
+     * 비밀번호 검증
+     */
+    private void validatePassword(Challenge challenge, ChallengeJoinRequest request) {
+        if (!challenge.getIsPrivate()) {
+            return;
+        }
+        
+        String password = request != null ? request.password() : null;
+        if (password == null || password.isBlank()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
+        }
+        if (!challenge.getPassword().equals(password)) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
+        }
+    }
+
+    /**
+     * 참가 인원 제한 검증
+     */
+    private void validateParticipantLimit(Challenge challenge) {
+        long currentCount = participationRepository.findByChallengeIdAndActiveStatus(
+                challenge.getChallengeId(),
+                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+        ).size();
+
+        if (currentCount >= challenge.getMaxParticipants()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_PARTICIPANT_LIMIT_EXCEEDED);
+        }
+    }
+
+    /**
+     * 시간 중복 검증
+     */
     private void validateTimeOverlap(Long memberId, LocalDateTime startAt, LocalDateTime endAt) {
         boolean hasOverlap = participationRepository.existsByMemberAndTimeOverlapAndStatusIn(
                 memberId, startAt, endAt, ParticipationStatus.TIME_OVERLAP_STATUSES);

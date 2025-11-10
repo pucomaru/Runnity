@@ -87,4 +87,19 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
             @Param("memberId") Long memberId,
             @Param("activeStatuses") Set<com.runnity.challenge.domain.ParticipationStatus> activeStatuses
     );
+
+    /**
+     * 특정 챌린지와 회원으로 참가 정보 조회 (삭제되지 않은 것만)
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId = :challengeId
+        AND cp.member.memberId = :memberId
+        AND cp.isDeleted = false
+    """)
+    java.util.Optional<ChallengeParticipation> findByChallengeIdAndMemberId(
+            @Param("challengeId") Long challengeId,
+            @Param("memberId") Long memberId
+    );
 }

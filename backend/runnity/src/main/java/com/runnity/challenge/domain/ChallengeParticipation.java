@@ -1,6 +1,8 @@
 package com.runnity.challenge.domain;
 
 import com.runnity.global.domain.BaseEntity;
+import com.runnity.global.exception.GlobalException;
+import com.runnity.global.status.ErrorStatus;
 import com.runnity.history.domain.RunRecord;
 import com.runnity.member.domain.Member;
 import jakarta.persistence.*;
@@ -52,5 +54,37 @@ public class ChallengeParticipation extends BaseEntity {
         this.status = ParticipationStatus.WAITING;
         this.challenge = challenge;
         this.member = member;
+    }
+
+    /**
+     * 참가 취소 처리
+     * WAITING 상태에서만 취소 가능
+     * 
+     * @throws GlobalException WAITING 상태가 아닌 경우
+     */
+    public void cancel() {
+        if (this.status != ParticipationStatus.WAITING) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_CANCEL_NOT_ALLOWED);
+        }
+        this.status = ParticipationStatus.LEFT;
+    }
+
+    /**
+     * 재참가 처리 (LEFT 상태에서 WAITING으로 변경)
+     * 
+     * @throws GlobalException LEFT 상태가 아닌 경우
+     */
+    public void rejoin() {
+        if (this.status != ParticipationStatus.LEFT) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_REJOIN_NOT_ALLOWED);
+        }
+        this.status = ParticipationStatus.WAITING;
+    }
+
+    /**
+     * 활성 참가 상태인지 확인 (LEFT 제외)
+     */
+    public boolean isActive() {
+        return ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES.contains(this.status);
     }
 }
