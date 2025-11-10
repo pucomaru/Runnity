@@ -36,6 +36,11 @@ android {
         )
         // AndroidManifest.xml의 ${KAKAO_MAP_KEY} 치환용
         manifestPlaceholders["KAKAO_MAP_KEY"] = properties.getProperty("KAKAO_MAP_KEY")
+
+        // 카카오 맵 SDK 네이티브 라이브러리 지원 아키텍처 설정
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
