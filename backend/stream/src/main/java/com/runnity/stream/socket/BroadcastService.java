@@ -24,7 +24,6 @@ redis 접근은 BroadcastRedisUtil을 통해 수해
 public class BroadcastService {
 
     private final BroadcastRedisUtil redisUtil;
-    private final BroadcastHandler broadcastHandler;    // WebSocket 브로드캐스트 담당
     private final ObjectMapper objectMapper = new ObjectMapper();
 
 //

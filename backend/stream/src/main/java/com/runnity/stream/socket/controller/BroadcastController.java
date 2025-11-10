@@ -2,11 +2,10 @@ package com.runnity.stream.socket.controller;
 
 import com.runnity.stream.socket.BroadcastService;
 import com.runnity.stream.socket.dto.BroadcastResponse;
+import com.runnity.stream.socket.dto.ChallengeRecordMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -27,6 +26,11 @@ public class BroadcastController {
     @GetMapping("/active")
     public ResponseEntity<List<BroadcastResponse>> getActiveBroadcasts() {
         return ResponseEntity.ok(broadcastService.getActiveBroadcasts());
+    }
+
+    @PostMapping("/mock/{challengeId}")
+    public void sendMock(@PathVariable Long challengeId){
+        ChallengeRecordMessage
     }
 
 }
