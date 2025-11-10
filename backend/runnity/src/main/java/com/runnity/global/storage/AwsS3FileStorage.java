@@ -1,6 +1,7 @@
 package com.runnity.global.storage;
 
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import lombok.RequiredArgsConstructor;
@@ -30,25 +31,17 @@ public class AwsS3FileStorage implements FileStorage {
 
     @Override
     public String upload(String prefix, MultipartFile file) {
-        validateImage(file, 5L * 1024 * 1024);
-
+        String key = prefix + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
         try {
-            String original = file.getOriginalFilename();
-            String ext = (original != null && original.contains(".")) ? original.substring(original.lastIndexOf(".")) : ".jpg";
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(file.getContentType());
+            metadata.setContentLength(file.getSize());
 
-            String key = prefix + "/" + UUID.randomUUID() + ext;
+            amazonS3.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), metadata));
 
-            ObjectMetadata meta = new ObjectMetadata();
-            meta.setContentLength(file.getSize());
-            meta.setContentType(file.getContentType());
-
-            amazonS3.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), meta));
-
-            String url = String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key);
-            log.info("S3 upload ok: {}", url);
-            return url;
+            return key;  // ← S3 키만 반환 (URL 아님!)
         } catch (IOException e) {
-            throw new RuntimeException("S3 업로드 실패", e);
+            throw new RuntimeException("S3 upload failed", e);
         }
     }
 
