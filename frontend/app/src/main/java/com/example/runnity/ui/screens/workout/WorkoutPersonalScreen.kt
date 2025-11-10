@@ -321,7 +321,7 @@ fun WorkoutPersonalScreen(
                             else -> "킬로미터"
                         }
                         val mainText = when {
-                            isGoalTime -> formatElapsedHM(metrics.activeElapsedMs)
+                            isGoalTime -> formatElapsed(metrics.activeElapsedMs)
                             else -> formatDistanceKm(metrics.distanceMeters)
                         }
                         Text(

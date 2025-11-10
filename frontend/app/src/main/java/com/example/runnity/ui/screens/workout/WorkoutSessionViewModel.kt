@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlin.math.*
 
 // 운동 상태 머신 (UI/수집/타이머 제어의 기준 상태)
@@ -76,6 +77,7 @@ class WorkoutSessionViewModel : ViewModel() {
     private var activeStartMs: Long? = null
     private var activeBaseOnResumeMs: Long = 0L
     private var tickerJob: Job? = null
+    private var stopping: Boolean = false
 
     // 목표 관련 상태
     data class Goal(
@@ -190,13 +192,17 @@ class WorkoutSessionViewModel : ViewModel() {
 
     // 종료: 최종 total/active 시간 확정 후 Ended 전환
     fun stop() {
-        val now = System.currentTimeMillis()
-        val total = sessionStartMs?.let { now - it } ?: _metrics.value.totalElapsedMs
-        // Use currentActiveElapsedMs to avoid double-counting the last slice on stop
-        val active = currentActiveElapsedMs()
-        _metrics.value = _metrics.value.copy(totalElapsedMs = total, activeElapsedMs = active)
-        _phase.value = WorkoutPhase.Ended
+        if (stopping || _phase.value == WorkoutPhase.Ended) return
+        stopping = true
+        // Cancel ticker immediately to avoid a post-stop tick
         stopTicker()
+        // Freeze to the last emitted ticker values
+        val snap = _metrics.value
+        _metrics.value = snap.copy(totalElapsedMs = snap.totalElapsedMs, activeElapsedMs = snap.activeElapsedMs)
+        _phase.value = WorkoutPhase.Ended
+        // Ensure activeStartMs is cleared to prevent any further active calculations
+        activeStartMs = null
+        stopping = false
     }
 
     // 위치 업데이트 주입: 현재 위치 갱신 + Running 상태에서만 경로에 추가
@@ -232,23 +238,25 @@ class WorkoutSessionViewModel : ViewModel() {
         if (prev == null) return
 
         // 정확도 필터 (약간 엄격)
-        if ((accuracyMeters ?: 0f) > 60f) return
+        if ((accuracyMeters ?: 0f) > 40f) return
 
         val d = haversineMeters(prev.latitude, prev.longitude, point.latitude, point.longitude)
         // 최소 이동 임계 (약간 엄격: 2m)
-        if (d < 2.0) return
+        if (d < 3.5) return
+        // 측정 정확도 대비 이동이 작으면 무시 (정확도 20m 이상일 때 노이즈 억제)
+        if (accuracyMeters != null && accuracyMeters > 20f && d < accuracyMeters * 0.75f) return
 
-        // 속도 필터 (약간 엄격: ~30.6 km/h 초과 제외)
-        if (speedMps != null && speedMps > 8.5f) return
+        // 속도 필터 (약간 엄격: ~25.2 km/h 초과 제외)
+        if (speedMps != null && speedMps > 7.0f) return
         // 저속 노이즈 억제: 거의 정지 상태에서의 미세 이동은 무시
-        if (speedMps != null && speedMps < 0.3f && d < 3.0) return
+        if (speedMps != null && speedMps < 0.5f && d < 5.0) return
 
         totalDistanceMetersInternal += d
 
         // 짧은 간격에서의 비현실적 점프 제거 (예: 1.5초 이내에 20m 이상 이동)
         segmentDistanceMeters += d
         val dtMs = if (elapsedRealtimeMs != null && prevT != null && elapsedRealtimeMs >= prevT) (elapsedRealtimeMs - prevT) else 0L
-        if (dtMs in 1..1500 && d > 20.0) {
+        if (dtMs in 1..2000 && d > 15.0) {
             // 점프 샘플 버림
             return
         }
@@ -318,7 +326,11 @@ class WorkoutSessionViewModel : ViewModel() {
     private fun startTicker() {
         if (tickerJob != null) return
         tickerJob = viewModelScope.launch {
-            while (true) {
+            while (isActive) {
+                // Respect phase and delay first to avoid immediate post-press jump
+                if (_phase.value != WorkoutPhase.Running) break
+                delay(1000L)
+                if (_phase.value != WorkoutPhase.Running) break
                 val now = System.currentTimeMillis()
                 val total = sessionStartMs?.let { now - it } ?: 0L
                 val active = currentActiveElapsedMs()
@@ -337,7 +349,6 @@ class WorkoutSessionViewModel : ViewModel() {
                         }
                     }
                 }
-                delay(1000L)
             }
         }
     }

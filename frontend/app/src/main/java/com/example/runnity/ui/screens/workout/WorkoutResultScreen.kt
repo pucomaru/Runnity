@@ -210,9 +210,9 @@ fun WorkoutResultScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (type == "time") {
-                            Text(text = "총 시간", style = Typography.Subtitle, color = ColorPalette.Light.secondary)
+                            Text(text = "시간", style = Typography.Subtitle, color = ColorPalette.Light.secondary)
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text(text = formatElapsedHM(metrics.totalElapsedMs), style = Typography.LargeTitle.copy(fontSize = 72.sp), color = ColorPalette.Light.primary)
+                            Text(text = formatElapsed(metrics.activeElapsedMs), style = Typography.LargeTitle.copy(fontSize = 72.sp), color = ColorPalette.Light.primary)
                             Spacer(modifier = Modifier.height(16.dp))
                             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                                 val half = this.maxWidth / 2
@@ -243,7 +243,7 @@ fun WorkoutResultScreen(
                                     }
                                     Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("시간", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                        Text(formatElapsedHM(metrics.totalElapsedMs), style = Typography.Title)
+                                        Text(formatElapsed(metrics.activeElapsedMs), style = Typography.Title)
                                     }
                                 }
                             }
@@ -288,6 +288,14 @@ private fun formatElapsedHM(ms: Long): String {
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
     return String.format("%02d:%02d", h, m)
+}
+
+private fun formatElapsedHMS(ms: Long): String {
+    val totalSec = ((ms / 1000)).toInt().coerceAtLeast(0)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return String.format("%02d:%02d:%02d", h, m, s)
 }
 
 private fun formatPace(secPerKm: Double): String {
