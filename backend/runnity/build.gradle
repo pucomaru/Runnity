@@ -68,7 +68,7 @@ dependencies {
 dependencyManagement {
     imports {
         // Spring Boot 3.5.5 에 맞는 Spring Cloud BOM
-        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2025.0.0"
     }
 }
 
