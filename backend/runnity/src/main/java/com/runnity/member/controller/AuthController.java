@@ -4,6 +4,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.global.status.SuccessStatus;
 import com.runnity.member.dto.*;
@@ -39,6 +40,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final AmazonS3 amazonS3;
+    private final ObjectMapper objectMapper;
 
     @Value("${AWS_BUCKET:AWS_BUCKET}")
     private String bucket;
@@ -101,7 +103,7 @@ public class AuthController {
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<AddInfoResponseDto>> addAdditionalInfo(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestPart("data") AddInfoRequestDto request,
+            @RequestPart("data") String dataJson,
             @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
     ) {
         try {
@@ -109,15 +111,20 @@ public class AuthController {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
             }
 
-            if (request == null) {
+            if (dataJson == null) {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
             }
+
+            AddInfoRequestDto request = objectMapper.readValue(dataJson, AddInfoRequestDto.class);
 
             // 서비스 호출
             authService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
 
             AddInfoResponseDto response = new AddInfoResponseDto("추가 정보가 성공적으로 저장되었습니다");
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.CREATED, response);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Invalid JSON in 'data': {}", dataJson, e);
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
         } catch (IllegalArgumentException e) {
             String key = e.getMessage();
 
@@ -215,7 +222,7 @@ public class AuthController {
     )
     public ResponseEntity<com.runnity.global.response.ApiResponse<Void>> updateMyProfile(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Valid @RequestPart(value = "data", required = false) ProfileUpdateRequestDto request,
+            @RequestPart("data") String dataJson,
             @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
     ) {
         try {
@@ -223,10 +230,15 @@ public class AuthController {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
             }
 
+            ProfileUpdateRequestDto request = objectMapper.readValue(dataJson, ProfileUpdateRequestDto.class);
+
+            // 서비스 호출
             authService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
 
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.PROFILE_UPDATE_OK, null);
-
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Invalid JSON in 'data': {}", dataJson, e);
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
         } catch (IllegalArgumentException e) {
             String key = e.getMessage();
             if("NICKNAME_REQUIRED".equals(key)){
