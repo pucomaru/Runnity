@@ -89,7 +89,7 @@ public class AuthController {
 
     @PostMapping(
             value = "/auth/addInfo",
-            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE}
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
     )
     @Operation(
             summary = "추가 정보 입력 (신규 회원)",
