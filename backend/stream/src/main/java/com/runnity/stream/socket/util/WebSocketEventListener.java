@@ -3,6 +3,7 @@ package com.runnity.stream.socket.util;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -22,14 +23,47 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 @Slf4j
 public class WebSocketEventListener {
 
+    private final ViewerCountService viewerCountService;
+
+    // 관전자기 websocket에 연결됐을 때 호출
     @EventListener
     public void handleSessionConnect(SessionConnectEvent event){
-        log.info("viewer connected");
+        try{
+            
+            // stomp 헤더 정보 추출
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+            String challengeId = accessor.getFirstNativeHeader("challengeId"); // 프론트에서 헤더로 전달
+
+            if(challengeId != null){
+                viewerCountService.increment(Long.parseLong(challengeId));
+                log.info("Viewer connected | challengeId = {} | sessionId = {}",challengeId, accessor.getSessionId());
+            }else{
+                log.warn("Connected without challengeId header. session={}", accessor.getSessionId());
+            }
+
+        }catch (Exception e){
+            log.error("error on websocket connect event :{}", e.getMessage());
+        }
+
     }
 
+    // 관전자가 websocket 연결 종료했을 떄 호출
     @EventListener
     public void handleSessionDisconnect(SessionDisconnectEvent event){
-        log.info("Viewer disconnected");
+        try{
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+            String challengeId = accessor.getFirstNativeHeader("challengeId");
+
+            if (challengeId != null) {
+                viewerCountService.decrement(Long.parseLong(challengeId));
+                log.info("Viewer disconnected | challengeId={} | session={}", challengeId, accessor.getSessionId());
+            } else {
+                log.warn("Disconnected without challengeId header. session={}", accessor.getSessionId());
+            }
+
+        }catch (Exception e){
+            log.error("Error on WebSocket disconnect event: {}", e.getMessage());
+        }
     }
 
 
