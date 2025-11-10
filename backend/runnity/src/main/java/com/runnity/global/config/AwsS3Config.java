@@ -12,9 +12,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnProperty(name = "SPRING_PROFILES_ACTIVE", havingValue = "prod")
 public class AwsS3Config {
-    @Value("${AWS_ACCESS_KEY}") private String accessKey;
-    @Value("${AWS_SECRET_KEY}") private String secretKey;
-    @Value("${AWS_STATIC}") private String region;
+    @Value("${AWS_ACCESS_KEY:AWS_ACCESS_KEY}") private String accessKey;
+    @Value("${AWS_SECRET_KEY:AWS_SECRET_KEY}") private String secretKey;
+    @Value("${AWS_STATIC:AWS_STATIC}") private String region;
 
     @Bean
     public AmazonS3 amazonS3() {

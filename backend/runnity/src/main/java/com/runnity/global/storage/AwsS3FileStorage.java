@@ -22,10 +22,10 @@ public class AwsS3FileStorage implements FileStorage {
 
     private final AmazonS3 amazonS3;
 
-    @Value("${AWS_BUCKET}")
+    @Value("${AWS_BUCKET:AWS_BUCKET}")
     private String bucket;
 
-    @Value("${AWS_STATIC}")
+    @Value("${AWS_STATIC:AWS_STATIC}")
     private String region;
 
     @Override
