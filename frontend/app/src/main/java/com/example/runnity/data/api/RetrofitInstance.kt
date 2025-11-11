@@ -1,9 +1,10 @@
 package com.example.runnity.data.api
 
 import com.example.runnity.BuildConfig
-import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.remote.api.AuthApiService
+import com.example.runnity.data.remote.interceptor.AuthInterceptor
+import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.google.gson.GsonBuilder
-import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -14,34 +15,25 @@ import java.util.concurrent.TimeUnit
 /**
  * Retrofit 인스턴스 관리
  * - API 통신 설정
- * - 토큰 자동 추가
+ * - 토큰 자동 추가 (AuthInterceptor)
+ * - 토큰 자동 갱신 (TokenAuthenticator)
  * - 로깅 인터셉터
  */
 object RetrofitInstance {
 
-    // TODO: 실제 서버 URL로 교체 필요
-    private const val BASE_URL = "https://api.runnity.com/"
+    /**
+     * ⚠️ BASE URL 설정
+     * local.properties 파일에서 BASE_URL을 설정하세요.
+     * 예: BASE_URL = https://runnity.p-e.kr/
+     *
+     * 개발/운영 환경별로 다른 URL 사용 가능
+     */
+    private val BASE_URL = BuildConfig.BASE_URL
 
     // 타임아웃 설정
     private const val CONNECT_TIMEOUT = 30L
     private const val READ_TIMEOUT = 30L
     private const val WRITE_TIMEOUT = 30L
-
-    /**
-     * 인증 토큰 자동 추가 Interceptor
-     * - Access Token을 헤더에 자동으로 추가
-     */
-    private val authInterceptor = Interceptor { chain ->
-        val token = TokenManager.getAccessToken()
-        val request = if (token != null) {
-            chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer $token")
-                .build()
-        } else {
-            chain.request()
-        }
-        chain.proceed(request)
-    }
 
     /**
      * 로깅 Interceptor
@@ -59,13 +51,16 @@ object RetrofitInstance {
 
     /**
      * OkHttpClient 설정
+     * - AuthInterceptor: 모든 요청에 Access Token 자동 추가
+     * - TokenAuthenticator: 401 에러 시 자동 토큰 갱신 및 재시도
      */
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
-        .addInterceptor(authInterceptor)
-        .addInterceptor(loggingInterceptor)
+        .addInterceptor(AuthInterceptor())           // 토큰 자동 추가
+        .addInterceptor(loggingInterceptor)          // HTTP 로깅
+        .authenticator(TokenAuthenticator())         // 401 에러 시 자동 토큰 갱신
         .build()
 
     /**
@@ -87,14 +82,25 @@ object RetrofitInstance {
     }
 
     /**
-     * API 서비스 생성
+     * API 서비스 생성 헬퍼 함수
      */
-    fun <T> createService(service: Class<T>): T {
+    private fun <T> createService(service: Class<T>): T {
         return retrofit.create(service)
     }
 
+    // ==================== API 서비스 인스턴스 ====================
+
     /**
-     * RunApiService 인스턴스
+     * AuthApiService 인스턴스
+     * 소셜 로그인, 토큰 관리, 프로필 관리
+     */
+    val authApi: AuthApiService by lazy {
+        createService(AuthApiService::class.java)
+    }
+
+    /**
+     * RunApiService 인스턴스 (기존 유지)
+     * TODO: 추후 실제 API에 맞춰 수정 필요
      */
     val runApi: RunApiService by lazy {
         createService(RunApiService::class.java)

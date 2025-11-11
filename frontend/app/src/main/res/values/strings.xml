@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Runnity</string>
+
+    <!-- Google Sign-In Web Client ID -->
+    <!-- TODO: Google Cloud Console에서 발급받은 실제 Web Client ID로 변경하세요 -->
+    <string name="default_web_client_id">YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com</string>
 </resources>
