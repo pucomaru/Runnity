@@ -1,6 +1,6 @@
 package com.runnity.stream.socket.controller;
 
-import com.runnity.stream.socket.BroadcastService;
+import com.runnity.stream.socket.BroadcastSessionService;
 import com.runnity.stream.socket.dto.BroadcastResponse;
 import com.runnity.stream.socket.dto.ChallengeStreamMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +22,13 @@ import java.util.List;
 @RequestMapping("/api/broadcast")
 public class BroadcastController {
 
-    private final BroadcastService broadcastService;
+    private final BroadcastSessionService broadcastSessionService;
     private final SimpMessagingTemplate messagingTemplate;
 
     // 현재 방송 중인 챌린지 목록 조회
     @GetMapping("/active")
     public ResponseEntity<List<BroadcastResponse>> getActiveBroadcasts() {
-        return ResponseEntity.ok(broadcastService.getActiveBroadcasts());
+        return ResponseEntity.ok(broadcastSessionService.getActiveBroadcasts());
     }
 
     @PostMapping("/{challengeId}")

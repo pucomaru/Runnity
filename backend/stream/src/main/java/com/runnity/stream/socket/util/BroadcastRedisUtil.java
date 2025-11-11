@@ -110,14 +110,27 @@ public class BroadcastRedisUtil {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
-    public void createMetaSession(Long challengeId, String title, int participantCount, boolean isBroadcast) {
+    public void createMetaSession(Long challengeId, String title, int participantCount, double distance, boolean isBroadcast) {
         String key = "broadcast:" + challengeId + ":meta";
         HashOperations<String, Object, Object> hashOps = redisTemplate.opsForHash();
 
         hashOps.put(key, "title", title);
         hashOps.put(key, "participantCount", participantCount);
+        hashOps.put(key, "distance", distance);
         hashOps.put(key, "isBroadcast", isBroadcast);
         hashOps.put(key, "createdAt", LocalDateTime.now().toString());
+    }
+
+    // 방송 총 거리(distance) 조회용
+    public double getTotalDistance(Long challengeId) {
+        String key = "broadcast:" + challengeId + ":meta";
+        Object value = redisTemplate.opsForHash().get(key, "distance");
+        if (value == null) return 0.0;
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
     }
 
 
