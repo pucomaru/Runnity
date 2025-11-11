@@ -200,6 +200,7 @@ public class MemberService {
                         request.getGender(),
                         request.getBirth()
                 );
+                log.info("신규 정보 입력 + 이미지저장, 경로 : {}", publicUrl);
             } else {
                 member.updateProfile(
                         request.getNickname(),
@@ -208,6 +209,7 @@ public class MemberService {
                         request.getGender(),
                         request.getBirth()
                 );
+                log.info("신규 정보만 입력");
             }
 
             new AddInfoResponseDto("신규 회원 정보가 저장되었습니다.");
@@ -272,38 +274,49 @@ public class MemberService {
 
     @Transactional
     public void updateProfile(Long memberId, ProfileUpdateRequestDto request, MultipartFile profileImage) {
-        // 회원 조회
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
+        try {
+            // 회원 조회
+            Member member = memberRepository.findById(memberId)
+                    .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
 
-        if (request != null && request.getNickname() != null) {
-            String nick = request.getNickname().trim();
-            if (!nick.isBlank()) {
-                validateFormat(nick);
-                if (memberRepository.nicknameCheckWithMemberId(nick, memberId)) {
-                    throw new IllegalArgumentException("NICKNAME_CONFLICT");
+            if (request != null && request.getNickname() != null) {
+                String nick = request.getNickname().trim();
+                if (!nick.isBlank()) {
+                    validateFormat(nick);
+                    if (memberRepository.nicknameCheckWithMemberId(nick, memberId)) {
+                        throw new IllegalArgumentException("NICKNAME_CONFLICT");
+                    }
+                    member.setNickname(nick);
                 }
-                member.setNickname(nick);
-            }
-        }
-
-        // 이미지 교체 처리
-        if (profileImage != null && !profileImage.isEmpty()) {
-            if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
-                fileStorage.delete(member.getProfileImage());
             }
 
-            String prefix = "profile-photos/" + memberId;
-            String publicUrl = fileStorage.upload(prefix, profileImage);
-            member.setProfileImage(publicUrl);
-        }
+            // 이미지 교체 처리
+            if (profileImage != null && !profileImage.isEmpty()) {
+                if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
+                    fileStorage.delete(member.getProfileImage());
+                }
 
-        // 부분 업데이트(전달된 필드만 변경)
-        if (request != null && request.getHeight() != null && request.getHeight() > 0) {
-            member.setHeight(request.getHeight());
-        }
-        if (request != null && request.getWeight() != null && request.getWeight() > 0) {
-            member.setWeight(request.getWeight());
+                String prefix = "profile-photos/" + memberId;
+                String publicUrl = fileStorage.upload(prefix, profileImage);
+                member.setProfileImage(publicUrl);
+                log.info("내 정보 수정 + 이미지저장, 경로 : {}", publicUrl);
+            }
+
+            // 부분 업데이트(전달된 필드만 변경)
+            if (request != null && request.getHeight() != null && request.getHeight() > 0) {
+                member.setHeight(request.getHeight());
+            }
+            if (request != null && request.getWeight() != null && request.getWeight() > 0) {
+                member.setWeight(request.getWeight());
+            }
+            log.info("내 정보 수정 완료");
+
+        } catch (IllegalArgumentException e) {
+            log.error("회원 정보 수정 실패 (잘못된 요청): {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("회원 정보 수정 실패 (서버 에러): {}", e.getMessage(), e);
+            throw new RuntimeException("회원 정보 수정 중 오류가 발생했습니다", e);
         }
     }
 
