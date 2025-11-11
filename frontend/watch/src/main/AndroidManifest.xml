@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <!-- WearOS 디바이스에 설치 가능한 앱임을 명시 -->
     <uses-feature android:name="android.hardware.type.watch" />
+    <!-- 심박 센서 -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- 기본 포그라운드 서비스 권한 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- 헬스 포그라운드 서비스 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <!-- 위치 권한 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- 위치 포그라운드 서비스 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- 움직임 감지 -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
         android:allowBackup="true"
@@ -21,6 +35,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".health.ExerciseFgService"
+            android:exported="false"
+            android:foregroundServiceType="health|location" />
     </application>
 
 </manifest>
