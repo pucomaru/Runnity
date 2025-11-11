@@ -1,10 +1,10 @@
 package com.runnity.stream.global.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @Configuration
-@EnableScheduling
-public class SchedulerConfig {
+@EnableJpaAuditing
+public class JpaConfig {
 }
 
