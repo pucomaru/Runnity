@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AuthService {
+public class MemberService {
 
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
     private final MemberRepository memberRepository;
