@@ -2,19 +2,45 @@ spring:
   application:
     name: stream
 
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:runnity}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: ${DB_USER:ssafy}
+    password: ${DB_PASSWORD:ssafy1234}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      idle-timeout: 60000
+      connection-timeout: 30000
+      pool-name: StreamHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        show_sql: true
+    open-in-view: false
+
+  data:
+    redis:
+      cache:
+        host: ${REDIS_CACHE_HOST:localhost}
+        port: ${REDIS_CACHE_PORT:6379}
+      pubsub:
+        host: ${REDIS_PUBSUB_HOST:localhost}
+        port: ${REDIS_PUBSUB_PORT:6380}
+      timeout: 2000
+
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:29092}
     consumer:
       group-id: runnity-stream-group
       auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      timeout: 2000
 
 server:
   address: 0.0.0.0
@@ -23,6 +49,7 @@ server:
 logging:
   level:
     root: INFO
+    org.hibernate.SQL: DEBUG
     org.springframework.kafka: INFO
     org.springframework.web: INFO
     com.runnity.stream: DEBUG
