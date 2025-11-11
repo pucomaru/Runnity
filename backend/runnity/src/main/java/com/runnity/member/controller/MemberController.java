@@ -8,14 +8,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.global.status.SuccessStatus;
 import com.runnity.member.dto.*;
-import com.runnity.member.service.AuthService;
+import com.runnity.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,9 +35,9 @@ import java.util.NoSuchElementException;
 @RequestMapping("/api/v1")
 @Tag(name = "Auth", description = "소셜 로그인, 토큰 재발급 API")
 @RequiredArgsConstructor
-public class AuthController {
+public class MemberController {
 
-    private final AuthService authService;
+    private final MemberService memberService;
     private final AmazonS3 amazonS3;
     private final ObjectMapper objectMapper;
 
@@ -55,7 +54,7 @@ public class AuthController {
             @RequestBody LoginRequestDto request
     ) {
         try {
-            LoginResponseDto resp = authService.googleLogin(request.getIdToken());
+            LoginResponseDto resp = memberService.googleLogin(request.getIdToken());
             return com.runnity.global.response.ApiResponse.success(
                     SuccessStatus.LOGIN_SUCCESS, resp
             );
@@ -76,7 +75,7 @@ public class AuthController {
             @RequestBody LoginRequestDto request
     ) {
         try {
-            LoginResponseDto resp = authService.kakaoLogin(request.getIdToken());
+            LoginResponseDto resp = memberService.kakaoLogin(request.getIdToken());
             return com.runnity.global.response.ApiResponse.success(
                     SuccessStatus.LOGIN_SUCCESS, resp
             );
@@ -118,7 +117,7 @@ public class AuthController {
             AddInfoRequestDto request = objectMapper.readValue(dataJson, AddInfoRequestDto.class);
 
             // 서비스 호출
-            authService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
+            memberService.addAdditionalInfo(userPrincipal.getMemberId(), request, profileImage);
 
             AddInfoResponseDto response = new AddInfoResponseDto("추가 정보가 성공적으로 저장되었습니다");
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.CREATED, response);
@@ -159,7 +158,7 @@ public class AuthController {
     ) {
         try {
             NicknameCheckResponseDto result =
-                    authService.checkNicknameAvailability(nickname, principal != null ? principal.getMemberId() : null);
+                    memberService.checkNicknameAvailability(nickname, principal != null ? principal.getMemberId() : null);
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.NICKNAME_CHECK_OK, result);
         } catch (IllegalArgumentException e) {
             String key = e.getMessage();
@@ -195,7 +194,7 @@ public class AuthController {
                 return com.runnity.global.response.ApiResponse.error(ErrorStatus.UNAUTHORIZED);
             }
 
-            ProfileResponseDto profile = authService.getProfile(userPrincipal.getMemberId());
+            ProfileResponseDto profile = memberService.getProfile(userPrincipal.getMemberId());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.PROFILE_FETCH_OK, profile);
 
         } catch (IllegalArgumentException e) {
@@ -233,7 +232,7 @@ public class AuthController {
             ProfileUpdateRequestDto request = objectMapper.readValue(dataJson, ProfileUpdateRequestDto.class);
 
             // 서비스 호출
-            authService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
+            memberService.updateProfile(userPrincipal.getMemberId(), request, profileImage);
 
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.PROFILE_UPDATE_OK, null);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
@@ -264,7 +263,7 @@ public class AuthController {
             @RequestBody TokenRequestDto request
     ) {
         try {
-            TokenResponseDto resp = authService.refreshAccessToken(request.getRefreshToken());
+            TokenResponseDto resp = memberService.refreshAccessToken(request.getRefreshToken());
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK, resp);
         } catch (IllegalArgumentException e) {
             String key = e.getMessage();
@@ -306,7 +305,7 @@ public class AuthController {
             }
 
             // 로그아웃 처리 (블랙리스트 등록)
-            authService.logout(userPrincipal.getMemberId(), accessToken);
+            memberService.logout(userPrincipal.getMemberId(), accessToken);
             return com.runnity.global.response.ApiResponse.success(SuccessStatus.OK);
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
@@ -333,7 +332,7 @@ public class AuthController {
     public ResponseEntity<Resource> getProfileImage(@PathVariable Long memberId) {
         try {
             // 1. DB에서 S3 키 조회
-            String s3Key = authService.getProfileImageKey(memberId);
+            String s3Key = memberService.getProfileImageKey(memberId);
 
             if (s3Key == null || s3Key.isBlank()) {
                 return ResponseEntity.notFound().build();
