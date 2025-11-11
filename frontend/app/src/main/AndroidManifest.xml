@@ -32,7 +32,6 @@
             android:name="com.kakao.vectormap.KAKAO_MAP_KEY"
             android:value="${KAKAO_MAP_KEY}"/>
 
-
         <activity
             android:name=".MainActivity"
             android:exported="true"

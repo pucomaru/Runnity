@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.runnity"
-        minSdk = 28
+        minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -56,6 +56,10 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // WearOS
+    // wearOs - 앱 연결
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    // 헬스 서비스 
+    implementation("androidx.health:health-services-client:1.1.0-alpha05")
+
+    implementation("com.google.guava:guava:31.1-android")
 }
