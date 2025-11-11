@@ -22,12 +22,14 @@ pipeline {
 
     stage('Docker Build & Push') {
       steps {
-        dir('backend/stream') {
+        // ⬇️ stream이 아닌 backend 경로에서 빌드 (Dockerfile이 여기 있음)
+        dir('backend') {
           sh "pwd && ls -al"
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
               set -euxo pipefail
               echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+              # 필요시 --build-arg MODULE=stream 같은 인자도 전달 가능
               docker build -t ${IMAGE}:${env.TAG} -t ${IMAGE}:latest -f Dockerfile .
               docker push ${IMAGE}:${env.TAG}
               docker push ${IMAGE}:latest
@@ -40,17 +42,20 @@ pipeline {
 
     stage('Bundle compose') {
       steps {
-        dir('backend/stream') {
+        // ⬇️ compose도 backend 폴더에 있다고 가정
+        dir('backend') {
           sh """
             set -euxo pipefail
             mkdir -p deploy_bundle
+            # stream 전용 compose 파일이 따로 있으면 이름 맞춰서 복사
+            # cp -f docker-compose.stream.yml deploy_bundle/docker-compose.yml
             cp -f docker-compose.yml deploy_bundle/
             [ -f .env ] && cp -f .env deploy_bundle/ || true
             tar czf deploy_bundle.tgz -C deploy_bundle .
             ls -al deploy_bundle
           """
         }
-        archiveArtifacts artifacts: 'backend/stream/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
+        archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
@@ -60,10 +65,10 @@ pipeline {
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
               set -euxo pipefail
-              test -f backend/stream/deploy_bundle.tgz
+              test -f backend/deploy_bundle.tgz
 
               ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 'set -eux; mkdir -p ~/stream-app'
-              scp -o StrictHostKeyChecking=no backend/stream/deploy_bundle.tgz ubuntu@43.203.250.119:~/stream-app/
+              scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@43.203.250.119:~/stream-app/
 
               ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 "set -euxo pipefail; cd ~/stream-app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
             """
