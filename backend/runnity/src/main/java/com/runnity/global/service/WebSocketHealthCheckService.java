@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
  * - WebSocket 서버가 주기적으로 Redis에 heartbeat를 기록 (ws_health:서버URL = "UP")
  * - 비즈니스 서버는 Redis를 조회하여 서버 상태를 확인
  * 
- * Note: Heartbeat 기록은 WebSocket 서버에서 수행합니다.
+ * Heartbeat 기록은 WebSocket 서버에서 수행합니다.
  */
 @Slf4j
 @Service
