@@ -8,6 +8,7 @@ import com.runnity.challenge.response.ChallengeListResponse;
 import com.runnity.challenge.response.ChallengeResponse;
 import com.runnity.challenge.service.ChallengeService;
 import com.runnity.global.status.SuccessStatus;
+import com.runnity.member.dto.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -39,9 +41,10 @@ public class ChallengeController {
             @ApiResponse(responseCode = "500", description = "서버 오류")
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeResponse>> createChallenge(
-            @Valid @RequestBody ChallengeCreateRequest request
+            @Valid @RequestBody ChallengeCreateRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long memberId = getCurrentUserId();
+        Long memberId = userPrincipal.getMemberId();
         ChallengeResponse response = challengeService.createChallenge(request, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.CHALLENGE_CREATED,
@@ -62,9 +65,10 @@ public class ChallengeController {
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeListResponse>> getChallenges(
             @ModelAttribute ChallengeListRequest request,
-            @PageableDefault(size = 10, page = 0) Pageable pageable
+            @PageableDefault(size = 10, page = 0) Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long memberId = getCurrentUserId();
+        Long memberId = userPrincipal.getMemberId();
         ChallengeListResponse response = challengeService.getChallenges(request, pageable, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.OK,
@@ -84,9 +88,10 @@ public class ChallengeController {
             @ApiResponse(responseCode = "500", description = "서버 오류")
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeResponse>> getChallenge(
-            @PathVariable Long challengeId
+            @PathVariable Long challengeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long memberId = getCurrentUserId();
+        Long memberId = userPrincipal.getMemberId();
         ChallengeResponse response = challengeService.getChallenge(challengeId, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.OK,
@@ -110,9 +115,10 @@ public class ChallengeController {
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeJoinResponse>> joinChallenge(
             @PathVariable Long challengeId,
-            @RequestBody(required = false) ChallengeJoinRequest request
+            @RequestBody(required = false) ChallengeJoinRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long memberId = getCurrentUserId();
+        Long memberId = userPrincipal.getMemberId();
         ChallengeJoinResponse response = challengeService.joinChallenge(challengeId, request, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.CHALLENGE_JOINED,
@@ -133,18 +139,14 @@ public class ChallengeController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeJoinResponse>> cancelChallenge(
-            @PathVariable Long challengeId
+            @PathVariable Long challengeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long memberId = getCurrentUserId();
+        Long memberId = userPrincipal.getMemberId();
         ChallengeJoinResponse response = challengeService.cancelParticipation(challengeId, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.CHALLENGE_LEFT,
                 response
         );
-    }
-
-    private Long getCurrentUserId() {
-        // TODO: 추후 인증 로직이 추가되면 수정 필요
-        return 2L;
     }
 }

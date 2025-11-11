@@ -7,9 +7,11 @@ import com.runnity.history.dto.response.MyChallengesResponse;
 import com.runnity.history.dto.response.RunRecordDetailResponse;
 import com.runnity.history.dto.response.RunRecordMonthlyResponse;
 import com.runnity.history.service.HistoryService;
+import com.runnity.member.dto.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,33 +21,34 @@ public class HistoryController {
 
     private final HistoryService service;
 
-    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
     @GetMapping("/challenges")
-    public ResponseEntity<ApiResponse<MyChallengesResponse>> getMyChallenges(){
-        long memberId = 1;
+    public ResponseEntity<ApiResponse<MyChallengesResponse>> getMyChallenges(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long memberId = userPrincipal.getMemberId();
         MyChallengesResponse response = service.getMyChallenges(memberId);
 
         return ApiResponse.success(SuccessStatus.OK, response);
     }
 
-    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
     @GetMapping("/runs/{runRecordId}")
     public ResponseEntity<ApiResponse<RunRecordDetailResponse>> getRunRecordDetail(
-            @PathVariable Long runRecordId
+            @PathVariable Long runRecordId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        long memberId = 1L;
+        Long memberId = userPrincipal.getMemberId();
 
         RunRecordDetailResponse response = service.getRunRecordDetail(memberId, runRecordId);
         return ApiResponse.success(SuccessStatus.OK, response);
     }
 
-    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
     @GetMapping("/runs")
     public ResponseEntity<ApiResponse<RunRecordMonthlyResponse>> getRunRecordsByMonth(
             @RequestParam int year,
-            @RequestParam int month
+            @RequestParam int month,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        long memberId = 1L;
+        Long memberId = userPrincipal.getMemberId();
 
         RunRecordMonthlyResponse response =
                 service.getRunRecordsByMonth(memberId, year, month);
@@ -53,12 +56,12 @@ public class HistoryController {
         return ApiResponse.success(SuccessStatus.OK, response);
     }
 
-    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
     @PostMapping("/runs")
     public ResponseEntity<ApiResponse<Void>> createRunRecord(
-            @Valid @RequestBody RunRecordCreateRequest request
+            @Valid @RequestBody RunRecordCreateRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        long memberId = 1L;
+        Long memberId = userPrincipal.getMemberId();
         service.createRunRecord(memberId, request);
         return ApiResponse.success(SuccessStatus.OK);
     }

@@ -4,9 +4,11 @@ import com.runnity.global.response.ApiResponse;
 import com.runnity.global.status.SuccessStatus;
 import com.runnity.history.dto.response.StatsSummaryResponse;
 import com.runnity.history.service.StatsService;
+import com.runnity.member.dto.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,14 +23,14 @@ public class StatsController {
 
     private final StatsService statsService;
 
-    // TODO: 추후 jwt에서 memberid 가져오게 변경 필요
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<StatsSummaryResponse>> getSummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(defaultValue = "week") String period
+            @RequestParam(defaultValue = "week") String period,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        long memberId = 10;
+        Long memberId = userPrincipal.getMemberId();
         StatsSummaryResponse response = statsService.getSummary(memberId, startDate, endDate, period);
         return ApiResponse.success(SuccessStatus.OK, response);
     }
