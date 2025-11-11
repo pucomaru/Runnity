@@ -183,18 +183,18 @@ public class MemberService {
 
             String prefix = "profile-photos/" + memberId;
 
-            // 프로필 사진 저장 (있을 경우)
             if (profileImage != null && !profileImage.isEmpty()) {
-
-                // 이전 파일 삭제(있는 경우)
+                // 이전 파일 삭제
                 if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
                     fileStorage.delete(member.getProfileImage());
                 }
 
-                String profileImagePath = fileStorage.upload(prefix, profileImage);
+                // S3 업로드 → Public URL 반환
+                String publicUrl = fileStorage.upload(prefix, profileImage);
+
                 member.updateProfileWithImage(
                         request.getNickname(),
-                        profileImagePath,
+                        publicUrl,  // Public URL 저장
                         request.getHeight(),
                         request.getWeight(),
                         request.getGender(),
@@ -289,13 +289,13 @@ public class MemberService {
 
         // 이미지 교체 처리
         if (profileImage != null && !profileImage.isEmpty()) {
-            // 기존 이미지 있으면 삭제
             if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
                 fileStorage.delete(member.getProfileImage());
             }
+
             String prefix = "profile-photos/" + memberId;
-            String newUrl = fileStorage.upload(prefix, profileImage);
-            member.setProfileImage(newUrl);
+            String publicUrl = fileStorage.upload(prefix, profileImage);
+            member.setProfileImage(publicUrl);
         }
 
         // 부분 업데이트(전달된 필드만 변경)
@@ -330,15 +330,5 @@ public class MemberService {
             log.error("로그아웃 처리 실패: memberId={}", memberId, e);
             throw new RuntimeException("Logout failed", e);
         }
-    }
-
-    /**
-     * 프로필 이미지 S3 키 조회 (프록시 엔드포인트에서 사용)
-     */
-    @Transactional(readOnly = true)
-    public String getProfileImageKey(Long memberId) {
-        return memberRepository.findById(memberId)
-                .map(Member::getProfileImage)
-                .orElse(null);
     }
 }
