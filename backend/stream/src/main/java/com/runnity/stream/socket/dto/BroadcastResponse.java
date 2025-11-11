@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class BroadcastResponse {
+
     private Long challengeId;          // 중계 challengeId
     private String title;              // 챌린지 제목
     private Integer viewerCount;       // 현재 시청자 수

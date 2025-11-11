@@ -22,6 +22,7 @@ public class BroadcastRedisUtil {
     // 개별 방송 세션 Hash 의 prefix
     private static final String PREFIX = "broadcast:";
 
+    // 방송 세션(Hash: broadcast:{challengeId}) 존재 여부 확인
     public boolean exists(Long challengeId){
         String key = PREFIX + challengeId;
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
@@ -43,8 +44,8 @@ public class BroadcastRedisUtil {
         hashOps.put(key, "participantCount", participantCount);
         hashOps.put(key, "createdAt", LocalDateTime.now().toString());
     
-
-
+        // 활성 방송 목록에 추가
+        redisTemplate.opsForSet().add(ACTIVE_SET, challengeId.toString());
     }
     
     // 방송 상태 갱신
@@ -70,7 +71,7 @@ public class BroadcastRedisUtil {
         String key = PREFIX + challengeId;
         Long viewerCount = redisTemplate.opsForHash().increment(key, "viewerCount",-1);
 
-        if (viewerCount != null && viewerCount < 100){
+        if (viewerCount != null && viewerCount < 0){
             redisTemplate.opsForHash().put(key,"viewerCount",0);
         }
     }
@@ -101,6 +102,22 @@ public class BroadcastRedisUtil {
         }
         return sessions;
 
+    }
+
+    // 방송 메타(Hash: broadcast:{challengeId}:meta) 존재 여부 확인
+    public boolean existsMeta(Long challengeId) {
+        String key = "broadcast:" + challengeId + ":meta";
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+    }
+
+    public void createMetaSession(Long challengeId, String title, int participantCount, boolean isBroadcast) {
+        String key = "broadcast:" + challengeId + ":meta";
+        HashOperations<String, Object, Object> hashOps = redisTemplate.opsForHash();
+
+        hashOps.put(key, "title", title);
+        hashOps.put(key, "participantCount", participantCount);
+        hashOps.put(key, "isBroadcast", isBroadcast);
+        hashOps.put(key, "createdAt", LocalDateTime.now().toString());
     }
 
 
