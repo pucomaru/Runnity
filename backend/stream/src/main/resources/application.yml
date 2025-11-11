@@ -53,3 +53,7 @@ logging:
     org.springframework.kafka: INFO
     org.springframework.web: INFO
     com.runnity.stream: DEBUG
+
+firebase:
+  service-account-key: ${FIREBASE_KEY_PATH}
+
