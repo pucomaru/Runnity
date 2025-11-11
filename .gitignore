@@ -71,3 +71,6 @@ logs/
 *.tar
 *.gz
 *.zip
+
+# FCM Service Account Key (Firebase)
+backend/stream/src/main/resources/fcmservice-account-key.json
