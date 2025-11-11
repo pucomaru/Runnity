@@ -24,7 +24,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class BroadcastService {
+public class BroadcastSessionService {
 
     private final BroadcastRedisUtil redisUtil;
     private final SimpMessagingTemplate messagingTemplate;      // STOMP 전송용
@@ -95,51 +95,50 @@ public class BroadcastService {
         }
     }
 
-        // 챌린지 시작 시 방송 세션 생성
-        public void createBroadcastSession (Long challengeId, String title,int participantCount){
-            redisUtil.createSession(challengeId, title, participantCount);
-        }
+    // 챌린지 시작 시 방송 세션 생성
+    public void createBroadcastSession (Long challengeId, String title,int participantCount){
+        redisUtil.createSession(challengeId, title, participantCount);
+    }
 
-        // 방송 상태 변경(WAITING, LIVE, ENDED)
-        public void updateStatus (Long challengeId, String status){
-            redisUtil.updateStatus(challengeId, status);
-        }
+    // 방송 상태 변경(WAITING, LIVE, ENDED)
+    public void updateStatus (Long challengeId, String status){
+        redisUtil.updateStatus(challengeId, status);
+    }
 
-        // 시청자 입장시 +1
-        public void addViewer (Long challengeId){
-            redisUtil.increaseViewer(challengeId);
-        }
+    // 시청자 입장시 +1
+    public void addViewer (Long challengeId){
+        redisUtil.increaseViewer(challengeId);
+    }
 
-        // 시청자 퇴장시 -1
-        public void removeViewer (Long challengeId){
-            redisUtil.decreaseViewer(challengeId);
-        }
+    // 시청자 퇴장시 -1
+    public void removeViewer (Long challengeId){
+        redisUtil.decreaseViewer(challengeId);
+    }
 
-        // 방송 종료 시 세션 제거
-        public void endBroadcast (Long challengeId){
-            redisUtil.expireSession(challengeId);
-        }
+    // 방송 종료 시 세션 제거
+    public void endBroadcast (Long challengeId){
+        redisUtil.expireSession(challengeId);
+    }
 
-        // 현재 활성 방송 목록 조회
-        public List<BroadcastResponse> getActiveBroadcasts () {
-            List<Map<Object, Object>> rawList = redisUtil.getActiveSessions();
-            List<BroadcastResponse> result = new ArrayList<>();
+    // 현재 활성 방송 목록 조회
+    public List<BroadcastResponse> getActiveBroadcasts () {
+        List<Map<Object, Object>> rawList = redisUtil.getActiveSessions();
+        List<BroadcastResponse> result = new ArrayList<>();
 
-            for (Map<Object, Object> map : rawList) {
-                try {
-                    Long challengeId = Long.parseLong(String.valueOf(map.get("challengeId")));
-                    String title = String.valueOf(map.get("title"));
-                    Integer viewerCount = Integer.parseInt(String.valueOf(map.get("viewerCount")));
-                    Integer participantCount = Integer.parseInt(String.valueOf(map.get("participantCount")));
-                    String createdAt = String.valueOf(map.get("createdAt"));
+        for (Map<Object, Object> map : rawList) {
+            try {
+                Long challengeId = Long.parseLong(String.valueOf(map.get("challengeId")));
+                String title = String.valueOf(map.get("title"));
+                Integer viewerCount = Integer.parseInt(String.valueOf(map.get("viewerCount")));
+                Integer participantCount = Integer.parseInt(String.valueOf(map.get("participantCount")));
+                String createdAt = String.valueOf(map.get("createdAt"));
 
-                    result.add(new BroadcastResponse(challengeId, title, viewerCount, participantCount, createdAt));
-                } catch (Exception e) {
-                    log.error("Failed to parse broadcast info: {}", e.getMessage());
-                }
+                result.add(new BroadcastResponse(challengeId, title, viewerCount, participantCount, createdAt));
+            } catch (Exception e) {
+                log.error("Failed to parse broadcast info: {}", e.getMessage());
             }
-
-            return result;
         }
 
+        return result;
+    }
 }
