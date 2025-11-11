@@ -139,7 +139,7 @@ fun LoginScreen(
                 Timber.d("LoginScreen: navigate to main")
                 // 로그인 성공 - 메인 화면으로 이동
                 navController.navigate("main") {
-                    popUpTo("login") { inclusive = true }
+                    popUpTo(0) { inclusive = true }
                     launchSingleTop = true
                 }
             }
@@ -147,7 +147,8 @@ fun LoginScreen(
                 Timber.d("LoginScreen: navigate to profile_setup")
                 // 추가 정보 입력 필요 - 프로필 설정 화면으로 이동
                 navController.navigate("profile_setup") {
-                    popUpTo("login") { inclusive = true }
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
                 }
             }
             is LoginUiState.Error -> {
