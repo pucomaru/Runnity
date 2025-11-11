@@ -22,7 +22,7 @@ pipeline {
 
     stage('Docker Build & Push') {
       steps {
-        dir('backend') {
+        dir('stream') {
           sh "pwd && ls -al"
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
@@ -40,56 +40,45 @@ pipeline {
 
     stage('Bundle compose') {
       steps {
-        dir('backend') {
+        dir('stream') {
           sh """
             set -euxo pipefail
             mkdir -p deploy_bundle
+            # stream/docker-compose.yml 은 아래처럼 이미지/태그를 사용하도록 작성되어 있어야 함:
+            #   image: docker.io/${DOCKERHUB_USERNAME}/runnity-stream:\${TAG}
             cp -f docker-compose.yml deploy_bundle/
             [ -f .env ] && cp -f .env deploy_bundle/ || true
             tar czf deploy_bundle.tgz -C deploy_bundle .
             ls -al deploy_bundle
           """
         }
-        // workspace 기준 경로 주의: backend/ 안에 파일이 있음
-        archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
+        archiveArtifacts artifacts: 'stream/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
-    stage('Deploy to servers') {
-      parallel {
-        stage('Deploy 13.209.87.132') {
-          steps {
-            sshagent (credentials: ['ssh_deploy_key']) {
-              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
-                sh """
-                  set -euxo pipefail
-                  test -f backend/deploy_bundle.tgz
+    stage('Deploy to server 43.203.250.119') {
+      steps {
+        // Jenkins Credentials 에 등록된 SSH 키의 ID 사용 (예: 'ubuntu')
+        sshagent (credentials: ['ubuntu']) {
+          withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+            sh """
+              set -euxo pipefail
+              test -f stream/deploy_bundle.tgz
 
-                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 'set -eux; mkdir -p ~/app'
-                  scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@13.209.87.132:~/app/
+              ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 'set -eux; mkdir -p ~/app'
+              scp -o StrictHostKeyChecking=no stream/deploy_bundle.tgz ubuntu@43.203.250.119:~/app/
 
-                  # 원격에서 TAG를 inline으로 주입해서 compose가 확실히 받게 함
-                  ssh -o StrictHostKeyChecking=no ubuntu@13.209.87.132 "set -euxo pipefail; cd ~/app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
-                """
-              }
-            }
-          }
-        }
-        stage('Deploy 15.164.230.99') {
-          steps {
-            sshagent (credentials: ['ssh_deploy_key']) {
-              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
-                sh """
-                  set -euxo pipefail
-                  test -f backend/deploy_bundle.tgz
-
-                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 'set -eux; mkdir -p ~/app'
-                  scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@15.164.230.99:~/app/
-
-                  ssh -o StrictHostKeyChecking=no ubuntu@15.164.230.99 "set -euxo pipefail; cd ~/app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
-                """
-              }
-            }
+              ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 "set -euxo pipefail; \
+                cd ~/app; ls -al; \
+                tar xzf deploy_bundle.tgz; \
+                test -f docker-compose.yml; \
+                echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; \
+                TAG=${env.TAG} docker compose pull; \
+                TAG=${env.TAG} docker compose up -d; \
+                docker logout || true; \
+                docker image prune -f || true; \
+                docker compose ps"
+            """
           }
         }
       }
