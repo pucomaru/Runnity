@@ -3,6 +3,7 @@ package com.runnity.challenge.controller;
 import com.runnity.challenge.request.ChallengeCreateRequest;
 import com.runnity.challenge.request.ChallengeJoinRequest;
 import com.runnity.challenge.request.ChallengeListRequest;
+import com.runnity.challenge.response.ChallengeEnterResponse;
 import com.runnity.challenge.response.ChallengeJoinResponse;
 import com.runnity.challenge.response.ChallengeListResponse;
 import com.runnity.challenge.response.ChallengeResponse;
@@ -146,6 +147,30 @@ public class ChallengeController {
         ChallengeJoinResponse response = challengeService.cancelParticipation(challengeId, memberId);
         return com.runnity.global.response.ApiResponse.success(
                 SuccessStatus.CHALLENGE_LEFT,
+                response
+        );
+    }
+
+    @PostMapping("/{challengeId}/enter")
+    @Operation(
+            summary = "챌린지 입장",
+            description = "챌린지에 입장하고 WebSocket 연결용 티켓을 발급받습니다. (WAITING → RUNNING)"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "입장 성공"),
+            @ApiResponse(responseCode = "400", description = "챌린지가 READY 상태가 아니거나, 참가 상태가 WAITING이 아닌 경우"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "404", description = "챌린지가 존재하지 않거나, 참가하지 않은 챌린지인 경우"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeEnterResponse>> enterChallenge(
+            @PathVariable Long challengeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long memberId = userPrincipal.getMemberId();
+        ChallengeEnterResponse response = challengeService.enterChallenge(challengeId, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.OK,
                 response
         );
     }

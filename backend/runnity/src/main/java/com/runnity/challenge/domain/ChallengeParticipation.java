@@ -87,4 +87,112 @@ public class ChallengeParticipation extends BaseEntity {
     public boolean isActive() {
         return ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES.contains(this.status);
     }
+
+    /**
+     * 챌린지 입장 처리 (WAITING → RUNNING)
+     * 
+     * @throws GlobalException WAITING 상태가 아닌 경우
+     */
+    public void startRunning() {
+        if (this.status != ParticipationStatus.WAITING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.RUNNING;
+    }
+
+    /**
+     * 챌린지 완주 처리 (RUNNING → COMPLETED)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void complete() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.COMPLETED;
+    }
+
+    /**
+     * 자발적 포기 처리 (RUNNING → QUIT)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void quit() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.QUIT;
+    }
+
+    /**
+     * 무응답 처리 (RUNNING → TIMEOUT)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void timeout() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.TIMEOUT;
+    }
+
+    /**
+     * 연결 끊김 처리 (RUNNING → DISCONNECTED)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void disconnect() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.DISCONNECTED;
+    }
+
+    /**
+     * 강제 퇴장 처리 (RUNNING → KICKED)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void kick() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.KICKED;
+    }
+
+    /**
+     * 오류 처리 (RUNNING → ERROR)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void markAsError() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.ERROR;
+    }
+
+    /**
+     * 시간 종료 처리 (RUNNING → EXPIRED)
+     * 
+     * @throws GlobalException RUNNING 상태가 아닌 경우
+     */
+    public void expire() {
+        if (this.status != ParticipationStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.EXPIRED;
+    }
+
+    /**
+     * 참여 안함 처리 (WAITING → NOT_STARTED)
+     * 
+     * @throws GlobalException WAITING 상태가 아닌 경우
+     */
+    public void markAsNotStarted() {
+        if (this.status != ParticipationStatus.WAITING) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.NOT_STARTED;
+    }
 }

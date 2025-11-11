@@ -6,6 +6,7 @@ import com.runnity.challenge.request.ChallengeListRequest;
 import com.runnity.challenge.request.ChallengeSortType;
 import com.runnity.challenge.request.ChallengeVisibility;
 import com.runnity.challenge.request.ChallengeJoinRequest;
+import com.runnity.challenge.response.ChallengeEnterResponse;
 import com.runnity.challenge.response.ChallengeJoinResponse;
 import com.runnity.challenge.response.ChallengeListItemResponse;
 import com.runnity.challenge.response.ChallengeListResponse;
@@ -13,7 +14,10 @@ import com.runnity.challenge.response.ChallengeParticipantResponse;
 import com.runnity.challenge.response.ChallengeResponse;
 import com.runnity.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.challenge.repository.ChallengeRepository;
+import com.runnity.global.config.WebSocketServerConfig;
 import com.runnity.global.exception.GlobalException;
+import com.runnity.global.service.WebSocketHealthCheckService;
+import com.runnity.global.service.WebSocketTicketService;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.member.domain.Member;
 import com.runnity.member.repository.MemberRepository;
@@ -41,6 +45,9 @@ public class ChallengeService {
     private final ChallengeParticipationRepository participationRepository;
     private final MemberRepository memberRepository;
     private final ScheduleOutboxRepository scheduleOutboxRepository;
+    private final WebSocketTicketService wsTicketService;
+    private final WebSocketServerConfig wsServerConfig;
+    private final WebSocketHealthCheckService wsHealthCheckService;
 
     @Transactional
     public ChallengeResponse createChallenge(ChallengeCreateRequest request, Long memberId) {
@@ -319,5 +326,78 @@ public class ChallengeService {
                     memberId, startAt, endAt);
             throw new GlobalException(ErrorStatus.CHALLENGE_TIME_OVERLAP);
         }
+    }
+
+    /**
+     * 챌린지 입장 (WAITING → RUNNING)
+     */
+    @Transactional
+    public ChallengeEnterResponse enterChallenge(Long challengeId, Long memberId) {
+        // 1. 챌린지 조회 및 입장 가능 여부 검증 (도메인 규칙)
+        Challenge challenge = validateAndGetChallenge(challengeId);
+        challenge.validateEnterable();
+
+        // 2. 참가자 조회 및 상태 전이 (도메인 규칙)
+        ChallengeParticipation participation = participationRepository
+                .findByChallengeIdAndMemberId(challengeId, memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
+        participation.startRunning();
+
+        // 3. WebSocket 티켓 발급 (인프라 제어)
+        String ticket = wsTicketService.issueTicket(memberId, challengeId);
+
+        // 4. WebSocket 서버 선택 (인프라 제어)
+        String wsUrl = selectWebSocketServer(memberId, challengeId);
+
+        log.info("챌린지 입장 완료: challengeId={}, memberId={}, participantId={}, ticket={}, wsUrl={}",
+                challengeId, memberId, participation.getParticipantId(), ticket, wsUrl);
+
+        return new ChallengeEnterResponse(ticket, memberId, challengeId, wsUrl);
+    }
+
+    /**
+     * WebSocket 서버 선택 (해시 기반 샤딩 + Health Check + Fallback)
+     * 1. 해시 기반으로 Primary 서버 선택
+     * 2. Health Check 실패 시 다른 서버로 Fallback
+     * 3. 모든 서버가 다운되면 예외 발생
+     */
+    private String selectWebSocketServer(Long memberId, Long challengeId) {
+        int serverCount = wsServerConfig.getServerCount();
+        if (serverCount == 0) {
+            throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        // 1. 해시 기반으로 Primary 서버 선택
+        String hashKey = memberId + ":" + challengeId;
+        int hash = hashKey.hashCode();
+        int primaryIndex = Math.abs(hash) % serverCount;
+
+        // 2. Primary 서버가 살아있으면 사용
+        String primaryUrl = wsServerConfig.getServerUrl(primaryIndex);
+        if (wsHealthCheckService.isHealthy(primaryUrl)) {
+            log.debug("WebSocket 서버 선택 (Primary): memberId={}, challengeId={}, serverIndex={}, wsUrl={}",
+                    memberId, challengeId, primaryIndex, primaryUrl);
+            return primaryUrl;
+        }
+
+        log.warn("WebSocket Primary 서버 다운: index={}, url={}", primaryIndex, primaryUrl);
+
+        // 3. Fallback: 다른 서버들 중 살아있는 서버 찾기
+        for (int i = 0; i < serverCount; i++) {
+            if (i == primaryIndex) {
+                continue; // Primary는 이미 체크했으므로 스킵
+            }
+
+            String fallbackUrl = wsServerConfig.getServerUrl(i);
+            if (wsHealthCheckService.isHealthy(fallbackUrl)) {
+                log.info("WebSocket Fallback 서버 선택: memberId={}, challengeId={}, serverIndex={}, wsUrl={}",
+                        memberId, challengeId, i, fallbackUrl);
+                return fallbackUrl;
+            }
+        }
+
+        // 4. 모든 서버가 다운된 경우
+        log.error("모든 WebSocket 서버 다운: serverCount={}", serverCount);
+        throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
     }
 }

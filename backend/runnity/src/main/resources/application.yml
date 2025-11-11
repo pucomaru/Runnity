@@ -80,3 +80,8 @@ logging:
 stream:
   server:
     url: ${STREAM_SERVER_URL:http://localhost:8084}
+
+websocket:
+  servers:
+    - ${WS_SERVER_1_URL:ws://localhost:8085}
+    - ${WS_SERVER_2_URL:ws://localhost:8086}
