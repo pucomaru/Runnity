@@ -1,9 +1,17 @@
 package com.example.runnity.ui.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.screens.login.LoginScreen
 import com.example.runnity.ui.screens.login.OnboardingScreen
 import com.example.runnity.ui.screens.login.ProfileSetupScreen
@@ -18,10 +26,30 @@ import com.example.runnity.ui.screens.login.WelcomeScreen
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val viewModel: AppNavigationViewModel = viewModel()
+    val startDestination by viewModel.startDestination.collectAsState()
+
+    // 앱 시작 시 자동으로 시작 화면 결정
+    LaunchedEffect(Unit) {
+        viewModel.checkStartDestination()
+    }
+
+    // 로딩 중 (시작 화면 결정 중)
+    if (startDestination == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ColorPalette.Light.background),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = ColorPalette.Light.primary)
+        }
+        return
+    }
 
     NavHost(
         navController = navController,
-        startDestination = "welcome" // TODO: 로그인 상태 체크 후 "welcome" 또는 "main"으로 분기
+        startDestination = startDestination!!
     ) {
         // 웰컴 화면
         composable("welcome") {

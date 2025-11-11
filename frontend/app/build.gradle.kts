@@ -36,6 +36,50 @@ android {
         )
         // AndroidManifest.xml의 ${KAKAO_MAP_KEY} 치환용
         manifestPlaceholders["KAKAO_MAP_KEY"] = properties.getProperty("KAKAO_MAP_KEY")
+        // AndroidManifest.xml의 ${KAKAO_NATIVE_APP_KEY} 치환용 (Kakao Login)
+        manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = properties.getProperty("KAKAO_CLIENT_ID")
+
+        // API Base URL을 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "BASE_URL",
+            "\"${properties.getProperty("BASE_URL")}\""
+        )
+
+        // JWT Secret을 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "JWT_SECRET",
+            "\"${properties.getProperty("JWT_SECRET")}\""
+        )
+
+        // Google Client ID를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "GOOGLE_CLIENT_ID",
+            "\"${properties.getProperty("GOOGLE_CLIENT_ID")}\""
+        )
+
+        // Kakao Client ID를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_CLIENT_ID",
+            "\"${properties.getProperty("KAKAO_CLIENT_ID")}\""
+        )
+
+        // Kakao ISS를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_ISS",
+            "\"${properties.getProperty("KAKAO_ISS")}\""
+        )
+
+        // Kakao JWKS URI를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_JWKS_URI",
+            "\"${properties.getProperty("KAKAO_JWKS_URI")}\""
+        )
 
         // 카카오 맵 SDK 네이티브 라이브러리 지원 아키텍처 설정
         ndk {
@@ -121,6 +165,13 @@ dependencies {
 
     // 카카오 지도 API
     implementation("com.kakao.maps.open:android:2.12.18")
+
+    // 소셜 로그인 SDK
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // Kakao Login
+    implementation("com.kakao.sdk:v2-user:2.11.0")
+
     // Splash Screen API (Android 12+)
     implementation("androidx.core:core-splashscreen:1.0.1")
 
@@ -132,5 +183,3 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
-
-

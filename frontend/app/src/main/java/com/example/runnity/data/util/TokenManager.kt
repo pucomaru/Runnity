@@ -15,6 +15,7 @@ object TokenManager {
     private const val PREFS_NAME = "runnity_secure_prefs"
     private const val KEY_ACCESS_TOKEN = "access_token"
     private const val KEY_REFRESH_TOKEN = "refresh_token"
+    private const val KEY_PROFILE_COMPLETED = "profile_completed"
 
     private var encryptedPrefs: android.content.SharedPreferences? = null
 
@@ -96,5 +97,29 @@ object TokenManager {
      */
     fun isLoggedIn(): Boolean {
         return getAccessToken() != null
+    }
+
+    /**
+     * 프로필 완성 상태 저장
+     * 네트워크 에러 시 로컬 캐시로 사용
+     *
+     * @param completed true: 프로필 완성됨, false: 추가 정보 필요
+     */
+    fun setProfileCompleted(completed: Boolean) {
+        encryptedPrefs?.edit()?.putBoolean(KEY_PROFILE_COMPLETED, completed)?.apply()
+        Timber.d("프로필 완성 상태 저장: $completed")
+    }
+
+    /**
+     * 프로필 완성 상태 조회
+     *
+     * @return true: 프로필 완성, false: 추가 정보 필요, null: 아직 모름 (첫 실행)
+     */
+    fun getProfileCompleted(): Boolean? {
+        return if (encryptedPrefs?.contains(KEY_PROFILE_COMPLETED) == true) {
+            encryptedPrefs?.getBoolean(KEY_PROFILE_COMPLETED, false)
+        } else {
+            null  // 한 번도 저장한 적 없음
+        }
     }
 }

@@ -2,6 +2,8 @@ package com.example.runnity.ui.screens.mypage
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,10 +20,16 @@ import java.util.Locale
  * - 러닝 통계 조회
  * - 로그아웃 처리
  */
-class MyPageViewModel : ViewModel() {
+class MyPageViewModel(
+    private val authRepository: AuthRepository = AuthRepository()
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MyPageUiState>(MyPageUiState.Loading)
     val uiState: StateFlow<MyPageUiState> = _uiState.asStateFlow()
+
+    // 로그아웃 상태
+    private val _logoutState = MutableStateFlow<LogoutState>(LogoutState.Idle)
+    val logoutState: StateFlow<LogoutState> = _logoutState.asStateFlow()
 
     // 선택된 기간 타입 (주/월/연/전체)
     private val _selectedPeriodType = MutableStateFlow(PeriodType.WEEK)
@@ -191,13 +199,19 @@ class MyPageViewModel : ViewModel() {
 
     /**
      * 로그아웃
+     * 성공/실패 여부와 관계없이 로컬 토큰은 삭제되므로 항상 성공으로 처리
      */
     fun logout() {
         viewModelScope.launch {
-            try {
-                // TODO: 로그아웃 처리
-            } catch (e: Exception) {
-                // TODO: 에러 처리
+            _logoutState.value = LogoutState.Loading
+
+            when (authRepository.logout()) {
+                is ApiResponse.Success,
+                is ApiResponse.Error,
+                ApiResponse.NetworkError -> {
+                    // 모든 경우 성공으로 처리 (로컬 토큰은 이미 삭제됨)
+                    _logoutState.value = LogoutState.Success
+                }
             }
         }
     }
@@ -327,6 +341,16 @@ sealed class MyPageUiState {
         val challengeRecords: List<RunningRecord>
     ) : MyPageUiState()
     data class Error(val message: String) : MyPageUiState()
+}
+
+/**
+ * 로그아웃 상태
+ */
+sealed class LogoutState {
+    object Idle : LogoutState()
+    object Loading : LogoutState()
+    object Success : LogoutState()
+    data class Error(val message: String) : LogoutState()
 }
 
 /**
