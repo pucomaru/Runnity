@@ -1,11 +1,9 @@
 package com.runnity.global.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * 토큰 블랙리스트 관리 서비스
@@ -13,10 +11,13 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TokenBlacklistService {
 
     private final RedisTemplate<String, String> redisTemplate;
+
+    public TokenBlacklistService(@Qualifier("stringRedisTemplate") RedisTemplate<String, String> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     private static final String BLACKLIST_PREFIX = "blacklist:";
 

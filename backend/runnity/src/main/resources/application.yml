@@ -26,8 +26,12 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      cache:
+        host: ${REDIS_CACHE_HOST:localhost}
+        port: ${REDIS_CACHE_PORT:6379}
+      pubsub:
+        host: ${REDIS_PUBSUB_HOST:localhost}
+        port: ${REDIS_PUBSUB_PORT:6380}
       timeout: 2000
 
 
