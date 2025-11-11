@@ -1,6 +1,8 @@
 package com.runnity.challenge.domain;
 
 import com.runnity.global.domain.BaseEntity;
+import com.runnity.global.exception.GlobalException;
+import com.runnity.global.status.ErrorStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -70,5 +72,38 @@ public class Challenge extends BaseEntity {
         this.isPrivate = isPrivate;
         this.password = password;
         this.isBroadcast = isBroadcast;
+    }
+
+    /**
+     * 챌린지 상태를 RECRUITING → READY로 전이
+     * @throws GlobalException 현재 상태가 RECRUITING이 아닌 경우
+     */
+    public void ready() {
+        if (this.status != ChallengeStatus.RECRUITING) {
+            throw new GlobalException(ErrorStatus.INVALID_STATE_TRANSITION);
+        }
+        this.status = ChallengeStatus.READY;
+    }
+
+    /**
+     * 챌린지 상태를 READY → RUNNING으로 전이
+     * @throws GlobalException 현재 상태가 READY가 아닌 경우
+     */
+    public void run() {
+        if (this.status != ChallengeStatus.READY) {
+            throw new GlobalException(ErrorStatus.INVALID_STATE_TRANSITION);
+        }
+        this.status = ChallengeStatus.RUNNING;
+    }
+
+    /**
+     * 챌린지 상태를 RUNNING → DONE으로 전이
+     * @throws GlobalException 현재 상태가 RUNNING이 아닌 경우
+     */
+    public void complete() {
+        if (this.status != ChallengeStatus.RUNNING) {
+            throw new GlobalException(ErrorStatus.INVALID_STATE_TRANSITION);
+        }
+        this.status = ChallengeStatus.DONE;
     }
 }
