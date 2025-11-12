@@ -36,6 +36,19 @@ class TokenAuthenticator : Authenticator {
      * @return 새로운 요청 (토큰 갱신 성공) 또는 null (갱신 실패)
      */
     override fun authenticate(route: Route?, response: Response): Request? {
+        val url = response.request.url.toString()
+
+        // 인증 관련 공개 API는 Authenticator 스킵
+        // - 로그인 API: 인증 불필요한 공개 엔드포인트
+        // - 토큰 API: 무한 재시도 방지
+        // - 로그아웃 API: 어차피 로컬 토큰 삭제가 목적이므로 재시도 불필요
+        if (url.contains("/auth/login/") ||
+            url.contains("/auth/token") ||
+            url.contains("/auth/logout")) {
+            Timber.d("TokenAuthenticator: 인증 관련 API 스킵 - $url")
+            return null
+        }
+
         // 이미 한 번 재시도한 경우 (무한 루프 방지)
         if (response.request.header("Authorization-Retry") != null) {
             Timber.w("토큰 재발급 이미 시도했으나 실패 - 로그아웃 필요")
