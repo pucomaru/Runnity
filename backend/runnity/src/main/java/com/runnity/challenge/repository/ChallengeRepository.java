@@ -24,6 +24,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             AND cp.isDeleted = false
             AND cp.status != 'LEFT'
         WHERE c.isDeleted = false
+        AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distance IS NULL OR c.distance = :distance)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
@@ -53,6 +54,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             AND cp.isDeleted = false
             AND cp.status != 'LEFT'
         WHERE c.isDeleted = false
+        AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distance IS NULL OR c.distance = :distance)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
