@@ -29,8 +29,9 @@ public class ScheduleOutbox extends BaseEntity {
     @Column(name = "challenge_id", nullable = false)
     private Long challengeId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 50)
-    private String eventType;
+    private ScheduleEventType eventType;
 
     @Column(name = "payload", columnDefinition = "TEXT", nullable = false)
     private String payload;
@@ -46,7 +47,7 @@ public class ScheduleOutbox extends BaseEntity {
     private Integer retryCount = 0;
 
     @Builder
-    public ScheduleOutbox(Long challengeId, String eventType, String payload) {
+    public ScheduleOutbox(Long challengeId, ScheduleEventType eventType, String payload) {
         this.challengeId = challengeId;
         this.eventType = eventType;
         this.payload = payload;
@@ -64,10 +65,41 @@ public class ScheduleOutbox extends BaseEntity {
         this.retryCount++;
     }
 
+    /**
+     * 스케줄 이벤트 타입
+     */
+    public enum ScheduleEventType {
+        SCHEDULE_CREATE("스케줄 생성"),
+        SCHEDULE_DELETE("스케줄 삭제");
+
+        private final String description;
+
+        ScheduleEventType(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    /**
+     * Outbox 처리 상태
+     */
     public enum OutboxStatus {
-        PENDING,
-        PUBLISHED,
-        FAILED
+        PENDING("대기 중"),
+        PUBLISHED("발행 완료"),
+        FAILED("실패");
+
+        private final String description;
+
+        OutboxStatus(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
     }
 }
 
