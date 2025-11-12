@@ -1,5 +1,7 @@
 package com.runnity.challenge.request;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -16,6 +18,7 @@ public enum ChallengeSortType {
         this.label = label;
     }
 
+    @JsonValue
     public String code() {
         return code;
     }
