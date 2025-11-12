@@ -7,10 +7,12 @@ import com.example.runnity.data.model.common.Gender
 import com.example.runnity.data.model.request.AddInfoRequest
 import com.example.runnity.data.repository.AuthRepository
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.util.UserProfileManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * 프로필 추가 정보 입력 ViewModel
@@ -75,9 +77,39 @@ class ProfileSetupViewModel(
 
             when (val result = authRepository.addAdditionalInfo(request, null)) {
                 is ApiResponse.Success -> {
+                    Timber.d("ProfileSetup: 추가 정보 입력 성공")
+
                     // 추가 정보 입력 완료 → 프로필 완성 상태 저장
                     TokenManager.setProfileCompleted(true)
-                    _submitState.value = SubmitState.Success
+
+                    // 프로필 정보 다시 조회하여 UserProfileManager에 저장
+                    Timber.d("ProfileSetup: 프로필 정보 재조회 시작")
+                    when (val profileResult = authRepository.getMyProfile()) {
+                        is ApiResponse.Success -> {
+                            Timber.d("ProfileSetup: 프로필 조회 성공, 저장 중...")
+                            UserProfileManager.saveProfile(profileResult.data)
+                            Timber.d("ProfileSetup: 프로필 저장 완료 - nickname=${profileResult.data.nickname}, email=${profileResult.data.email}")
+
+                            // 프로필 저장 확인 후 Success 상태로 전환
+                            val savedProfile = UserProfileManager.getProfile()
+                            if (savedProfile != null) {
+                                Timber.d("ProfileSetup: 프로필 저장 검증 성공")
+                                _submitState.value = SubmitState.Success
+                            } else {
+                                Timber.e("ProfileSetup: 프로필 저장 검증 실패 - 저장된 프로필이 없음")
+                                _submitState.value = SubmitState.Error("프로필 저장에 실패했습니다")
+                            }
+                        }
+                        is ApiResponse.Error -> {
+                            Timber.e("ProfileSetup: 프로필 조회 실패 (${profileResult.code}: ${profileResult.message})")
+                            // 추가 정보는 제출되었으나 프로필 조회 실패 - 경고와 함께 진행
+                            _submitState.value = SubmitState.Error("프로필 정보를 불러오는데 실패했습니다. 다시 로그인해주세요.")
+                        }
+                        ApiResponse.NetworkError -> {
+                            Timber.e("ProfileSetup: 프로필 조회 실패 (네트워크 에러)")
+                            _submitState.value = SubmitState.Error("네트워크 연결을 확인해주세요")
+                        }
+                    }
                 }
                 is ApiResponse.Error -> {
                     _submitState.value = SubmitState.Error(result.message)

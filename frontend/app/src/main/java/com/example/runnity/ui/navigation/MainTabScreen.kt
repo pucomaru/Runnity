@@ -30,6 +30,7 @@ import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
 import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
+import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
@@ -269,9 +270,19 @@ fun MainTabScreen(
                 route = BottomNavItem.MyPage.graphRoute
             ) {
                 composable(BottomNavItem.MyPage.route) {
-                    MyPageScreen(parentNavController = parentNavController)
+                    MyPageScreen(
+                        navController = navController,
+                        parentNavController = parentNavController
+                    )
                 }
-                // TODO: 설정, 프로필 수정 등 세부 화면 추가 가능
+
+                // 프로필 설정 화면 (네비바 없음)
+                composable("profile_setting") {
+                    ProfileSettingScreen(
+                        navController = navController,
+                        parentNavController = parentNavController
+                    )
+                }
             }
         }
     }

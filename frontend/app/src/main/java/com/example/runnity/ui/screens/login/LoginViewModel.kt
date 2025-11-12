@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.repository.AuthRepository
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.util.UserProfileManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * 로그인 화면 ViewModel
@@ -34,11 +36,15 @@ class LoginViewModel(
                 is ApiResponse.Success -> {
                     val data = result.data
                     if (data.needAdditionalInfo) {
-                        // 추가 정보 입력 필요
+                        // 추가 정보 입력 필요 (신규 회원)
+                        Timber.d("Login: 구글 로그인 성공 (신규 회원) → profile_setup")
+                        TokenManager.setProfileCompleted(false)
                         _uiState.value = LoginUiState.NeedAdditionalInfo
                     } else {
-                        // 로그인 완료
-                        _uiState.value = LoginUiState.Success
+                        // 로그인 완료 (기존 회원) → 프로필 조회하고 저장
+                        Timber.d("Login: 구글 로그인 성공 (기존 회원) → 프로필 조회")
+                        TokenManager.setProfileCompleted(true)
+                        fetchAndSaveProfile()
                     }
                 }
                 is ApiResponse.Error -> {
@@ -63,11 +69,15 @@ class LoginViewModel(
                 is ApiResponse.Success -> {
                     val data = result.data
                     if (data.needAdditionalInfo) {
-                        // 추가 정보 입력 필요
+                        // 추가 정보 입력 필요 (신규 회원)
+                        Timber.d("Login: 카카오 로그인 성공 (신규 회원) → profile_setup")
+                        TokenManager.setProfileCompleted(false)
                         _uiState.value = LoginUiState.NeedAdditionalInfo
                     } else {
-                        // 로그인 완료
-                        _uiState.value = LoginUiState.Success
+                        // 로그인 완료 (기존 회원) → 프로필 조회하고 저장
+                        Timber.d("Login: 카카오 로그인 성공 (기존 회원) → 프로필 조회")
+                        TokenManager.setProfileCompleted(true)
+                        fetchAndSaveProfile()
                     }
                 }
                 is ApiResponse.Error -> {
@@ -90,6 +100,32 @@ class LoginViewModel(
                 _uiState.value = LoginUiState.Success
             } else {
                 _uiState.value = LoginUiState.Idle
+            }
+        }
+    }
+
+    /**
+     * 프로필 조회 및 저장
+     * 로그인 성공 후 기존 회원의 프로필 정보를 가져와 저장
+     */
+    private suspend fun fetchAndSaveProfile() {
+        Timber.d("Login: 프로필 조회 API 호출")
+        when (val profileResult = authRepository.getMyProfile()) {
+            is ApiResponse.Success -> {
+                Timber.d("Login: 프로필 조회 성공, 저장 중...")
+                UserProfileManager.saveProfile(profileResult.data)
+                Timber.d("Login: 프로필 저장 완료 - nickname=${profileResult.data.nickname}")
+                _uiState.value = LoginUiState.Success
+            }
+            is ApiResponse.Error -> {
+                Timber.e("Login: 프로필 조회 실패 (${profileResult.code}: ${profileResult.message})")
+                // 프로필 조회 실패해도 로그인은 성공 (메인 화면에서 다시 조회 가능)
+                _uiState.value = LoginUiState.Success
+            }
+            ApiResponse.NetworkError -> {
+                Timber.e("Login: 프로필 조회 실패 (네트워크 에러)")
+                // 프로필 조회 실패해도 로그인은 성공
+                _uiState.value = LoginUiState.Success
             }
         }
     }

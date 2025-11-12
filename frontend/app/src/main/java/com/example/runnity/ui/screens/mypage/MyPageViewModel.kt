@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.repository.AuthRepository
+import com.example.runnity.data.util.UserProfileManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -26,10 +28,6 @@ class MyPageViewModel(
 
     private val _uiState = MutableStateFlow<MyPageUiState>(MyPageUiState.Loading)
     val uiState: StateFlow<MyPageUiState> = _uiState.asStateFlow()
-
-    // 로그아웃 상태
-    private val _logoutState = MutableStateFlow<LogoutState>(LogoutState.Idle)
-    val logoutState: StateFlow<LogoutState> = _logoutState.asStateFlow()
 
     // 선택된 기간 타입 (주/월/연/전체)
     private val _selectedPeriodType = MutableStateFlow(PeriodType.WEEK)
@@ -51,11 +49,20 @@ class MyPageViewModel(
     private fun loadUserProfile() {
         viewModelScope.launch {
             try {
-                // TODO: Repository에서 사용자 프로필 및 통계 로드
+                // UserProfileManager에서 프로필 정보 가져오기
+                Timber.d("MyPage: 프로필 로드 시작")
+                val profile = UserProfileManager.getProfile()
+
+                if (profile == null) {
+                    Timber.w("MyPage: UserProfileManager에 프로필 없음")
+                } else {
+                    Timber.d("MyPage: 프로필 로드 성공 - nickname=${profile.nickname}, email=${profile.email}")
+                }
+
                 _uiState.value = MyPageUiState.Success(
                     userProfile = UserProfile(
-                        nickname = "역삼 우사인볼트",
-                        profileImageUrl = null
+                        nickname = profile?.nickname ?: "닉네임 없음",
+                        profileImageUrl = profile?.profileImageUrl
                     ),
                     stats = generateMockStats(),
                     graphData = generateMockGraphData(),
@@ -63,6 +70,7 @@ class MyPageViewModel(
                     challengeRecords = generateMockChallengeRecords()
                 )
             } catch (e: Exception) {
+                Timber.e(e, "MyPage: 프로필 로드 실패")
                 _uiState.value = MyPageUiState.Error(e.message ?: "프로필 로드 실패")
             }
         }
@@ -197,25 +205,6 @@ class MyPageViewModel(
         _selectedRecordTab.value = index
     }
 
-    /**
-     * 로그아웃
-     * 성공/실패 여부와 관계없이 로컬 토큰은 삭제되므로 항상 성공으로 처리
-     */
-    fun logout() {
-        viewModelScope.launch {
-            _logoutState.value = LogoutState.Loading
-
-            when (authRepository.logout()) {
-                is ApiResponse.Success,
-                is ApiResponse.Error,
-                ApiResponse.NetworkError -> {
-                    // 모든 경우 성공으로 처리 (로컬 토큰은 이미 삭제됨)
-                    _logoutState.value = LogoutState.Success
-                }
-            }
-        }
-    }
-
     // Mock 데이터 생성 함수들
     private fun generateMockStats() = RunningStats(
         totalDistance = 13.0,
@@ -341,16 +330,6 @@ sealed class MyPageUiState {
         val challengeRecords: List<RunningRecord>
     ) : MyPageUiState()
     data class Error(val message: String) : MyPageUiState()
-}
-
-/**
- * 로그아웃 상태
- */
-sealed class LogoutState {
-    object Idle : LogoutState()
-    object Loading : LogoutState()
-    object Success : LogoutState()
-    data class Error(val message: String) : LogoutState()
 }
 
 /**
