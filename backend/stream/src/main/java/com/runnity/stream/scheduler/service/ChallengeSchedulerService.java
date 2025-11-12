@@ -72,16 +72,33 @@ public class ChallengeSchedulerService implements MessageListener {
 
         for (ScheduleOutbox outbox : pendingOutboxes) {
             try {
-                pubsubRedisTemplate.convertAndSend("challenge:schedule:create", outbox.getPayload());
+                // 이벤트 타입에 따라 다르게 처리
+                switch (outbox.getEventType()) {
+                    case "SCHEDULE_CREATE":
+                        // Redis pub/sub으로 스케줄 생성 이벤트 발행
+                        pubsubRedisTemplate.convertAndSend("challenge:schedule:create", outbox.getPayload());
+                        log.info("스케줄 생성 이벤트 발행 완료: challengeId={}", outbox.getChallengeId());
+                        break;
+                        
+                    case "SCHEDULE_DELETE":
+                        // 스케줄 삭제 처리 (Redis ZSET에서 제거)
+                        deleteSchedule(outbox.getChallengeId());
+                        log.info("스케줄 삭제 완료: challengeId={}", outbox.getChallengeId());
+                        break;
+                        
+                    default:
+                        log.warn("알 수 없는 이벤트 타입: {}, challengeId={}", 
+                                outbox.getEventType(), outbox.getChallengeId());
+                }
 
                 outbox.markAsPublished();
                 outboxRepository.save(outbox);
 
-                log.info("Outbox 이벤트 발행 완료: challengeId={}", outbox.getChallengeId());
             } catch (Exception e) {
                 outbox.markAsFailed();
                 outboxRepository.save(outbox);
-                log.error("Outbox 이벤트 발행 실패: challengeId={}", outbox.getChallengeId(), e);
+                log.error("Outbox 이벤트 처리 실패: challengeId={}, eventType={}", 
+                        outbox.getChallengeId(), outbox.getEventType(), e);
             }
         }
     }
@@ -172,8 +189,34 @@ public class ChallengeSchedulerService implements MessageListener {
             String[] parts = event.split(":");
             Long challengeId = Long.parseLong(parts[0]);
 
+            // 챌린지가 삭제되었는지 확인
             Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
-            if (challenge != null && challenge.getStatus() != ChallengeStatus.DONE) {
+            if (challenge == null || challenge.isDeleted()) {
+                // 삭제된 챌린지는 Redis에서 제거
+                redisTemplate.opsForZSet().remove(zsetKey, event);
+                log.info("삭제된 챌린지 스케줄 제거: challengeId={}, type={}", challengeId, eventType);
+                continue;
+            }
+
+            // SCHEDULE_DELETE 이벤트가 있는지 확인
+            boolean hasDeleteEvent = outboxRepository
+                    .findByStatusOrderByCreatedAtAsc(ScheduleOutbox.OutboxStatus.PUBLISHED)
+                    .stream()
+                    .anyMatch(outbox -> 
+                        outbox.getChallengeId().equals(challengeId) 
+                        && "SCHEDULE_DELETE".equals(outbox.getEventType())
+                    );
+
+            if (hasDeleteEvent) {
+                // 삭제 이벤트가 있으면 Redis에서 제거하고 재등록하지 않음
+                redisTemplate.opsForZSet().remove(zsetKey, event);
+                log.info("삭제 이벤트가 있는 챌린지 스케줄 제거: challengeId={}, type={}", 
+                        challengeId, eventType);
+                continue;
+            }
+
+            // 활성 챌린지만 재등록
+            if (challenge.getStatus() != ChallengeStatus.DONE) {
                 // Challenge 테이블의 startAt, endAt을 기반으로 스케줄 재등록
                 LocalDateTime executeAt = switch (eventType) {
                     case "READY" -> challenge.getStartAt().minusMinutes(5);
@@ -187,9 +230,9 @@ public class ChallengeSchedulerService implements MessageListener {
                             challengeId, eventType, executeAt);
                 }
             } else {
-                // 완료된 챌린지나 존재하지 않는 챌린지는 Redis에서 제거
+                // 완료된 챌린지는 Redis에서 제거
                 redisTemplate.opsForZSet().remove(zsetKey, event);
-                log.info("만료된 스케줄 삭제: challengeId={}, type={}", challengeId, eventType);
+                log.info("완료된 스케줄 삭제: challengeId={}, type={}", challengeId, eventType);
             }
         }
     }
@@ -201,6 +244,18 @@ public class ChallengeSchedulerService implements MessageListener {
 
     private double toTimestamp(LocalDateTime dateTime) {
         return Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant()).getTime();
+    }
+
+    /**
+     * 스케줄 삭제 처리 (Redis ZSET에서 제거)
+     */
+    private void deleteSchedule(Long challengeId) {
+        // Redis ZSET에서 해당 챌린지의 모든 스케줄 제거
+        redisTemplate.opsForZSet().remove("schedule:ready", challengeId + ":READY");
+        redisTemplate.opsForZSet().remove("schedule:running", challengeId + ":RUNNING");
+        redisTemplate.opsForZSet().remove("schedule:done", challengeId + ":DONE");
+        
+        log.info("Redis에서 스케줄 삭제 완료: challengeId={}", challengeId);
     }
 }
 
