@@ -71,8 +71,6 @@ public enum ParticipationStatus {
     public static final EnumSet<ParticipationStatus> ACTUAL_PARTICIPANT_STATUSES =
             EnumSet.of(RUNNING, COMPLETED, QUIT, TIMEOUT, DISCONNECTED, ERROR, KICKED, EXPIRED);
 
-    
-
     @Override
     public String toString() {
         return label + " (" + code + ")";
