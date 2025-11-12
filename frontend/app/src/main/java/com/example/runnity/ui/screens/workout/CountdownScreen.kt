@@ -21,6 +21,8 @@ import androidx.compose.animation.core.tween
 import com.example.runnity.theme.Typography
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.example.runnity.data.datalayer.sendSessionControl
 
 @Composable
 fun CountdownScreen(
@@ -32,6 +34,7 @@ fun CountdownScreen(
     // 숫자 상태: 3 -> 2 -> 1
     var current by remember { mutableStateOf(3) }
     val scale = remember { Animatable(1f) }
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         val values = listOf(3, 2, 1)
@@ -41,7 +44,8 @@ fun CountdownScreen(
             scale.animateTo(1.25f, animationSpec = tween(durationMillis = 500))
             scale.animateTo(1.0f, animationSpec = tween(durationMillis = 500))
         }
-        // 카운트 종료 후 개인 운동 화면으로 이동
+        // 카운트 종료: 워치에 start 전송 후 개인 운동 화면으로 이동
+        sendSessionControl(context, "start")
         val route = when (type) {
             "distance" -> "workout/personal?type=distance&km=${km ?: ""}"
             "time" -> "workout/personal?type=time&min=${min ?: ""}"

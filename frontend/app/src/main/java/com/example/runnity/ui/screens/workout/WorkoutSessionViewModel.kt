@@ -79,6 +79,30 @@ class WorkoutSessionViewModel : ViewModel() {
     private var tickerJob: Job? = null
     private var stopping: Boolean = false
 
+    // 워치 메트릭 우선 적용을 위한 최근 수신 시각
+    private var lastWatchMetricsAt: Long = 0L
+    private fun isWatchPrimaryActive(now: Long = System.currentTimeMillis()): Boolean =
+        (now - lastWatchMetricsAt) <= 4000L
+
+    // 워치로부터 메트릭을 수신하여 우선 반영
+    fun ingestWatchMetrics(hrBpm: Int?, distanceM: Double?, elapsedMs: Long?, paceSpKm: Double?, caloriesKcal: Double?) {
+        val now = System.currentTimeMillis()
+        lastWatchMetricsAt = now
+        // 시간은 내부 ticker가 관리하지만, 활동/총 경과는 유지
+        val cur = _metrics.value
+        val newDistance = distanceM ?: cur.distanceMeters
+        val newCalories = caloriesKcal ?: cur.caloriesKcal
+        val newAvgPace = paceSpKm ?: cur.avgPaceSecPerKm
+        val newHr = hrBpm ?: cur.avgHeartRate
+        _metrics.value = cur.copy(
+            distanceMeters = newDistance,
+            caloriesKcal = newCalories,
+            avgPaceSecPerKm = newAvgPace,
+            avgHeartRate = newHr
+        )
+        if (paceSpKm != null) _currentPaceSecPerKm.value = paceSpKm
+    }
+
     // 목표 관련 상태
     data class Goal(
         val type: String, // "time" | "distance"
@@ -264,22 +288,24 @@ class WorkoutSessionViewModel : ViewModel() {
         val clampedDt = dtMs.coerceIn(0L, 10_000L)
         segmentTimeMs += clampedDt
 
-        // 100m 달성 시 현재 페이스 산출 및 이벤트 발행
-        if (segmentDistanceMeters >= 100.0 && segmentTimeMs > 0L) {
-            val paceSecPerKm = (segmentTimeMs / 1000.0) / (segmentDistanceMeters / 1000.0)
-            if (paceSecPerKm.isFinite() && paceSecPerKm > 0) {
-                _currentPaceSecPerKm.value = paceSecPerKm
-            }
+        // 100m 달성 시 현재 페이스 산출 및 이벤트 발행 (워치 우선 활성 시 스킵)
+        if (!isWatchPrimaryActive()) {
+            if (segmentDistanceMeters >= 100.0 && segmentTimeMs > 0L) {
+                val paceSecPerKm = (segmentTimeMs / 1000.0) / (segmentDistanceMeters / 1000.0)
+                if (paceSecPerKm.isFinite() && paceSecPerKm > 0) {
+                    _currentPaceSecPerKm.value = paceSecPerKm
+                }
 
-            // 남는 거리/시간 비례 이월(초과분 유지)
-            val overMeters = segmentDistanceMeters - 100.0
-            if (overMeters > 0.0) {
-                val keepRatio = if (segmentDistanceMeters > 0.0) overMeters / segmentDistanceMeters else 0.0
-                segmentDistanceMeters = overMeters
-                segmentTimeMs = (segmentTimeMs * keepRatio).toLong()
-            } else {
-                segmentDistanceMeters = 0.0
-                segmentTimeMs = 0L
+                // 남는 거리/시간 비례 이월(초과분 유지)
+                val overMeters = segmentDistanceMeters - 100.0
+                if (overMeters > 0.0) {
+                    val keepRatio = if (segmentDistanceMeters > 0.0) overMeters / segmentDistanceMeters else 0.0
+                    segmentDistanceMeters = overMeters
+                    segmentTimeMs = (segmentTimeMs * keepRatio).toLong()
+                } else {
+                    segmentDistanceMeters = 0.0
+                    segmentTimeMs = 0L
+                }
             }
         }
 
@@ -290,6 +316,8 @@ class WorkoutSessionViewModel : ViewModel() {
 
     // 외부에서 계산된 거리/칼로리를 반영, 평균 페이스는 active 시간 기준으로 내부 계산
     fun updateDistanceAndCalories(distanceMeters: Double, caloriesKcal: Double) {
+        // 워치 메트릭이 최근에 활성화되어 있으면 폰 계산은 건너뜀 (워치 우선)
+        if (isWatchPrimaryActive()) return
         val pace = if (distanceMeters > 0.0) {
             val activeSec = currentActiveElapsedMs() / 1000.0
             if (activeSec > 0) (activeSec / (distanceMeters / 1000.0)) else null
