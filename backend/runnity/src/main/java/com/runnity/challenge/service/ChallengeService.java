@@ -62,7 +62,7 @@ public class ChallengeService {
         String payload = createSchedulePayload(challenge.getChallengeId(), startAt, endAt);
         ScheduleOutbox outbox = ScheduleOutbox.builder()
                 .challengeId(challenge.getChallengeId())
-                .eventType("SCHEDULE_CREATE")
+                .eventType(ScheduleOutbox.ScheduleEventType.SCHEDULE_CREATE)
                 .payload(payload)
                 .build();
         scheduleOutboxRepository.save(outbox);
@@ -243,7 +243,7 @@ public class ChallengeService {
         // 1. 챌린지 검증
         Challenge challenge = validateAndGetChallenge(challengeId);
 
-        // 2. 회원 조회 (평균 페이스 필요)
+        // 2. 회원 조회
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
@@ -259,7 +259,10 @@ public class ChallengeService {
         log.info("챌린지 참가 취소 완료: challengeId={}, memberId={}, participantId={}",
                 challengeId, memberId, participation.getParticipantId());
 
-        // 5. Response 반환
+        // 5. 참가자 수 확인 및 챌린지 삭제 처리
+        deleteChallengeIfNoParticipants(challenge);
+
+        // 6. Response 반환
         return new ChallengeJoinResponse(
                 participation.getParticipantId(),
                 challenge.getChallengeId(),
@@ -326,6 +329,44 @@ public class ChallengeService {
             log.warn("시간 중복 챌린지 생성 시도: memberId={}, startAt={}, endAt={}",
                     memberId, startAt, endAt);
             throw new GlobalException(ErrorStatus.CHALLENGE_TIME_OVERLAP);
+        }
+    }
+
+    /**
+     * 참가자가 0명이면 챌린지 삭제 처리
+     * RECRUITING 상태에서만 삭제 가능
+     * 
+     * @param challenge 검증할 챌린지
+     */
+    private void deleteChallengeIfNoParticipants(Challenge challenge) {
+        // RECRUITING 상태가 아니면 삭제하지 않음
+        if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
+            return;
+        }
+
+        // 활성 참가자 수 조회 (LEFT 제외)
+        long activeParticipantCount = participationRepository.findByChallengeIdAndActiveStatus(
+                challenge.getChallengeId(),
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
+        ).size();
+
+        // 참가자가 0명이면 챌린지 삭제
+        if (activeParticipantCount == 0) {
+            challenge.delete();
+            challengeRepository.save(challenge);
+
+            // 스케줄러 서버에 삭제 이벤트 발행
+            String deletePayload = String.format("{\"challengeId\":%d}", challenge.getChallengeId());
+            ScheduleOutbox deleteOutbox = ScheduleOutbox.builder()
+                    .challengeId(challenge.getChallengeId())
+                    .eventType(ScheduleOutbox.ScheduleEventType.SCHEDULE_DELETE)
+                    .payload(deletePayload)
+                    .build();
+            scheduleOutboxRepository.save(deleteOutbox);
+
+            log.info("참가자 0명으로 인한 챌린지 삭제 및 스케줄 삭제 이벤트 발행: challengeId={}, title={}",
+                    challenge.getChallengeId(),
+                    challenge.getTitle());
         }
     }
 }
