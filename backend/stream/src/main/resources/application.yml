@@ -20,8 +20,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-        show_sql: true
+        format_sql: false
+        show_sql: false
     open-in-view: false
 
   data:
@@ -49,7 +49,7 @@ server:
 logging:
   level:
     root: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: INFO
     org.springframework.kafka: INFO
     org.springframework.web: INFO
     com.runnity.stream: DEBUG
