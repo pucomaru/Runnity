@@ -84,6 +84,10 @@ public class ChallengeService {
     public ChallengeListResponse getChallenges(ChallengeListRequest request, Pageable pageable, Long memberId) {
         Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
 
+        List<ChallengeDistance> distances = (request.distances() == null || request.distances().isEmpty()) 
+                ? null 
+                : request.distances();
+
         // Pageable의 Sort를 제거하여 @Query의 ORDER BY만 사용하도록 함
         // ChallengeSortType은 ChallengeListRequest.sort로 처리되므로 Pageable.sort와 충돌 방지
         Pageable pageableWithoutSort = PageRequest.of(
@@ -94,7 +98,7 @@ public class ChallengeService {
         Page<Object[]> result = request.sort() == ChallengeSortType.POPULAR
                 ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
                         request.keyword(),
-                        request.distance(),
+                        distances,
                         request.startAt(),
                         request.endAt(),
                         isPrivateFilter,
@@ -102,7 +106,7 @@ public class ChallengeService {
                 )
                 : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
                         request.keyword(),
-                        request.distance(),
+                        distances,
                         request.startAt(),
                         request.endAt(),
                         isPrivateFilter,

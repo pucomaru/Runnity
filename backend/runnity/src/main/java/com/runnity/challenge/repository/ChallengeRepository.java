@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
 
@@ -26,7 +27,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         WHERE c.isDeleted = false
         AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
-        AND (:distance IS NULL OR c.distance = :distance)
+        AND (:distances IS NULL OR c.distance IN :distances)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
         AND (:endAt IS NULL OR c.startAt <= :endAt)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
@@ -35,7 +36,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     """)
     Page<Object[]> findChallengesWithParticipantCountOrderByPopular(
             @Param("keyword") String keyword,
-            @Param("distance") ChallengeDistance distance,
+            @Param("distances") List<ChallengeDistance> distances,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("isPrivate") Boolean isPrivate,
@@ -56,7 +57,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         WHERE c.isDeleted = false
         AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
-        AND (:distance IS NULL OR c.distance = :distance)
+        AND (:distances IS NULL OR c.distance IN :distances)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
         AND (:endAt IS NULL OR c.startAt <= :endAt)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
@@ -65,7 +66,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     """)
     Page<Object[]> findChallengesWithParticipantCountOrderByLatest(
             @Param("keyword") String keyword,
-            @Param("distance") ChallengeDistance distance,
+            @Param("distances") List<ChallengeDistance> distances,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("isPrivate") Boolean isPrivate,
