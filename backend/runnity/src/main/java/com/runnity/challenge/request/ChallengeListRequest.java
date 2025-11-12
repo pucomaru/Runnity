@@ -32,6 +32,8 @@ public record ChallengeListRequest(
 ) {
 
     public ChallengeListRequest {
+        keyword = (keyword != null && (keyword.isBlank() || "null".equalsIgnoreCase(keyword))) ? null : keyword;
+        
         visibility = Objects.requireNonNullElse(visibility, ChallengeVisibility.PUBLIC);
         sort = Objects.requireNonNullElse(sort, ChallengeSortType.LATEST);
     }
