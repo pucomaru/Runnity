@@ -23,7 +23,7 @@ public class Member extends BaseEntity {
 
     private String socialType;
 
-    @Column(nullable = false, unique = true)
+    @Column
     private String email;
 
     @Column(name = "nickname")
