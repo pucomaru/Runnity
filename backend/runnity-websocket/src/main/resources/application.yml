@@ -26,23 +26,27 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      cache:
+        host: ${REDIS_CACHE_HOST:localhost}
+        port: ${REDIS_CACHE_PORT:6379}
+      pubsub:
+        host: ${REDIS_PUBSUB_HOST:localhost}
+        port: ${REDIS_PUBSUB_PORT:6380}
       timeout: 2000
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:29092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
-    consumer:
-      group-id: runnity-websocket-group
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 server:
   address: 0.0.0.0
   port: ${WEBSOCKET_SERVER_PORT:8081}
+
+websocket:
+  server-id: ${WEBSOCKET_SERVER_ID:ws-local-1}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:3000}
 
 logging:
   level:
