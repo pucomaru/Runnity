@@ -120,7 +120,7 @@ public class ChallengeService {
                 : Set.copyOf(participationRepository.findJoinedChallengeIds(
                         challengeIds,
                         memberId,
-                        ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                        ParticipationStatus.TOTAL_APPLICANT_STATUSES
                 ));
 
         // DTO 변환
@@ -146,7 +146,7 @@ public class ChallengeService {
         // 참가자 목록 조회 (LEFT 제외)
         List<ChallengeParticipation> participations = participationRepository.findByChallengeIdAndActiveStatus(
                 challengeId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         );
 
         int currentParticipants = participations.size();
@@ -155,7 +155,7 @@ public class ChallengeService {
         boolean joined = participationRepository.existsByChallengeIdAndMemberIdAndActiveStatus(
                 challengeId,
                 memberId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         );
 
         // 참가자 DTO 변환
@@ -307,7 +307,7 @@ public class ChallengeService {
     private void validateParticipantLimit(Challenge challenge) {
         long currentCount = participationRepository.findByChallengeIdAndActiveStatus(
                 challenge.getChallengeId(),
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         ).size();
 
         if (currentCount >= challenge.getMaxParticipants()) {
