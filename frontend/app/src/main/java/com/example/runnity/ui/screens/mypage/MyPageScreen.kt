@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyPageScreen(
+    navController: NavController? = null,
     parentNavController: NavController? = null,
     viewModel: MyPageViewModel = viewModel()
 ) {
@@ -96,7 +97,7 @@ fun MyPageScreen(
                         ProfileSection(
                             userProfile = state.userProfile,
                             onEditClick = {
-                                // TODO: 프로필 수정 페이지로 이동
+                                navController?.navigate("profile_setting")
                             }
                         )
                     }

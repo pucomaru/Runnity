@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.repository.AuthRepository
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.util.UserProfileManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +51,9 @@ class AppNavigationViewModel(
                     val profile = result.data
                     val needInfo = profile.needAdditionalInfo
 
+                    // 프로필 정보 저장 (전역 접근 가능)
+                    UserProfileManager.saveProfile(profile)
+
                     // 캐시 저장 (다음 네트워크 에러 대비)
                     TokenManager.setProfileCompleted(!needInfo)
 
@@ -67,15 +71,17 @@ class AppNavigationViewModel(
                 is ApiResponse.Error -> {
                     when (result.code) {
                         401 -> {
-                            // 토큰 만료/무효 → 토큰 삭제 후 로그인
+                            // 토큰 만료/무효 → 토큰 및 프로필 삭제 후 로그인
                             Timber.w("AppNavigation: 토큰 만료 (401) → login (토큰 삭제)")
                             TokenManager.clearTokens()
+                            UserProfileManager.clearProfile()
                             _startDestination.value = "login"
                         }
                         404 -> {
                             // 회원 없음 → 로그인
                             Timber.w("AppNavigation: 회원 없음 (404) → login (토큰 삭제)")
                             TokenManager.clearTokens()
+                            UserProfileManager.clearProfile()
                             _startDestination.value = "login"
                         }
                         else -> {

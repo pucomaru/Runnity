@@ -1,20 +1,9 @@
 package com.example.runnity.ui.screens.mypage
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +14,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,7 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
+import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.PrimaryButton
@@ -58,15 +52,20 @@ fun ProfileSection(
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .clip(CircleShape)
-                .background(ColorPalette.Light.containerBackground),
+                .clip(CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Person,
+            Image(
+                painter = if (userProfile.profileImageUrl != null && userProfile.profileImageUrl.isNotBlank()) {
+                    // 프로필 이미지 URL이 있을 경우
+                    rememberAsyncImagePainter(userProfile.profileImageUrl)
+                } else {
+                    // 프로필 이미지가 없을 경우 기본 이미지
+                    painterResource(id = R.drawable.profile)
+                },
                 contentDescription = "프로필",
-                modifier = Modifier.size(40.dp),
-                tint = ColorPalette.Light.component
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
         }
 
@@ -82,7 +81,7 @@ fun ProfileSection(
 
         // 편집 버튼
         Icon(
-            imageVector = Icons.Outlined.Edit,
+            imageVector = Icons.Outlined.Settings,
             contentDescription = "프로필 수정",
             modifier = Modifier
                 .size(24.dp)
