@@ -71,6 +71,13 @@ public enum ParticipationStatus {
     public static final EnumSet<ParticipationStatus> ACTUAL_PARTICIPANT_STATUSES =
             EnumSet.of(RUNNING, COMPLETED, QUIT, TIMEOUT, DISCONNECTED, ERROR, KICKED, EXPIRED);
 
+    public static final EnumSet<ParticipationStatus> CHALLENGE_START_STATUS =
+            EnumSet.of(WAITING);
+
+    public static final EnumSet<ParticipationStatus> CHALLENGE_END_STATUS =
+            EnumSet.of(COMPLETED);
+
+
     @Override
     public String toString() {
         return label + " (" + code + ")";
