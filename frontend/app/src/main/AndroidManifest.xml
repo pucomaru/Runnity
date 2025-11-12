@@ -45,6 +45,15 @@
             </intent-filter>
         </activity>
 
+        <!-- 워치에서 세션 제어를 받고 ViewModel에 전달 -->
+        <service
+            android:name=".data.datalayer.PhoneControlListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+            </intent-filter>
+        </service>
+
         <!-- Kakao Login Redirect Activity -->
         <activity
             android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"

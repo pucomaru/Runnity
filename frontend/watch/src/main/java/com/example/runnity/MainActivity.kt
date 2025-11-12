@@ -98,6 +98,22 @@ fun ControlPanel(modifier: Modifier = Modifier) {
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
+                Log.d("MainActivity", "Show Countdown clicked")
+                Toast.makeText(context, "Countdown 3s", Toast.LENGTH_SHORT).show()
+                context.startActivity(
+                    Intent(context, com.example.runnity.ui.WatchCountdownActivity::class.java).apply {
+                        putExtra("seconds", 3)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+        ) { Text("Show Countdown (3s)") }
+
+        Spacer(Modifier.height(12.dp))
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
                 Log.d("MainActivity", "Stop button clicked")
                 Toast.makeText(context, "Stop clicked", Toast.LENGTH_SHORT).show()
                 context.startService(

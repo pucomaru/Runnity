@@ -59,6 +59,10 @@ import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.label.LabelLayer
 import com.example.runnity.utils.PermissionUtils
+import com.example.runnity.data.datalayer.SessionControlBus
+import com.example.runnity.data.datalayer.sendSessionControl
+import com.example.runnity.data.datalayer.SessionMetricsBus
+import kotlinx.coroutines.flow.collectLatest
 
 // 개인 러닝 화면
 @Composable
@@ -127,6 +131,30 @@ fun WorkoutPersonalScreen(
     // 시스템 뒤로가기 방지 (운동 중 뒤로가기 금지)
     BackHandler(enabled = true) {
         // consume back press
+    }
+
+    // 워치에서 제어 수신: pause/resume/stop → ViewModel 액션 매핑
+    LaunchedEffect(Unit) {
+        SessionControlBus.events.collectLatest { type ->
+            when (type) {
+                "pause" -> sessionViewModel.pause()
+                "resume" -> sessionViewModel.resume()
+                "stop" -> sessionViewModel.stop()
+            }
+        }
+    }
+
+    // 워치 메트릭 수신: watch-primary 적용을 위해 ViewModel에 주입
+    LaunchedEffect(Unit) {
+        SessionMetricsBus.events.collectLatest { m ->
+            sessionViewModel.ingestWatchMetrics(
+                hrBpm = m.hrBpm,
+                distanceM = m.distanceM,
+                elapsedMs = m.elapsedMs,
+                paceSpKm = m.paceSpKm,
+                caloriesKcal = m.caloriesKcal
+            )
+        }
     }
 
     var selectedTab by remember { mutableStateOf(0) } // 0=통계, 1=지도
@@ -403,7 +431,10 @@ fun WorkoutPersonalScreen(
             // 컨트롤 영역 (세션 상태 기반 토글)
             if (phase != WorkoutPhase.Paused) {
                 // Running: 일시정지 하나 (가로 중앙)
-                CenterControlCircle(icon = "pause") { sessionViewModel.pause() }
+                CenterControlCircle(icon = "pause") {
+                    sessionViewModel.pause()
+                    sendSessionControl(context, "pause")
+                }
             } else {
                 // Paused: 종료(길게3초) + 재개
                 Row(
@@ -413,6 +444,7 @@ fun WorkoutPersonalScreen(
                 ) {
                     CenterControlCircle(icon = "stop", accent = ColorPalette.Common.stopAccent) {
                         sessionViewModel.stop()
+                        sendSessionControl(context, "stop")
                         val route = buildString {
                             append("workout/result?")
                             if (type != null) append("type=$type&")
@@ -421,7 +453,10 @@ fun WorkoutPersonalScreen(
                         }.trimEnd('&')
                         navController?.navigate(route)
                     }
-                    CenterControlCircle(icon = "play") { sessionViewModel.resume() }
+                    CenterControlCircle(icon = "play") {
+                        sessionViewModel.resume()
+                        sendSessionControl(context, "resume")
+                    }
                 }
             }
         }
