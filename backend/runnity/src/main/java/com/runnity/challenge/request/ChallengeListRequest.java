@@ -27,7 +27,7 @@ public record ChallengeListRequest(
         @Schema(description = "공개 여부 (PUBLIC: 공개방만, ALL: 전체)", implementation = ChallengeVisibility.class, defaultValue = "PUBLIC")
         ChallengeVisibility visibility,
 
-        @Schema(description = "정렬 기준 (POPULAR: 인기순, LATEST: 최신순)", implementation = ChallengeSortType.class, defaultValue = "LATEST")
+        @Schema(description = "정렬 기준 (POPULAR: 인기순, LATEST: 최신순)", implementation = ChallengeSortType.class, defaultValue = "POPULAR")
         ChallengeSortType sort
 ) {
 
@@ -35,6 +35,6 @@ public record ChallengeListRequest(
         keyword = (keyword != null && (keyword.isBlank() || "null".equalsIgnoreCase(keyword))) ? null : keyword;
         
         visibility = Objects.requireNonNullElse(visibility, ChallengeVisibility.PUBLIC);
-        sort = Objects.requireNonNullElse(sort, ChallengeSortType.LATEST);
+        sort = Objects.requireNonNullElse(sort, ChallengeSortType.POPULAR);
     }
 }
