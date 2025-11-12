@@ -22,6 +22,7 @@ import com.runnity.scheduler.repository.ScheduleOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +84,13 @@ public class ChallengeService {
     public ChallengeListResponse getChallenges(ChallengeListRequest request, Pageable pageable, Long memberId) {
         Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
 
+        // Pageable의 Sort를 제거하여 @Query의 ORDER BY만 사용하도록 함
+        // ChallengeSortType은 ChallengeListRequest.sort로 처리되므로 Pageable.sort와 충돌 방지
+        Pageable pageableWithoutSort = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+        );
+
         Page<Object[]> result = request.sort() == ChallengeSortType.POPULAR
                 ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
                         request.keyword(),
@@ -90,7 +98,7 @@ public class ChallengeService {
                         request.startAt(),
                         request.endAt(),
                         isPrivateFilter,
-                        pageable
+                        pageableWithoutSort
                 )
                 : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
                         request.keyword(),
@@ -98,7 +106,7 @@ public class ChallengeService {
                         request.startAt(),
                         request.endAt(),
                         isPrivateFilter,
-                        pageable
+                        pageableWithoutSort
                 );
 
         // 챌린지 ID 추출
