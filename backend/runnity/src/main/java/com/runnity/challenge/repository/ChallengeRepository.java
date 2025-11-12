@@ -27,7 +27,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distance IS NULL OR c.distance = :distance)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
-        AND (:endAt IS NULL OR c.endAt <= :endAt)
+        AND (:endAt IS NULL OR c.startAt <= :endAt)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
         ORDER BY COUNT(cp) DESC, c.createdAt DESC
@@ -56,7 +56,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distance IS NULL OR c.distance = :distance)
         AND (:startAt IS NULL OR c.startAt >= :startAt)
-        AND (:endAt IS NULL OR c.endAt <= :endAt)
+        AND (:endAt IS NULL OR c.startAt <= :endAt)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
         ORDER BY c.createdAt DESC

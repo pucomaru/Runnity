@@ -20,7 +20,7 @@ public record ChallengeListRequest(
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         LocalDateTime startAt,
 
-        @Schema(description = "종료 일시 (이 시간 이전 종료되는 챌린지만 조회)", example = "2025-11-07T23:59:59")
+        @Schema(description = "종료 일시 (이 시간 이전에 시작하는 챌린지만 조회)", example = "2025-11-07T23:59:59")
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         LocalDateTime endAt,
 
