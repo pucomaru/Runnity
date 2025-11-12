@@ -5,9 +5,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +37,9 @@ fun BroadcastScreen(
     parentNavController: NavController? = null,  // 앱 전체 이동용
     viewModel: BroadcastViewModel = viewModel()
 ) {
+
+    val uiState by viewModel.uiState.collectAsState()
+
     // 검색어 상태
     var searchQuery by remember { mutableStateOf("") }
 
@@ -142,29 +147,43 @@ fun BroadcastScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 4. 중계 리스트 (LazyColumn)
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)  // FAB 공간 확보
-            ) {
-                items(broadcasts.size) { index ->
-                    ChallengeCard(
-                        distance = broadcasts[index].distance,
-                        title = broadcasts[index].title,
-                        startDateTime = broadcasts[index].startDateTime,
-                        participants = broadcasts[index].participants,
-                        buttonState = broadcasts[index].buttonState,
-                        onCardClick = {
-                            // 세부 화면으로 이동
-                            navController?.navigate("Broadcast_detail/${broadcasts[index].id}")
-                        },
-                        onButtonClick = {
-                            // TODO: 예약하기/참가하기 버튼 클릭 처리
+            when (val state = uiState) {
+                is BroadcastUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                is BroadcastUiState.Success -> {
+                    if (state.broadcasts.isEmpty()) {
+                        // 2. 데이터가 없을 때 메시지 표시
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("진행 중인 중계가 없습니다.")
                         }
-                    )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
+                        ) {
+                            items(state.broadcasts.size) { index ->
+                                val broadcast = state.broadcasts[index]
+                                // 3. BroadcastCard 사용
+                                BroadcastCard(
+                                    title = broadcast.title,
+                                    viewerCount = broadcast.viewerCount,
+                                    participantCount = broadcast.participantCount,
+                                    onCardClick = {
+                                        // TODO: 중계방 상세 화면으로 이동
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                is BroadcastUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = state.message)
+                    }
                 }
             }
         }

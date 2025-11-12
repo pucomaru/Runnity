@@ -33,6 +33,7 @@ import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.example.runnity.ui.screens.broadcast.BroadcastScreen
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 import com.example.runnity.ui.screens.workout.CountdownScreen
 
@@ -260,6 +261,14 @@ fun MainTabScreen(
                     ChallengeDetailScreen(
                         challengeId = challengeId,
                         navController = navController
+                    )
+                }
+
+                // 챌린지 중계 화면
+                composable("broadcast_view") {
+                    BroadcastScreen(
+                        navController = navController,
+                        parentNavController = parentNavController
                     )
                 }
             }

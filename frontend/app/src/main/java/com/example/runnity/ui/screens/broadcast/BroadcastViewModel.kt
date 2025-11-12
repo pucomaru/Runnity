@@ -2,6 +2,9 @@ package com.example.runnity.ui.screens.broadcast
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.runnity.data.api.BroadcastResponse
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.repository.BroadcastRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,10 +17,13 @@ import kotlinx.coroutines.launch
  * - 중계 정렬 (인기순, 최신순)
  * - 중계 참여
  */
-class BroadcastViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ChallengeUiState>(ChallengeUiState.Loading)
-    val uiState: StateFlow<ChallengeUiState> = _uiState.asStateFlow()
+class BroadcastViewModel (
+    private val broadcastRepository: BroadcastRepository = BroadcastRepository()
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<BroadcastUiState>(BroadcastUiState.Loading)
+    val uiState: StateFlow<BroadcastUiState> = _uiState.asStateFlow()
 
     // TODO: 중계 목록 State 추가
     // private val _challenges = MutableStateFlow<List<ChallengeListItem>>(emptyList())
@@ -32,16 +38,21 @@ class BroadcastViewModel : ViewModel() {
     // val sortType: StateFlow<String> = _sortType.asStateFlow()
 
     init {
-        loadChallenges()
+        loadActiveBroadcasts()
     }
 
-    private fun loadChallenges() {
+    private fun loadActiveBroadcasts() {
         viewModelScope.launch {
-            try {
-                // TODO: Repository에서 중계 목록 로드
-                _uiState.value = ChallengeUiState.Success(emptyList())
-            } catch (e: Exception) {
-                _uiState.value = ChallengeUiState.Error(e.message ?: "중계 목록 로드 실패")
+            _uiState.value = BroadcastUiState.Loading
+            when (val result = broadcastRepository.getActiveBroadcasts()) {
+                is ApiResponse.Success -> {
+                    _uiState.value = BroadcastUiState.Success(result.data ?: emptyList())
+                }
+                is ApiResponse.Error -> {
+                    _uiState.value = BroadcastUiState.Error(result.message ?: "중계방 목록 로드 실패")
+                }
+
+                else -> {}
             }
         }
     }
@@ -101,8 +112,8 @@ class BroadcastViewModel : ViewModel() {
 /**
  * 중계 화면 UI 상태
  */
-sealed class ChallengeUiState {
-    object Loading : ChallengeUiState()
-    data class Success(val challenges: List<Any>) : ChallengeUiState() // TODO: ChallengeListItem으로 교체
-    data class Error(val message: String) : ChallengeUiState()
+sealed class BroadcastUiState {
+    object Loading : BroadcastUiState()
+    data class Success(val broadcasts: List<BroadcastResponse>) : BroadcastUiState()
+    data class Error(val message: String) : BroadcastUiState()
 }

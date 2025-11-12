@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -170,23 +171,47 @@ fun ChallengeScreen(
             }
         }
 
-        // 5. FloatingActionButton (챌린지 생성)
-        FloatingActionButton(
-            onClick = {
-                // 챌린지 생성 페이지로 이동
-                navController?.navigate("challenge_create")
-            },
+        Column(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.BottomEnd) // Column 자체를 오른쪽 아래에 정렬
                 .padding(16.dp),
-            containerColor = ColorPalette.Common.accent,
-            contentColor = Color.White
+            horizontalAlignment = Alignment.End, // Column 내부 아이템들을 오른쪽 정렬
+            verticalArrangement = Arrangement.spacedBy(16.dp) // 버튼 사이 간격
         ) {
-            Icon(
-                imageVector = Icons.Filled.Add,
-                contentDescription = "챌린지 생성",
-                modifier = Modifier.size(24.dp)
-            )
+
+            // 5. FloatingActionButton (챌린지 생성)
+            FloatingActionButton(
+                onClick = {
+                    // 챌린지 생성 페이지로 이동
+                    navController?.navigate("challenge_create")
+                },
+//                modifier = Modifier
+//                    .align(Alignment.BottomEnd)
+//                    .padding(16.dp),
+                containerColor = ColorPalette.Common.accent,
+                contentColor = Color.White
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "챌린지 생성",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // 6. FloatingActionButton (중계방 이동)
+            FloatingActionButton(
+                onClick = {
+                    navController?.navigate("broadcast_view")
+                },
+                containerColor = ColorPalette.Common.accent,
+                contentColor = Color.White
+            ) {
+                Icon(
+                    // TODO: 중계방 아이콘으로 변경 (예: Icons.Default.LiveTv)
+                    imageVector = Icons.Default.LiveTv,
+                    contentDescription = "중계방 이동"
+                )
+            }
         }
     }
 }
