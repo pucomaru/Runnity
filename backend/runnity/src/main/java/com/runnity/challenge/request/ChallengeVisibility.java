@@ -32,9 +32,4 @@ public enum ChallengeVisibility {
                 .filter(visibility -> visibility.code.equalsIgnoreCase(code))
                 .findFirst();
     }
-
-    @Override
-    public String toString() {
-        return label + " (" + code + ")";
-    }
 }

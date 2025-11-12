@@ -32,9 +32,4 @@ public enum ChallengeSortType {
                 .filter(type -> type.code.equalsIgnoreCase(code))
                 .findFirst();
     }
-
-    @Override
-    public String toString() {
-        return label + " (" + code + ")";
-    }
 }

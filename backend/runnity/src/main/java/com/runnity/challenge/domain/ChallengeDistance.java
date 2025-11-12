@@ -48,9 +48,4 @@ public enum ChallengeDistance {
                 .filter(d -> Float.compare(d.value, value) == 0)
                 .findFirst();
     }
-
-    @Override
-    public String toString() {
-        return value + "km (" + code + ")";
-    }
 }
