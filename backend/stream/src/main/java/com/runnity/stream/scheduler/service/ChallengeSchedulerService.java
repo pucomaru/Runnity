@@ -74,13 +74,13 @@ public class ChallengeSchedulerService implements MessageListener {
             try {
                 // 이벤트 타입에 따라 다르게 처리
                 switch (outbox.getEventType()) {
-                    case "SCHEDULE_CREATE":
+                    case SCHEDULE_CREATE:
                         // Redis pub/sub으로 스케줄 생성 이벤트 발행
                         pubsubRedisTemplate.convertAndSend("challenge:schedule:create", outbox.getPayload());
                         log.info("스케줄 생성 이벤트 발행 완료: challengeId={}", outbox.getChallengeId());
                         break;
                         
-                    case "SCHEDULE_DELETE":
+                    case SCHEDULE_DELETE:
                         // 스케줄 삭제 처리 (Redis ZSET에서 제거)
                         deleteSchedule(outbox.getChallengeId());
                         log.info("스케줄 삭제 완료: challengeId={}", outbox.getChallengeId());
@@ -204,7 +204,7 @@ public class ChallengeSchedulerService implements MessageListener {
                     .stream()
                     .anyMatch(outbox -> 
                         outbox.getChallengeId().equals(challengeId) 
-                        && "SCHEDULE_DELETE".equals(outbox.getEventType())
+                        && outbox.getEventType() == ScheduleOutbox.ScheduleEventType.SCHEDULE_DELETE
                     );
 
             if (hasDeleteEvent) {
