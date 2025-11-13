@@ -1,12 +1,5 @@
 package com.runnity.websocket.dto.websocket.server;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-
-import java.util.Set;
-
 /**
  * ERROR 메시지 (서버 → 클라이언트)
  * 
@@ -18,20 +11,20 @@ import java.util.Set;
  * @param timestamp 타임스탬프
  */
 public record ErrorMessage(
-    @NotNull String type,
-    @NotNull String errorCode,
-    @NotNull String errorMessage,
-    @NotNull Long timestamp
+    String type,
+    String errorCode,
+    String errorMessage,
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public ErrorMessage {
+        if (errorCode == null || errorCode.isBlank()) {
+            throw new IllegalArgumentException("errorCode는 필수입니다");
+        }
+        if (errorMessage == null || errorMessage.isBlank()) {
+            throw new IllegalArgumentException("errorMessage는 필수입니다");
+        }
         if (timestamp == null) {
             timestamp = System.currentTimeMillis();
-        }
-        Set<ConstraintViolation<ErrorMessage>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
     
@@ -39,4 +32,3 @@ public record ErrorMessage(
         this("ERROR", errorCode, errorMessage, System.currentTimeMillis());
     }
 }
-

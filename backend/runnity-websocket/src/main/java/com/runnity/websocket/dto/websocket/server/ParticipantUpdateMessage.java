@@ -1,13 +1,5 @@
 package com.runnity.websocket.dto.websocket.server;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
-
-import java.util.Set;
-
 /**
  * PARTICIPANT_UPDATE 메시지 (서버 → 클라이언트)
  * 
@@ -21,21 +13,24 @@ import java.util.Set;
  * @param timestamp 타임스탬프
  */
 public record ParticipantUpdateMessage(
-    @NotNull String type,
-    @NotNull Long userId,
-    @NotNull @PositiveOrZero Double distance,
-    @NotNull @PositiveOrZero Double pace,
-    @NotNull Long timestamp
+    String type,
+    Long userId,
+    Double distance,
+    Double pace,
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public ParticipantUpdateMessage {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId는 필수입니다");
+        }
+        if (distance == null || distance < 0) {
+            throw new IllegalArgumentException("distance는 0 이상이어야 합니다");
+        }
+        if (pace == null || pace < 0) {
+            throw new IllegalArgumentException("pace는 0 이상이어야 합니다");
+        }
         if (timestamp == null) {
             timestamp = System.currentTimeMillis();
-        }
-        Set<ConstraintViolation<ParticipantUpdateMessage>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
     
@@ -43,4 +38,3 @@ public record ParticipantUpdateMessage(
         this("PARTICIPANT_UPDATE", userId, distance, pace, System.currentTimeMillis());
     }
 }
-

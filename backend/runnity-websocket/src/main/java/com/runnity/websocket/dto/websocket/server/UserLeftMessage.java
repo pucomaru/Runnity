@@ -1,12 +1,5 @@
 package com.runnity.websocket.dto.websocket.server;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-
-import java.util.Set;
-
 /**
  * USER_LEFT 메시지 (서버 → 클라이언트)
  * 
@@ -19,20 +12,20 @@ import java.util.Set;
  * @param timestamp 타임스탬프
  */
 public record UserLeftMessage(
-    @NotNull String type,
-    @NotNull Long userId,
-    @NotNull String reason,
-    @NotNull Long timestamp
+    String type,
+    Long userId,
+    String reason,
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public UserLeftMessage {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId는 필수입니다");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reason은 필수입니다");
+        }
         if (timestamp == null) {
             timestamp = System.currentTimeMillis();
-        }
-        Set<ConstraintViolation<UserLeftMessage>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
     
@@ -40,4 +33,3 @@ public record UserLeftMessage(
         this("USER_LEFT", userId, reason, System.currentTimeMillis());
     }
 }
-
