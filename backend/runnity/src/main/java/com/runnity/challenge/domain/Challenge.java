@@ -106,4 +106,20 @@ public class Challenge extends BaseEntity {
         }
         this.status = ChallengeStatus.DONE;
     }
+
+    /**
+     * 챌린지 입장 가능 여부 검증
+     * - 삭제된 챌린지가 아닌지 확인
+     * - READY 상태인지 확인
+     * 
+     * @throws GlobalException 입장 불가능한 경우
+     */
+    public void validateEnterable() {
+        if (this.isDeleted()) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
+        }
+        if (this.status != ChallengeStatus.READY) {
+            throw new GlobalException(ErrorStatus.CHALLENGE_NOT_READY);
+        }
+    }
 }
