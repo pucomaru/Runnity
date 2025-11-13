@@ -9,11 +9,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,41 +47,69 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun ChallengeDetailScreen(
     challengeId: String,                    // URL 파라미터로 받은 챌린지 ID
-    navController: NavController            // 뒤로가기용
+    navController: NavController,           // 뒤로가기용
+    viewModel: ChallengeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    // TODO: ViewModel에서 실제 챌린지 데이터 가져오기
-    // 현재는 샘플 데이터 사용
-    val challengeTitle = "3km 달릴 사람 구한다"
-    val challengeDescription = "한강공원에서 같이 뛸 분들을 찾습니다. 편안한 페이스로 달려요!"
-    val distance = "3km"
-    val maxParticipants = 20
-    val currentParticipants = 12
-    val isPublic = true
-    val hasBroadcast = false
-    val isReserved = true  // 내가 예약한 챌린지 여부
-    val isWebSocketConnected = false  // 웹소켓 연결 여부 (테스트용: false)
+    // 챌린지 ID를 Long으로 변환
+    val challengeIdLong = challengeId.toLongOrNull() ?: 0L
 
-    // 챌린지 시작 시간 (테스트용: 현재 시간 + 4분 55초로 설정)
-    val challengeStartTime = remember { LocalDateTime.now().plusMinutes(4).plusSeconds(55) }
+    // ViewModel에서 챌린지 상세 정보 로드
+    LaunchedEffect(challengeIdLong) {
+        if (challengeIdLong > 0) {
+            viewModel.loadChallengeDetail(challengeIdLong)
+        }
+    }
 
-    // 현재 사용자 ID (테스트용)
-    val currentUserId = "user_1"
+    // 챌린지 상세 정보 관찰
+    val challengeDetail by viewModel.challengeDetail.collectAsState()
 
-    // 참여자 리스트 샘플 데이터
-    val allParticipants = listOf(
-        Participant("user_1", "러너123", "https://example.com/avatar1.jpg", "5'30\""),
-        Participant("user_2", "달리기왕", null, "6'00\""),
-        Participant("user_3", "김철수", null, "5'45\""),
-        Participant("user_4", "박영희", "https://example.com/avatar4.jpg", "6'15\""),
-        Participant("user_5", "이민호", null, "5'20\""),
-        Participant("user_6", "정수진", null, "6'30\""),
-        Participant("user_7", "최동욱", null, "5'55\""),
-        Participant("user_8", "한지민", null, "6'10\""),
-        Participant("user_9", "오승호", null, "5'40\""),
-        Participant("user_10", "윤서연", null, "6'20\""),
-        Participant("user_11", "강태양", null, "5'50\""),
-        Participant("user_12", "남궁민", null, "6'05\"")
-    )
+    // 다이얼로그 상태
+    var showReserveDialog by remember { mutableStateOf(false) }
+    var showCancelReserveDialog by remember { mutableStateOf(false) }
+
+    // 챌린지 정보가 없으면 로딩 표시
+    if (challengeDetail == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("챌린지 정보를 불러오는 중...")
+        }
+        return
+    }
+
+    // 챌린지 정보 추출
+    val detail = challengeDetail!!
+    val challengeTitle = detail.title
+    val challengeDescription = detail.description
+    val distance = ChallengeMapper.formatDistance(detail.distance)
+    val maxParticipants = detail.maxParticipants
+    val currentParticipants = detail.currentParticipants
+    val isPublic = !detail.isPrivate
+    val hasBroadcast = detail.isBroadcast
+    val isReserved = detail.joined
+    val isWebSocketConnected = false  // TODO: 웹소켓 연결 상태 확인
+
+    // 챌린지 시작 시간 파싱
+    val challengeStartTime = try {
+        LocalDateTime.parse(detail.startAt, DateTimeFormatter.ISO_DATE_TIME)
+    } catch (e: Exception) {
+        LocalDateTime.now().plusMinutes(10)
+    }
+
+    // 현재 사용자 ID (TODO: UserProfileManager에서 가져오기)
+    // 임시로 하드코딩, 추후 UserProfileManager.getProfile()?.memberId로 변경 필요
+    val currentUserId = "1"
+
+    // 참여자 리스트를 UI 모델로 변환
+    val allParticipants = detail.participants.map { participant ->
+        Participant(
+            id = participant.memberId.toString(),
+            nickname = participant.nickname,
+            avatarUrl = participant.profileImage,
+            averagePace = formatAveragePace(participant.averagePaceSec)
+        )
+    }
 
     // 나를 상단에 고정, 나머지는 그대로
     val participants = remember(allParticipants, currentUserId) {
@@ -172,6 +202,7 @@ fun ChallengeDetailScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // 참여자 목록 표시
                 ChallengeParticipantsSection(
                     participants = participants,
                     maxParticipants = maxParticipants,
@@ -191,10 +222,17 @@ fun ChallengeDetailScreen(
             PrimaryButton(
                 text = buttonText,
                 onClick = {
-                    // TODO: 버튼 클릭 처리
-                    // - 예약하기: API 호출
-                    // - 예약 취소하기: API 호출
-                    // - 포기하기: 웹소켓 연결 해제 + API 호출
+                    if (!isReserved) {
+                        // 예약하기 다이얼로그 표시
+                        showReserveDialog = true
+                    } else if (isFiveMinutesBefore && isWebSocketConnected) {
+                        // 웹소켓 연결 중인 경우 포기하기 (다이얼로그 없이 바로 처리)
+                        // TODO: 웹소켓 포기 로직
+                        viewModel.cancelChallenge(challengeIdLong)
+                    } else {
+                        // 예약 취소하기 다이얼로그 표시
+                        showCancelReserveDialog = true
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = buttonColor,
@@ -202,6 +240,54 @@ fun ChallengeDetailScreen(
                 )
             )
         }
+    }
+
+    // 예약하기 확인 다이얼로그
+    if (showReserveDialog) {
+        AlertDialog(
+            onDismissRequest = { showReserveDialog = false },
+            title = { Text("챌린지 예약") },
+            text = { Text("이 챌린지를 예약하시겠습니까?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.joinChallenge(challengeIdLong)
+                        showReserveDialog = false
+                    }
+                ) {
+                    Text("예약하기")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReserveDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // 예약 취소하기 확인 다이얼로그
+    if (showCancelReserveDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelReserveDialog = false },
+            title = { Text("챌린지 예약 취소") },
+            text = { Text("이 챌린지 예약을 취소하시겠습니까?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.cancelChallenge(challengeIdLong)
+                        showCancelReserveDialog = false
+                    }
+                ) {
+                    Text("취소하기")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelReserveDialog = false }) {
+                    Text("닫기")
+                }
+            }
+        )
     }
 }
 
@@ -538,3 +624,13 @@ data class Participant(
     val avatarUrl: String?,
     val averagePace: String  // 평균 페이스 (예: "5'30\"")
 )
+
+/**
+ * 평균 페이스를 초 단위에서 분:초 형식으로 변환
+ * 예: 305초 → "5'05\""
+ */
+private fun formatAveragePace(averagePaceSec: Int): String {
+    val minutes = averagePaceSec / 60
+    val seconds = averagePaceSec % 60
+    return String.format("%d'%02d\"", minutes, seconds)
+}

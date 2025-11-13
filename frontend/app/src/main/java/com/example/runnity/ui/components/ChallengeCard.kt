@@ -21,13 +21,15 @@ import com.example.runnity.theme.Typography
  * 챌린지 카드의 버튼 상태
  *
  * - None: 버튼 없음 (기본 상태)
+ * - Reserve: "예약하기" 버튼 표시 (시작 시간 5분 전 이전)
+ * - CancelReserve: "예약 취소하기" 버튼 표시 (이미 예약한 챌린지)
  * - Join: "참가하기" 버튼 표시 (액센트 배경, 시작 5분 전부터 활성화)
- *
- * 참고: 예약하기/취소하기는 상세 화면에서만 제공
  */
 enum class ChallengeButtonState {
-    None,      // 버튼 없음
-    Join       // 참가하기 (액센트 배경, 시작 5분 전)
+    None,           // 버튼 없음
+    Reserve,        // 예약하기
+    CancelReserve,  // 예약 취소하기
+    Join            // 참가하기 (액센트 배경, 시작 5분 전)
 }
 
 /**
@@ -140,8 +142,27 @@ fun ChallengeCard(
             }
 
             // 3. 버튼 (오른쪽, 조건부 표시)
-            // 시작 5분 전부터 "참가하기" 버튼만 표시
             when (buttonState) {
+                ChallengeButtonState.Reserve -> {
+                    // "예약하기" 버튼 (회색)
+                    SmallPillButton(
+                        text = "예약하기",
+                        onClick = onButtonClick,
+                        backgroundColor = ColorPalette.Light.background,
+                        contentColor = ColorPalette.Light.primary,
+                        enableSelectionEffect = false
+                    )
+                }
+                ChallengeButtonState.CancelReserve -> {
+                    // "예약 취소하기" 버튼 (회색)
+                    SmallPillButton(
+                        text = "예약 취소",
+                        onClick = onButtonClick,
+                        backgroundColor = ColorPalette.Light.background,
+                        contentColor = ColorPalette.Light.primary,
+                        enableSelectionEffect = false
+                    )
+                }
                 ChallengeButtonState.Join -> {
                     // "참가하기" 버튼 (액센트 색상)
                     SmallPillButton(
