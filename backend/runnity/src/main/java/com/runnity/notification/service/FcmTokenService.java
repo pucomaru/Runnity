@@ -8,6 +8,7 @@ import com.runnity.notification.domain.MemberFcmToken;
 import com.runnity.notification.dto.request.FcmTokenDeleteRequest;
 import com.runnity.notification.dto.request.FcmTokenRegisterRequest;
 import com.runnity.notification.repository.MemberFcmTokenRepository;
+import com.runnity.notification.repository.NotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ public class FcmTokenService {
 
     private final MemberFcmTokenRepository memberFcmTokenRepository;
     private final MemberRepository memberRepository;
-
+    private final NotificationOutboxRepository notificationOutboxRepository;
 
     @Transactional
     public void resiterToken(Long memberId, FcmTokenRegisterRequest request){
@@ -77,5 +78,10 @@ public class FcmTokenService {
         tokenEntity.delete();
         memberFcmTokenRepository.save(tokenEntity);
         log.info("[FCM] FCM 토큰 비활성화 완료");
+    }
+
+    @Transactional
+    public void createTestOutboxRow() {
+        notificationOutboxRepository.insertTestRow();
     }
 }

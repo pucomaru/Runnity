@@ -62,4 +62,10 @@ public class FcmTokenController {
         fcmTokenService.deleteToken(memberId, request);
         return ApiResponse.success(SuccessStatus.FCM_DELETE);
     }
+
+    @PostMapping("/outbox-test")
+    public ResponseEntity<Void> createTestOutbox() {
+        fcmTokenService.createTestOutboxRow();
+        return ResponseEntity.ok().build();
+    }
 }
