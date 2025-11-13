@@ -84,7 +84,7 @@ jwt:
 logging:
   level:
     root: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: INFO
     com.runnity: DEBUG
 
 stream:
