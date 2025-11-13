@@ -52,8 +52,8 @@ server:
 # WebSocket 설정
 websocket:
   servers:
-    - ${WEBSOCKET_SERVER_URL_1:ws://localhost:8081}
-    - ${WEBSOCKET_SERVER_URL_2:ws://localhost:8082}
+    - ${WEBSOCKET_SERVER_URL_0:wss://runnity.p-e.kr/ws/server-0}
+    - ${WEBSOCKET_SERVER_URL_1:wss://runnity.p-e.kr/ws/server-1}
   ticket:
     ttl: ${WEBSOCKET_TICKET_TTL:30}
   health:
