@@ -8,10 +8,8 @@ from app.models.highlight_event import HighlightEvent
 
 _bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 
-producer = KafkaProducer(
-    bootstrap_servers=_bootstrap,
-    value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
-)
+
+_producer = None   # Lazy init
 
 def _get_producer():
     global _producer
@@ -20,7 +18,9 @@ def _get_producer():
         try:
             _producer = KafkaProducer(
                 bootstrap_servers=bootstrap,
-                value_serializer=lambda v: json.dumps(v).encode("utf-8")
+                value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
+                retries=3,
+                api_version_auto_timeout_ms=5000
             )
             logger.info(f"KafkaProducer initialized (bootstrap={bootstrap})")
         except Exception as e:
@@ -28,7 +28,13 @@ def _get_producer():
             _producer = None
     return _producer
 
+
 def send_commentary(event):
+    producer = _get_producer()
+    if producer is None:
+        logger.error("Producer unavailable! Cannot send commentary.")
+        return
+
     data = event.dict()
     producer.send("commentary-event", value=data)
     producer.flush()

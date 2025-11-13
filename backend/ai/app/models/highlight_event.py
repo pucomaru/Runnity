@@ -15,7 +15,6 @@ class HighlightEvent(BaseModel):
     distance: Optional[float] = None
     totalDistance: Optional[float] = None
     pace: Optional[float] = None
-    commentary: Optional[str] = None
 
     commentary: Optional[str] = None   # LLM 결과가 여기에 들어감
     timestamp: Optional[float] = None  # 나중에 클라이언트 싱크용 타임스탬프
