@@ -17,16 +17,26 @@ import androidx.health.services.client.ExerciseUpdateCallback
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.DataType
+import androidx.health.services.client.data.WarmUpConfig
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.health.services.client.data.ExerciseLapSummary
 import androidx.health.services.client.data.Availability
 import java.util.concurrent.Executors
 import com.example.runnity.R
+import com.example.runnity.ui.WatchWorkoutActivity
+import com.google.android.gms.wearable.Wearable
+import org.json.JSONObject
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 // 포그라운드 서비스 알림/액션 식별자
 private const val CHANNEL_ID = "runnity_exercise"
 private const val NOTIFICATION_ID = 2001
 private const val ACTION_START = "com.example.runnity.action.START"
+private const val ACTION_PREPARE = "com.example.runnity.action.PREPARE"
+private const val ACTION_PAUSE = "com.example.runnity.action.PAUSE"
+private const val ACTION_RESUME = "com.example.runnity.action.RESUME"
 private const val ACTION_STOP = "com.example.runnity.action.STOP"
 
 // 포그라운드 서비스: 운동 측정을 백그라운드에서도 유지
@@ -41,6 +51,15 @@ class ExerciseFgService : Service() {
     // HS 콜백/비동기 작업용 단일 스레드 실행기
     private val callbackExecutor = Executors.newSingleThreadExecutor()
 
+    // 메트릭 상태 보관
+    @Volatile private var latestHrBpm: Int? = null
+    @Volatile private var latestDistanceM: Double? = null
+    @Volatile private var latestCaloriesKcal: Double? = null
+    @Volatile private var isRunning: Boolean = false
+    private var sessionStartMs: Long = 0L
+    private var activeStartMs: Long = 0L
+    private var activeElapsedAccumMs: Long = 0L
+
     // 운동 업데이트 콜백: 상태/가용성/랩 요약 수신
     private val updateCallback = object : ExerciseUpdateCallback {
         override fun onExerciseUpdateReceived(update: ExerciseUpdate) {
@@ -48,24 +67,97 @@ class ExerciseFgService : Service() {
                 "ExerciseFgService",
                 "ExerciseUpdate: state=${update.exerciseStateInfo.state}"
             )
+            // 메트릭 파싱 (가능한 경우에만)
+            runCatching {
+                val container = update.latestMetrics
+                // 심박 (샘플 타입) - 가장 최근 값 사용
+                val hr = container.getData(DataType.HEART_RATE_BPM).lastOrNull()?.value
+                if (hr != null) {
+                    latestHrBpm = hr.toInt()
+                }
+                // 거리 (델타 타입) - 누적 값 사용
+                val dist = container.getData(DataType.DISTANCE).lastOrNull()?.value
+                if (dist != null) {
+                    latestDistanceM = dist
+                }
+                // 칼로리(있으면 사용)
+                val cal = runCatching { container.getData(DataType.CALORIES).lastOrNull()?.value }.getOrNull()
+                if (cal != null) {
+                    latestCaloriesKcal = cal
+                }
+                if (hr != null || dist != null || cal != null) {
+                    Log.d("ExerciseFgService", "parsed metrics hr=${hr?.toInt()} dist=${dist} cal=${cal}")
+                }
+            }.onFailure {
+                Log.w("ExerciseFgService", "failed to parse latestMetrics", it)
+            }
+            // 임시 전체 덤프가 필요하면 아래 주석 해제
+            // Log.d("ExerciseFgService", "Update dump: $update")
         }
 
         override fun onAvailabilityChanged(dataType: DataType<*, *>, availability: Availability) {
-            Log.d("ExerciseFgService", "Availability: ${dataType} -> ${availability}")
+            Log.d("ExerciseFgService", "Availability changed: $dataType -> $availability")
         }
 
         // 시작형 서비스만 사용. bind( )는 제공하지 않음
         override fun onRegistered() {
-            Log.d("ExerciseFgService", "UpdateCallback registered")
+            Log.d("ExerciseFgService", "ExerciseUpdateCallback registered")
         }
 
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {
-            Log.d("ExerciseFgService", "LapSummary: ${lapSummary}")
+            Log.d("ExerciseFgService", "Lap summary: $lapSummary")
         }
 
         override fun onRegistrationFailed(throwable: Throwable) {
-            Log.e("ExerciseFgService", "UpdateCallback registration failed", throwable)
+            Log.w("ExerciseFgService", "ExerciseUpdateCallback registration failed", throwable)
         }
+    }
+
+    // --------------------
+    // 메트릭 1초 주기 송신
+    // --------------------
+    private var metricsScheduler: ScheduledExecutorService? = null
+    private var metricsTask: ScheduledFuture<*>? = null
+
+    private fun startMetricsTicker() {
+        if (metricsScheduler == null) metricsScheduler = Executors.newSingleThreadScheduledExecutor()
+        if (metricsTask != null && !(metricsTask?.isCancelled ?: true)) return
+        Log.d("ExerciseFgService", "Start metrics ticker")
+        metricsTask = metricsScheduler!!.scheduleAtFixedRate({
+            try {
+                sendMetricsOnce()
+            } catch (_: Throwable) { }
+        }, 0, 1, TimeUnit.SECONDS)
+    }
+
+    private fun stopMetricsTicker() {
+        try { metricsTask?.cancel(true) } catch (_: Throwable) {}
+        metricsTask = null
+        Log.d("ExerciseFgService", "Stop metrics ticker")
+    }
+
+    private fun sendMetricsOnce() {
+        val now = System.currentTimeMillis()
+        val activeElapsed = if (isRunning) activeElapsedAccumMs + (now - activeStartMs) else activeElapsedAccumMs
+        val dist = latestDistanceM
+        val paceSpKm = if (dist != null && dist > 0.0 && activeElapsed > 0L) {
+            (activeElapsed / 1000.0) / (dist / 1000.0)
+        } else null
+        val json = JSONObject()
+        json.put("type", "metrics")
+        if (latestHrBpm != null) json.put("hr_bpm", latestHrBpm)
+        if (dist != null) json.put("distance_m", dist)
+        if (paceSpKm != null && paceSpKm.isFinite()) json.put("pace_spkm", paceSpKm)
+        if (latestCaloriesKcal != null) json.put("cal_kcal", latestCaloriesKcal)
+        json.put("elapsed_ms", activeElapsed)
+        val bytes = json.toString().toByteArray()
+        Wearable.getNodeClient(this).connectedNodes
+            .addOnSuccessListener { nodes ->
+                nodes.filter { it.isNearby }.forEach { node ->
+                    Wearable.getMessageClient(this)
+                        .sendMessage(node.id, "/metrics/update", bytes)
+                }
+            }
     }
 
     override fun onCreate() {
@@ -78,28 +170,65 @@ class ExerciseFgService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // 액티비티/폰에서 Intent.action으로 제어할 때 사용
-        when (intent?.action) {
+        val act = intent?.action
+        Log.d("ExerciseFgService", "onStartCommand action=$act")
+        when (act) {
+            ACTION_PREPARE -> {
+                ensureExerciseClient()
+                prepareRunningSession()
+            }
             ACTION_START -> {
-                Log.d("ExerciseFgService", "ACTION_START received")
                 // 준비/진행 중 센서(HR, 위치 등) 가용성 변경 알림
                 ensureExerciseClient()
                 startRunningSession()
+                isRunning = true
+                val now = System.currentTimeMillis()
+                sessionStartMs = now
+                activeStartMs = now
+                // 최소 UI: 운동 진행 화면 표시
+                try {
+                    val uiIntent = Intent(
+                        this,
+                        WatchWorkoutActivity::class.java
+                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    startActivity(uiIntent)
+                } catch (t: Throwable) {
+                    Log.w("ExerciseFgService", "failed to launch WatchWorkoutActivity", t)
+                }
+            }
+            ACTION_PAUSE -> {
+                ensureExerciseClient()
+                pauseExercise()
+                stopMetricsTicker()
+                if (isRunning) {
+                    val now = System.currentTimeMillis()
+                    activeElapsedAccumMs += (now - activeStartMs)
+                    isRunning = false
+                }
+            }
+            ACTION_RESUME -> {
+                ensureExerciseClient()
+                resumeExercise()
+                startMetricsTicker()
+                if (!isRunning) {
+                    activeStartMs = System.currentTimeMillis()
+                    isRunning = true
+                }
             }
             ACTION_STOP -> {
-                Log.d("ExerciseFgService", "ACTION_STOP received")
                 stopRunningSession()
                 stopForeground(STOP_FOREGROUND_REMOVE)
+                stopMetricsTicker()
+                isRunning = false
+                activeStartMs = 0L
+                activeElapsedAccumMs = 0L
                 stopSelf()
-            }
-            else -> {
-                Log.d("ExerciseFgService", "onStartCommand with no action")
             }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        Log.d("ExerciseFgService", "onDestroy")
         super.onDestroy()
     }
 
@@ -139,6 +268,31 @@ class ExerciseFgService : Service() {
             .addListener({
                 Log.d("ExerciseFgService", "startExerciseAsync requested")
             }, callbackExecutor)
+
+        // 메트릭 송신 시작
+        startMetricsTicker()
+    }
+
+    // 운동 세션 준비(센서 워밍업/가용성 확인)
+    private fun prepareRunningSession() {
+        val ec = exerciseClient ?: return
+        try {
+            ec.setUpdateCallback(callbackExecutor, updateCallback)
+            Log.d("ExerciseFgService", "setUpdateCallback done")
+        } catch (t: Throwable) {
+            Log.w("ExerciseFgService", "setUpdateCallback (prepare) failed: ${t}")
+        }
+
+        val warmUp = WarmUpConfig(
+            ExerciseType.RUNNING,
+            setOf(
+                DataType.DISTANCE
+            )
+        )
+        ec.prepareExerciseAsync(warmUp)
+            .addListener({
+                Log.d("ExerciseFgService", "prepareExerciseAsync requested")
+            }, callbackExecutor)
     }
 
     // 운동 세션 종료
@@ -147,12 +301,27 @@ class ExerciseFgService : Service() {
         ec.endExerciseAsync()
             .addListener({
                 // 세션을 먼저 종료하고 포그라운드/서비스를 내려간다
-                Log.d("ExerciseFgService", "endExerciseAsync requested")
             }, callbackExecutor)
         // 세션 종료 및 콜백 해제
         ec.clearUpdateCallbackAsync(updateCallback)
             .addListener({
-                Log.d("ExerciseFgService", "clearUpdateCallbackAsync requested")
+            }, callbackExecutor)
+        stopMetricsTicker()
+    }
+
+    private fun pauseExercise() {
+        val ec = exerciseClient ?: return
+        ec.pauseExerciseAsync()
+            .addListener({
+                // paused
+            }, callbackExecutor)
+    }
+
+    private fun resumeExercise() {
+        val ec = exerciseClient ?: return
+        ec.resumeExerciseAsync()
+            .addListener({
+                // resumed
             }, callbackExecutor)
     }
 

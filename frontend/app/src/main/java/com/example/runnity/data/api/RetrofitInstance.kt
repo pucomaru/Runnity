@@ -3,6 +3,7 @@ package com.example.runnity.data.api
 import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
 import com.example.runnity.data.remote.api.BroadcastApiService
+import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.google.gson.GsonBuilder
@@ -100,6 +101,14 @@ object RetrofitInstance {
     }
 
     /**
+     * ChallengeApiService 인스턴스
+     * 챌린지 목록 조회, 생성, 참가, 취소, 상세 조회
+     */
+    val challengeApi: ChallengeApiService by lazy {
+        createService(ChallengeApiService::class.java)
+    }
+
+    /**
      * RunApiService 인스턴스 (기존 유지)
      * TODO: 추후 실제 API에 맞춰 수정 필요
      */
@@ -112,6 +121,6 @@ object RetrofitInstance {
      * 현재 활성화된 중계방 처리
      */
     val broadcastApi: BroadcastApiService by lazy {
-        retrofit.create(BroadcastApiService::class.java)
+        createService(BroadcastApiService::class.java)
     }
 }

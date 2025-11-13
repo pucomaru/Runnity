@@ -29,7 +29,8 @@ import java.time.LocalDate
  */
 @Composable
 fun ChallengeFilterScreen(
-    navController: NavController? = null
+    navController: NavController? = null,
+    viewModel: ChallengeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     // 거리 선택 상태 (여러 개 선택 가능)
     var selectedDistances by remember { mutableStateOf(setOf<String>()) }
@@ -230,11 +231,81 @@ fun ChallengeFilterScreen(
         PrimaryButton(
             text = "적용하기",
             onClick = {
-                // TODO: 필터 적용 로직
-                // - selectedDistances, selectedDate, selectedStartTime, selectedEndTime, selectedVisibility
-                // - 이 값들을 ViewModel에 전달하거나 Navigation arguments로 전달
+                // 거리 필터 변환 (UI -> API)
+                // 여러 개 선택 가능하지만 API는 단일 값만 받으므로 첫 번째 값 사용
+                val distanceCode = if (selectedDistances.isNotEmpty()) {
+                    convertDistanceToCode(selectedDistances.first())
+                } else {
+                    null
+                }
+
+                // 날짜/시간 필터 변환
+                // startAt: 이 시간 이후 시작하는 챌린지만
+                // endAt: 이 시간 이전에 시작하는 챌린지만
+                val startAt = if (selectedStartDate != null) {
+                    convertToIso8601(selectedStartDate!!, selectedStartTime)
+                } else {
+                    null
+                }
+
+                val endAt = if (selectedEndDate != null) {
+                    convertToIso8601(selectedEndDate!!, selectedEndTime)
+                } else {
+                    null
+                }
+
+                // 공개 여부 변환
+                val visibility = when (selectedVisibility) {
+                    "공개만" -> "PUBLIC"
+                    else -> null  // 전체인 경우 필터 없음 (ALL과 동일)
+                }
+
+                // ViewModel에 필터 적용
+                viewModel.loadChallenges(
+                    distance = distanceCode,
+                    startAt = startAt,
+                    endAt = endAt,
+                    visibility = visibility
+                )
+
+                // 필터 화면 닫기
                 navController?.navigateUp()
             }
         )
     }
+}
+
+/**
+ * UI 거리 값을 API 거리 코드로 변환
+ */
+private fun convertDistanceToCode(distance: String): String {
+    return when (distance) {
+        "1km" -> "ONE"
+        "2km" -> "TWO"
+        "3km" -> "THREE"
+        "4km" -> "FOUR"
+        "5km" -> "FIVE"
+        "6km" -> "SIX"
+        "7km" -> "SEVEN"
+        "8km" -> "EIGHT"
+        "9km" -> "NINE"
+        "10km" -> "TEN"
+        "15km" -> "FIFTEEN"
+        "하프" -> "HALF"
+        else -> "FIVE"
+    }
+}
+
+/**
+ * 날짜와 시간을 ISO 8601 형식으로 변환
+ * 예: 2025-11-12T21:00:00
+ */
+private fun convertToIso8601(date: LocalDate, time: String): String {
+    // time은 "HH:mm" 형식 (예: "14:30")
+    val parts = time.split(":")
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+
+    val dateTime = java.time.LocalDateTime.of(date.year, date.month, date.dayOfMonth, hour, minute)
+    return dateTime.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
 }

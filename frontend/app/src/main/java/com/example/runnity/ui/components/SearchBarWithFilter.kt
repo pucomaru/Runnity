@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
@@ -16,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
@@ -24,9 +27,11 @@ import com.example.runnity.theme.Typography
  * 검색바 + 필터 아이콘 컴포넌트
  * - 검색 입력창과 필터 버튼이 한 줄에 배치
  * - 검색창: 왼쪽 (넓게), 필터 아이콘: 오른쪽
+ * - 키보드 검색 버튼 또는 검색 아이콘 클릭 시 검색 실행
  *
  * @param searchQuery 검색어 (상태 값)
  * @param onSearchChange 검색어 변경 이벤트
+ * @param onSearchSubmit 검색 실행 이벤트 (키보드 검색 버튼 또는 검색 아이콘 클릭)
  * @param onFilterClick 필터 아이콘 클릭 이벤트 (필터 페이지로 이동)
  * @param placeholder 검색창 placeholder (기본: "방 제목 검색")
  * @param modifier Modifier (선택사항)
@@ -36,6 +41,7 @@ import com.example.runnity.theme.Typography
  * SearchBarWithFilter(
  *     searchQuery = searchQuery,
  *     onSearchChange = { searchQuery = it },
+ *     onSearchSubmit = { viewModel.searchChallenges() },
  *     onFilterClick = { navController.navigate("filter") }
  * )
  */
@@ -43,6 +49,7 @@ import com.example.runnity.theme.Typography
 fun SearchBarWithFilter(
     searchQuery: String,                   // 현재 검색어
     onSearchChange: (String) -> Unit,      // 검색어 변경 콜백
+    onSearchSubmit: () -> Unit = {},       // 검색 실행 콜백
     onFilterClick: () -> Unit,             // 필터 버튼 클릭 콜백
     placeholder: String = "방 제목 검색",   // placeholder 텍스트
     modifier: Modifier = Modifier          // 추가 Modifier
@@ -79,13 +86,18 @@ fun SearchBarWithFilter(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 검색 아이콘
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "검색",
-                        tint = ColorPalette.Light.component,  // 회색
+                    // 검색 아이콘 (클릭 가능)
+                    IconButton(
+                        onClick = onSearchSubmit,
                         modifier = Modifier.size(20.dp)
-                    )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "검색",
+                            tint = ColorPalette.Light.component,  // 회색
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
 
                     // 검색 입력창
                     Box(modifier = Modifier.weight(1f)) {
@@ -106,6 +118,12 @@ fun SearchBarWithFilter(
                                 color = ColorPalette.Light.primary  // 검정색
                             ),
                             singleLine = true,  // 한 줄 입력
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Search  // 키보드 검색 버튼
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { onSearchSubmit() }  // 검색 버튼 누르면 실행
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -98,112 +100,134 @@ fun HomeScreen(
     )
 
     // 전체 레이아웃
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // 1. 상단 앱바 (로고 + 알람)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ColorPalette.Common.accent)  // 액센트 색상 배경
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 로고 (이미지)
-            Image(
-                painter = painterResource(id = R.drawable.runnity_logo),
-                contentDescription = "Runnity Logo",
-                modifier = Modifier.height(32.dp),
-                contentScale = ContentScale.Fit
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
 
-            // 알람 아이콘
-            IconButton(
-                onClick = {
-                    // TODO: 알람 페이지로 이동
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Notifications,
-                    contentDescription = "알림",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-        }
-
-        // 2. 스크롤 가능한 내용
+        // 스크롤 가능한 콘텐츠
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)  // 컴포넌트 간 16dp 간격
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 2-1. 날씨 카드
-            Box(
+            // 1. 상단 앱바 (로고 + 알람)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(ColorPalette.Common.accent)  // 액센트 색상 배경
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                WeatherCard(
-                    country = "Korea",
-                    city = "Seoul",
-                    weather = "Cloudy",
-                    temperature = "10°",
-                    time = "9:41 AM",
-                    backgroundImageUrl = null  // TODO: 실제 날씨 배경 이미지 URL
+                // 로고 (이미지)
+                Image(
+                    painter = painterResource(id = R.drawable.runnity_logo),
+                    contentDescription = "Runnity Logo",
+                    modifier = Modifier.height(32.dp),
+                    contentScale = ContentScale.Fit
                 )
-            }
 
-            // 2-2. 운영진 추천 챌린지 섹션
-            SectionHeader(
-                subtitle = "운영진 추천 챌린지",
-                caption = "이번 주 인기 챌린지"
-            )
-
-            RecommendedChallengeCarousel(
-                challenges = recommendedChallenges,
-                onChallengeClick = { id ->
-                    navController?.navigate("challenge_detail/$id")
-                }
-            )
-
-            // 2-3. 예약한 챌린지 섹션
-            SectionHeader(
-                subtitle = "예약한 챌린지",
-                caption = "내가 예약한 챌린지를 확인하세요"
-            )
-
-            // 예약한 챌린지 리스트
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                reservedChallenges.forEach { challenge ->
-                    ChallengeCard(
-                        distance = challenge.distance,
-                        title = challenge.title,
-                        startDateTime = challenge.startDateTime,
-                        participants = challenge.participants,
-                        buttonState = challenge.buttonState,
-                        onCardClick = {
-                            navController?.navigate("challenge_detail/${challenge.id}")
-                        },
-                        onButtonClick = {
-                            // TODO: 참가하기 버튼 클릭 처리 (Join 버튼)
-                            // - 챌린지 참가 API 호출
-                            // - 러닝 화면으로 이동
-                        }
+                // 알람 아이콘
+                IconButton(
+                    onClick = {
+                        // TODO: 알람 페이지로 이동
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Notifications,
+                        contentDescription = "알림",
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp)
                     )
                 }
             }
 
-            // 하단 여백
-            Spacer(modifier = Modifier.height(16.dp))
+            // 2. 스크롤 가능한 내용
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)  // 컴포넌트 간 16dp 간격
+            ) {
+                // 2-1. 날씨 카드
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ColorPalette.Common.accent)  // 액센트 색상 배경
+                        .padding(16.dp)
+                ) {
+                    WeatherCard(
+                        country = "Korea",
+                        city = "Seoul",
+                        weather = "Cloudy",
+                        temperature = "10°",
+                        time = "9:41 AM",
+                        backgroundImageUrl = null  // TODO: 실제 날씨 배경 이미지 URL
+                    )
+                }
+
+                // 2-2. 운영진 추천 챌린지 섹션
+                SectionHeader(
+                    subtitle = "운영진 추천 챌린지",
+                    caption = "이번 주 인기 챌린지"
+                )
+
+                RecommendedChallengeCarousel(
+                    challenges = recommendedChallenges,
+                    onChallengeClick = { id ->
+                        navController?.navigate("challenge_detail/$id")
+                    }
+                )
+
+                // 2-3. 예약한 챌린지 섹션
+                SectionHeader(
+                    subtitle = "예약한 챌린지",
+                    caption = "내가 예약한 챌린지를 확인하세요"
+                )
+
+                // 예약한 챌린지 리스트
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    reservedChallenges.forEach { challenge ->
+                        ChallengeCard(
+                            distance = challenge.distance,
+                            title = challenge.title,
+                            startDateTime = challenge.startDateTime,
+                            participants = challenge.participants,
+                            buttonState = challenge.buttonState,
+                            onCardClick = {
+                                navController?.navigate("challenge_detail/${challenge.id}")
+                            },
+                            onButtonClick = {
+                                // TODO: 참가하기 버튼 클릭 처리 (Join 버튼)
+                                // - 챌린지 참가 API 호출
+                                // - 러닝 화면으로 이동
+                            }
+                        )
+                    }
+                }
+
+                // 하단 여백
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+
+        FloatingActionButton(
+            onClick = { navController?.navigate("broadcast_view") },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = ColorPalette.Common.accent,
+            contentColor = Color.White
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LiveTv,
+                contentDescription = "중계방 보기"
+            )
         }
     }
 }

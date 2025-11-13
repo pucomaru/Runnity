@@ -39,6 +39,7 @@ import android.Manifest
 import android.app.Activity
 import android.os.Build
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.runnity.data.datalayer.sendSessionControl
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
@@ -260,6 +261,9 @@ fun StartRunScreen(
                                     is Goal.Time -> "countdown/personal?type=time&min=${goal.minutes}"
                                     is Goal.FreeRun -> "countdown/personal"
                                 }
+                                // 워치 준비 -> 카운트다운(3초)
+                                sendSessionControl(context, "prepare")
+                                sendSessionControl(context, "countdown", seconds = 3)
                                 navController?.navigate(route)
                             }
                         }
@@ -383,6 +387,9 @@ fun StartRunScreen(
                             is Goal.FreeRun -> "countdown/personal"
                         }
                         showGoalSheet = false
+                        // 워치 준비 -> 카운트다운(3초)
+                        sendSessionControl(context, "prepare")
+                        sendSessionControl(context, "countdown", seconds = 3)
                         navController?.navigate(route)
                     },
                     modifier = Modifier.fillMaxWidth()
