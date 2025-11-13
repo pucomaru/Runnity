@@ -92,16 +92,20 @@ public class ChallengeService {
                 ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
                 request.keyword(),
                 distances,
-                request.startAt(),
-                request.endAt(),
+                request.startDate(),
+                request.endDate(),
+                request.startTime(),
+                request.endTime(),
                 isPrivateFilter,
                 pageableWithoutSort
         )
                 : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
                 request.keyword(),
                 distances,
-                request.startAt(),
-                request.endAt(),
+                request.startDate(),
+                request.endDate(),
+                request.startTime(),
+                request.endTime(),
                 isPrivateFilter,
                 pageableWithoutSort
         );

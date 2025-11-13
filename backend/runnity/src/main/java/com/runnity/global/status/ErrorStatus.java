@@ -52,6 +52,10 @@ public enum ErrorStatus implements BaseErrorStatus {
     CHALLENGE_NOT_READY(HttpStatus.BAD_REQUEST, 400, "챌린지가 입장 가능한 상태가 아닙니다."),
     INVALID_PARTICIPATION_STATUS(HttpStatus.BAD_REQUEST, 400, "참가 상태가 유효하지 않습니다."),
     TICKET_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, 500, "티켓 발급에 실패했습니다."),
+    CHALLENGE_DATE_BEFORE_TODAY(HttpStatus.BAD_REQUEST, 400, "시작 날짜는 오늘 이후여야 합니다."),
+    CHALLENGE_DATE_AFTER_MAX_LIMIT(HttpStatus.BAD_REQUEST, 400, "종료 날짜는 최대 일주일 후까지 가능합니다."),
+    CHALLENGE_INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, 400, "시작 날짜는 종료 날짜보다 이전이어야 합니다."),
+    CHALLENGE_INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, 400, "시작 시간은 종료 시간보다 이전이어야 합니다."),
 
     //history
     RUN_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 운동 기록입니다."),

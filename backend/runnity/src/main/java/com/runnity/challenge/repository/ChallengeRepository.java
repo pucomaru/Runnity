@@ -8,7 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
@@ -28,8 +29,10 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distances IS NULL OR c.distance IN :distances)
-        AND (:startAt IS NULL OR c.startAt >= :startAt)
-        AND (:endAt IS NULL OR c.startAt <= :endAt)
+        AND (:startDate IS NULL OR CAST(c.startAt AS DATE) >= :startDate)
+        AND (:endDate IS NULL OR CAST(c.startAt AS DATE) <= :endDate)
+        AND (:startTime IS NULL OR CAST(c.startAt AS TIME) >= :startTime)
+        AND (:endTime IS NULL OR CAST(c.startAt AS TIME) <= :endTime)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
         ORDER BY COUNT(cp) DESC, c.createdAt DESC
@@ -37,8 +40,10 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     Page<Object[]> findChallengesWithParticipantCountOrderByPopular(
             @Param("keyword") String keyword,
             @Param("distances") List<ChallengeDistance> distances,
-            @Param("startAt") LocalDateTime startAt,
-            @Param("endAt") LocalDateTime endAt,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime,
             @Param("isPrivate") Boolean isPrivate,
             Pageable pageable
     );
@@ -58,8 +63,10 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND c.status = 'RECRUITING'
         AND (:keyword IS NULL OR c.title LIKE CONCAT('%', :keyword, '%'))
         AND (:distances IS NULL OR c.distance IN :distances)
-        AND (:startAt IS NULL OR c.startAt >= :startAt)
-        AND (:endAt IS NULL OR c.startAt <= :endAt)
+        AND (:startDate IS NULL OR CAST(c.startAt AS DATE) >= :startDate)
+        AND (:endDate IS NULL OR CAST(c.startAt AS DATE) <= :endDate)
+        AND (:startTime IS NULL OR CAST(c.startAt AS TIME) >= :startTime)
+        AND (:endTime IS NULL OR CAST(c.startAt AS TIME) <= :endTime)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
         ORDER BY c.startAt ASC
@@ -67,8 +74,10 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     Page<Object[]> findChallengesWithParticipantCountOrderByLatest(
             @Param("keyword") String keyword,
             @Param("distances") List<ChallengeDistance> distances,
-            @Param("startAt") LocalDateTime startAt,
-            @Param("endAt") LocalDateTime endAt,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime,
             @Param("isPrivate") Boolean isPrivate,
             Pageable pageable
     );
