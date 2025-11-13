@@ -17,6 +17,7 @@ import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
+import timber.log.Timber
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -340,6 +341,7 @@ fun ChallengeCreateScreen(
                 // 입력값 검증
                 val validationError = validateInputs(
                     title = title,
+                    description = description,
                     maxParticipants = maxParticipants,
                     selectedDistance = selectedDistance,
                     selectedDate = selectedDate,
@@ -354,12 +356,14 @@ fun ChallengeCreateScreen(
                 }
 
                 // ISO 8601 형식으로 날짜/시간 변환
+                Timber.d("챌린지 생성: selectedHour=$selectedHour, selectedMinute=$selectedMinute, selectedAmPm=$selectedAmPm")
                 val startAt = convertToIso8601(
                     date = selectedDate!!,
                     hour = selectedHour,
                     minute = selectedMinute,
                     amPm = selectedAmPm
                 )
+                Timber.d("챌린지 생성 시간: $startAt")
 
                 // 거리 변환 (UI -> API)
                 val distanceCode = convertDistanceToCode(selectedDistance!!)
@@ -409,6 +413,7 @@ fun ChallengeCreateScreen(
  */
 private fun validateInputs(
     title: String,
+    description: String,
     maxParticipants: String,
     selectedDistance: String?,
     selectedDate: LocalDate?,
@@ -417,6 +422,9 @@ private fun validateInputs(
 ): String? {
     if (title.isBlank()) {
         return "챌린지 이름을 입력해주세요"
+    }
+    if (description.isBlank()) {
+        return "챌린지 설명을 입력해주세요"
     }
     if (maxParticipants.isBlank()) {
         return "정원을 입력해주세요"

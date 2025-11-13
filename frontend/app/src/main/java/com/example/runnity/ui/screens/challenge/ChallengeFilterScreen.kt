@@ -18,6 +18,7 @@ import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
+import timber.log.Timber
 import java.time.LocalDate
 
 /**
@@ -26,25 +27,57 @@ import java.time.LocalDate
  * - 필터 조건 선택 후 적용
  *
  * @param navController 네비게이션 컨트롤러
+ * @param viewModel 챌린지 ViewModel (부모 화면과 공유)
  */
 @Composable
 fun ChallengeFilterScreen(
     navController: NavController? = null,
-    viewModel: ChallengeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    viewModel: ChallengeViewModel
 ) {
+    // ViewModel에서 현재 필터 값 가져오기
+    val currentDistances by viewModel.distanceFilter.collectAsState()
+    val currentStartDate by viewModel.startDateFilter.collectAsState()
+    val currentEndDate by viewModel.endDateFilter.collectAsState()
+    val currentStartTime by viewModel.startTimeFilter.collectAsState()
+    val currentEndTime by viewModel.endTimeFilter.collectAsState()
+    val currentVisibility by viewModel.visibilityFilter.collectAsState()
+
     // 거리 선택 상태 (여러 개 선택 가능)
-    var selectedDistances by remember { mutableStateOf(setOf<String>()) }
+    var selectedDistances by remember {
+        mutableStateOf(
+            currentDistances?.mapNotNull { code -> convertCodeToDistance(code) }?.toSet() ?: setOf()
+        )
+    }
 
     // 날짜 선택 상태 (범위)
-    var selectedStartDate by remember { mutableStateOf<LocalDate?>(null) }
-    var selectedEndDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedStartDate by remember {
+        mutableStateOf<LocalDate?>(
+            currentStartDate?.let { parseDate(it) }
+        )
+    }
+    var selectedEndDate by remember {
+        mutableStateOf<LocalDate?>(
+            currentEndDate?.let { parseDate(it) }
+        )
+    }
 
-    // 시간 선택 상태
-    var selectedStartTime by remember { mutableStateOf("00:00") }
-    var selectedEndTime by remember { mutableStateOf("24:00") }
+    // 시간 선택 상태 (HH:mm:ss → HH:mm 변환)
+    var selectedStartTime by remember {
+        mutableStateOf(currentStartTime?.let { parseTime(it) } ?: "00:00")
+    }
+    var selectedEndTime by remember {
+        mutableStateOf(currentEndTime?.let { parseTime(it) } ?: "24:00")
+    }
 
-    // 공개 여부 선택 상태
-    var selectedVisibility by remember { mutableStateOf("공개만") }
+    var selectedVisibility by remember {
+        mutableStateOf(
+            when (currentVisibility) {
+                "PUBLIC" -> "공개만"
+                "ALL" -> "전체"
+                else -> "공개만"
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -64,13 +97,22 @@ fun ChallengeFilterScreen(
                     modifier = Modifier
                         .size(24.dp)
                         .clickable {
-                            // 초기화
+                            // 초기화 (UI + ViewModel)
                             selectedDistances = setOf()
                             selectedStartDate = null
                             selectedEndDate = null
                             selectedStartTime = "00:00"
                             selectedEndTime = "24:00"
                             selectedVisibility = "공개만"
+
+                            viewModel.applyFilters(
+                                distances = null,
+                                startDate = null,
+                                endDate = null,
+                                startTime = null,
+                                endTime = null,
+                                visibility = null
+                            )
                         }
                 )
             }
@@ -175,20 +217,32 @@ fun ChallengeFilterScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ===== 날짜 · 시간 섹션 =====
-            SectionHeader(subtitle = "날짜 · 시간")
+            // ===== 날짜 섹션 =====
+            SectionHeader(subtitle = "날짜")
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 날짜·시간 선택 컴포넌트
-            DateTimeSelector(
+            // 날짜 선택 컴포넌트
+            DateRangeSelector(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 selectedStartDate = selectedStartDate,
                 selectedEndDate = selectedEndDate,
                 onDateRangeSelected = { startDate, endDate ->
                     selectedStartDate = startDate
                     selectedEndDate = endDate
-                },
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ===== 시간대 섹션 =====
+            SectionHeader(subtitle = "시간대")
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 시간대 선택 컴포넌트
+            TimeRangeSelector(
+                modifier = Modifier.padding(horizontal = 16.dp),
                 selectedStartTime = selectedStartTime,
                 selectedEndTime = selectedEndTime,
                 onTimeSelected = { startTime, endTime ->
@@ -232,24 +286,25 @@ fun ChallengeFilterScreen(
             text = "적용하기",
             onClick = {
                 // 거리 필터 변환 (UI -> API)
-                // 여러 개 선택 가능하지만 API는 단일 값만 받으므로 첫 번째 값 사용
-                val distanceCode = if (selectedDistances.isNotEmpty()) {
-                    convertDistanceToCode(selectedDistances.first())
+                // 여러 개 선택된 거리들을 API 코드로 변환
+                val distanceCodes = if (selectedDistances.isNotEmpty()) {
+                    selectedDistances.map { convertDistanceToCode(it) }
+                } else {
+                    null  // 선택 안하면 null (전체)
+                }
+
+                // 날짜 필터 변환 (LocalDate -> String)
+                val startDate = selectedStartDate?.toString() // 2025-11-14
+                val endDate = selectedEndDate?.toString()     // 2025-11-17
+
+                // 시간 필터 변환 (HH:mm -> HH:mm:ss)
+                val startTime = if (selectedStartDate != null) {
+                    convertTimeToApiFormat(selectedStartTime) // 09:00:00
                 } else {
                     null
                 }
-
-                // 날짜/시간 필터 변환
-                // startAt: 이 시간 이후 시작하는 챌린지만
-                // endAt: 이 시간 이전에 시작하는 챌린지만
-                val startAt = if (selectedStartDate != null) {
-                    convertToIso8601(selectedStartDate!!, selectedStartTime)
-                } else {
-                    null
-                }
-
-                val endAt = if (selectedEndDate != null) {
-                    convertToIso8601(selectedEndDate!!, selectedEndTime)
+                val endTime = if (selectedEndDate != null) {
+                    convertTimeToApiFormat(selectedEndTime)   // 23:00:00
                 } else {
                     null
                 }
@@ -257,14 +312,19 @@ fun ChallengeFilterScreen(
                 // 공개 여부 변환
                 val visibility = when (selectedVisibility) {
                     "공개만" -> "PUBLIC"
-                    else -> null  // 전체인 경우 필터 없음 (ALL과 동일)
+                    "전체" -> "ALL"
+                    else -> "ALL"
                 }
 
-                // ViewModel에 필터 적용
-                viewModel.loadChallenges(
-                    distance = distanceCode,
-                    startAt = startAt,
-                    endAt = endAt,
+                Timber.d("필터 적용: distances=$distanceCodes, startDate=$startDate, endDate=$endDate, startTime=$startTime, endTime=$endTime, visibility=$visibility")
+
+                // ViewModel에 필터 적용 (상태 저장 + API 호출)
+                viewModel.applyFilters(
+                    distances = distanceCodes,
+                    startDate = startDate,
+                    endDate = endDate,
+                    startTime = startTime,
+                    endTime = endTime,
                     visibility = visibility
                 )
 
@@ -297,15 +357,80 @@ private fun convertDistanceToCode(distance: String): String {
 }
 
 /**
- * 날짜와 시간을 ISO 8601 형식으로 변환
- * 예: 2025-11-12T21:00:00
+ * API 거리 코드를 UI 거리 값으로 변환 (역변환)
  */
-private fun convertToIso8601(date: LocalDate, time: String): String {
-    // time은 "HH:mm" 형식 (예: "14:30")
-    val parts = time.split(":")
-    val hour = parts.getOrNull(0)?.toIntOrNull() ?: 0
-    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+private fun convertCodeToDistance(code: String): String? {
+    return when (code) {
+        "ONE" -> "1km"
+        "TWO" -> "2km"
+        "THREE" -> "3km"
+        "FOUR" -> "4km"
+        "FIVE" -> "5km"
+        "SIX" -> "6km"
+        "SEVEN" -> "7km"
+        "EIGHT" -> "8km"
+        "NINE" -> "9km"
+        "TEN" -> "10km"
+        "FIFTEEN" -> "15km"
+        "HALF" -> "하프"
+        else -> null
+    }
+}
 
-    val dateTime = java.time.LocalDateTime.of(date.year, date.month, date.dayOfMonth, hour, minute)
-    return dateTime.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+/**
+ * Date 문자열을 LocalDate로 파싱
+ * 예: "2025-11-14" -> LocalDate
+ */
+private fun parseDate(dateString: String): LocalDate? {
+    return try {
+        LocalDate.parse(dateString)
+    } catch (e: Exception) {
+        Timber.w(e, "Date 파싱 실패: $dateString")
+        null
+    }
+}
+
+/**
+ * Time 문자열을 UI 형식으로 파싱
+ * 예: "09:00:00" -> "09:00"
+ *     "23:59:59" -> "24:00" (특수 처리)
+ */
+private fun parseTime(timeString: String): String {
+    return try {
+        val parts = timeString.split(":")
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val second = parts.getOrNull(2)?.toIntOrNull() ?: 0
+
+        // 23:59:59는 "24:00"으로 표시 (UI 표시용)
+        if (hour == 23 && minute == 59 && second == 59) {
+            "24:00"
+        } else {
+            String.format("%02d:%02d", hour, minute)
+        }
+    } catch (e: Exception) {
+        Timber.w(e, "Time 파싱 실패: $timeString")
+        "00:00"
+    }
+}
+
+/**
+ * UI 시간 형식을 API 형식으로 변환
+ * 예: "09:00" -> "09:00:00"
+ *     "24:00" -> "23:59:59" (특수 처리)
+ */
+private fun convertTimeToApiFormat(time: String): String {
+    val parts = time.split(":")
+    var hour = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    var minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    var second = 0
+
+    // "24:00" 특수 처리 -> 23:59:59
+    if (hour == 24 && minute == 0) {
+        hour = 23
+        minute = 59
+        second = 59
+    }
+
+    return String.format("%02d:%02d:%02d", hour, minute, second)
 }

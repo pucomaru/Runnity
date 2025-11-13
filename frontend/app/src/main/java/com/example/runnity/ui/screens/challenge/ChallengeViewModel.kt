@@ -44,8 +44,23 @@ class ChallengeViewModel(
     val sortType: StateFlow<String> = _sortType.asStateFlow()
 
     // 필터 옵션
-    private val _distanceFilter = MutableStateFlow<String?>(null)
-    val distanceFilter: StateFlow<String?> = _distanceFilter.asStateFlow()
+    private val _distanceFilter = MutableStateFlow<List<String>?>(null)
+    val distanceFilter: StateFlow<List<String>?> = _distanceFilter.asStateFlow()
+
+    private val _startDateFilter = MutableStateFlow<String?>(null)
+    val startDateFilter: StateFlow<String?> = _startDateFilter.asStateFlow()
+
+    private val _endDateFilter = MutableStateFlow<String?>(null)
+    val endDateFilter: StateFlow<String?> = _endDateFilter.asStateFlow()
+
+    private val _startTimeFilter = MutableStateFlow<String?>(null)
+    val startTimeFilter: StateFlow<String?> = _startTimeFilter.asStateFlow()
+
+    private val _endTimeFilter = MutableStateFlow<String?>(null)
+    val endTimeFilter: StateFlow<String?> = _endTimeFilter.asStateFlow()
+
+    private val _visibilityFilter = MutableStateFlow<String?>(null)
+    val visibilityFilter: StateFlow<String?> = _visibilityFilter.asStateFlow()
 
     init {
         loadChallenges()
@@ -56,10 +71,12 @@ class ChallengeViewModel(
      */
     fun loadChallenges(
         keyword: String? = _searchQuery.value.takeIf { it.isNotBlank() },
-        distance: String? = _distanceFilter.value,
-        startAt: String? = null,
-        endAt: String? = null,
-        visibility: String? = null,
+        distances: List<String>? = _distanceFilter.value,
+        startDate: String? = _startDateFilter.value,
+        endDate: String? = _endDateFilter.value,
+        startTime: String? = _startTimeFilter.value,
+        endTime: String? = _endTimeFilter.value,
+        visibility: String? = _visibilityFilter.value,
         sort: String? = _sortType.value,
         page: Int = 0,
         size: Int = 20
@@ -67,13 +84,26 @@ class ChallengeViewModel(
         viewModelScope.launch {
             _uiState.value = ChallengeUiState.Loading
 
+            // 실제 사용할 값 (파라미터가 명시적으로 전달되면 그 값을 사용)
+            val actualKeyword = keyword ?: _searchQuery.value.takeIf { it.isNotBlank() }
+            val actualDistances = distances ?: _distanceFilter.value
+            val actualVisibility = visibility ?: _visibilityFilter.value
+            val actualSort = sort ?: _sortType.value
+
+            val actualStartDate = startDate ?: _startDateFilter.value ?: java.time.LocalDate.now().toString()
+            val actualStartTime = startTime ?: _startTimeFilter.value
+            val actualEndDate = endDate ?: _endDateFilter.value
+            val actualEndTime = endTime ?: _endTimeFilter.value
+
             when (val response = repository.getChallenges(
-                keyword = keyword,
-                distance = distance,
-                startAt = startAt,
-                endAt = endAt,
-                visibility = visibility,
-                sort = sort,
+                keyword = actualKeyword,
+                distances = actualDistances,
+                startDate = actualStartDate,
+                endDate = actualEndDate,
+                startTime = actualStartTime,
+                endTime = actualEndTime,
+                visibility = actualVisibility,
+                sort = actualSort,
                 page = page,
                 size = size
             )) {
@@ -128,9 +158,6 @@ class ChallengeViewModel(
         _searchQuery.value = query
     }
 
-    /**
-     * 검색 실행
-     */
     fun searchChallenges() {
         loadChallenges(keyword = _searchQuery.value)
     }
@@ -146,9 +173,37 @@ class ChallengeViewModel(
     /**
      * 거리 필터 변경
      */
-    fun updateDistanceFilter(distance: String?) {
-        _distanceFilter.value = distance
-        loadChallenges(distance = distance)
+    fun updateDistanceFilter(distances: List<String>?) {
+        _distanceFilter.value = distances
+        loadChallenges(distances = distances)
+    }
+
+    /**
+     * 모든 필터 한 번에 적용 (필터 화면에서 사용)
+     */
+    fun applyFilters(
+        distances: List<String>? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        startTime: String? = null,
+        endTime: String? = null,
+        visibility: String? = null
+    ) {
+        Timber.d("applyFilters 호출: distances=$distances, startDate=$startDate, endDate=$endDate, startTime=$startTime, endTime=$endTime, visibility=$visibility")
+        _distanceFilter.value = distances
+        _startDateFilter.value = startDate
+        _endDateFilter.value = endDate
+        _startTimeFilter.value = startTime
+        _endTimeFilter.value = endTime
+        _visibilityFilter.value = visibility
+        loadChallenges(
+            distances = distances,
+            startDate = startDate,
+            endDate = endDate,
+            startTime = startTime,
+            endTime = endTime,
+            visibility = visibility
+        )
     }
 
     /**
