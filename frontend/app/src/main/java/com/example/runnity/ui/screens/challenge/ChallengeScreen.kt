@@ -36,56 +36,22 @@ fun ChallengeScreen(
     parentNavController: NavController? = null,  // 앱 전체 이동용
     viewModel: ChallengeViewModel = viewModel()
 ) {
-    // 검색어 상태
-    var searchQuery by remember { mutableStateOf("") }
+    // ViewModel 상태 관찰
+    val uiState by viewModel.uiState.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
-    // 정렬 상태
-    var selectedSort by remember { mutableStateOf("인기순") }
+    // 정렬 상태 (기본값: 최신순)
+    var selectedSort by remember { mutableStateOf("최신순") }
 
-    // TODO: ViewModel에서 실제 데이터 가져오기
-    // 현재는 샘플 데이터 사용 (HomeScreen 참고)
-    val challenges = listOf(
-        ChallengeListItem(
-            id = "ch_1",
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "ch_2",
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "ch_3",
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "ch_4",
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "ch_5",
-            distance = "3km",
-            title = "3km 달릴 사람 구한다",
-            startDateTime = "2025.11.02 21:00 시작",
-            participants = "15/100명",
-            buttonState = ChallengeButtonState.None
-        )
-    )
+    // API 응답을 UI 모델로 변환
+    val challenges = when (val state = uiState) {
+        is ChallengeUiState.Success -> {
+            state.challenges.map { apiItem ->
+                ChallengeMapper.toUiModel(apiItem)
+            }
+        }
+        else -> emptyList()
+    }
 
     // 전체 레이아웃 (Box로 FAB 배치)
     Box(
@@ -104,7 +70,11 @@ fun ChallengeScreen(
             // 2. 검색바 + 필터 버튼
             SearchBarWithFilter(
                 searchQuery = searchQuery,
-                onSearchChange = { searchQuery = it },
+                onSearchChange = { viewModel.updateSearchQuery(it) },
+                onSearchSubmit = {
+                    // 키보드 검색 버튼 또는 검색 아이콘 클릭 시 검색 실행
+                    viewModel.searchChallenges()
+                },
                 onFilterClick = {
                     // 필터 페이지로 이동
                     navController?.navigate("challenge_filter")
@@ -124,7 +94,7 @@ fun ChallengeScreen(
                 // 새로고침 버튼
                 IconButton(
                     onClick = {
-                        // TODO: 챌린지 목록 새로고침
+                        viewModel.refreshChallenges()
                     }
                 ) {
                     Icon(
@@ -137,7 +107,16 @@ fun ChallengeScreen(
                 // 정렬 드롭다운 (오른쪽 정렬)
                 SortDropdown(
                     selectedSort = selectedSort,
-                    onSortSelected = { selectedSort = it }
+                    onSortSelected = {
+                        selectedSort = it
+                        // "인기순" -> "POPULAR", "최신순" -> "LATEST" 변환
+                        val sortType = when (it) {
+                            "인기순" -> "POPULAR"
+                            "최신순" -> "LATEST"
+                            else -> "LATEST"
+                        }
+                        viewModel.updateSortType(sortType)
+                    }
                 )
             }
 
@@ -152,18 +131,24 @@ fun ChallengeScreen(
                 contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)  // FAB 공간 확보
             ) {
                 items(challenges.size) { index ->
+                    val challenge = challenges[index]
                     ChallengeCard(
-                        distance = challenges[index].distance,
-                        title = challenges[index].title,
-                        startDateTime = challenges[index].startDateTime,
-                        participants = challenges[index].participants,
-                        buttonState = challenges[index].buttonState,
+                        distance = challenge.distance,
+                        title = challenge.title,
+                        startDateTime = challenge.startDateTime,
+                        participants = challenge.participants,
+                        buttonState = challenge.buttonState,
                         onCardClick = {
                             // 세부 화면으로 이동
-                            navController?.navigate("challenge_detail/${challenges[index].id}")
+                            navController?.navigate("challenge_detail/${challenge.id}")
                         },
                         onButtonClick = {
-                            // TODO: 예약하기/참가하기 버튼 클릭 처리
+                            // 참가하기 버튼 (시작 5분 전, 웹소켓 참가용)
+                            val challengeId = challenge.id.toLongOrNull()
+                            if (challengeId != null && challenge.buttonState == ChallengeButtonState.Join) {
+                                // TODO: 웹소켓 참가 로직 추가
+                                viewModel.joinChallenge(challengeId)
+                            }
                         }
                     )
                 }

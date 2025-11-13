@@ -2,6 +2,7 @@ package com.example.runnity.data.api
 
 import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
+import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.google.gson.GsonBuilder
@@ -96,6 +97,14 @@ object RetrofitInstance {
      */
     val authApi: AuthApiService by lazy {
         createService(AuthApiService::class.java)
+    }
+
+    /**
+     * ChallengeApiService 인스턴스
+     * 챌린지 목록 조회, 생성, 참가, 취소, 상세 조회
+     */
+    val challengeApi: ChallengeApiService by lazy {
+        createService(ChallengeApiService::class.java)
     }
 
     /**

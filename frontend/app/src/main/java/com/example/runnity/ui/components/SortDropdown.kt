@@ -37,8 +37,8 @@ fun SortDropdown(
     onSortSelected: (String) -> Unit,      // 정렬 선택 콜백
     modifier: Modifier = Modifier          // 추가 Modifier
 ) {
-    // 정렬 옵션 (고정)
-    val sortOptions = listOf("인기순", "최신순")
+    // 정렬 옵션 (고정) - 최신순이 먼저
+    val sortOptions = listOf("최신순", "인기순")
 
     // 드롭다운 메뉴 표시 여부 상태
     var expanded by remember { mutableStateOf(false) }

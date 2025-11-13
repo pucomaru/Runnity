@@ -4,17 +4,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * 챌린지 생성 화면
@@ -25,7 +30,8 @@ import java.time.LocalDate
  */
 @Composable
 fun ChallengeCreateScreen(
-    navController: NavController? = null
+    navController: NavController? = null,
+    viewModel: ChallengeViewModel = viewModel()
 ) {
     // 제목 입력 상태 (최대 20자)
     var title by remember { mutableStateOf("") }
@@ -55,6 +61,10 @@ fun ChallengeCreateScreen(
 
     // 중계방 사용 여부
     var broadcastEnabled by remember { mutableStateOf("미사용") }
+
+    // 에러 메시지 다이얼로그
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -327,13 +337,148 @@ fun ChallengeCreateScreen(
         PrimaryButton(
             text = "생성하기",
             onClick = {
-                // TODO: 챌린지 생성 로직
-                // - title (최대 20자), description, maxParticipants (최대 100명),
-                //   selectedVisibility, password (비공개일 경우 4자리),
-                //   selectedDistance, selectedDate, selectedHour, selectedMinute, selectedAmPm, broadcastEnabled
-                // - 입력값 검증 후 API 호출
-                navController?.navigateUp()
+                // 입력값 검증
+                val validationError = validateInputs(
+                    title = title,
+                    maxParticipants = maxParticipants,
+                    selectedDistance = selectedDistance,
+                    selectedDate = selectedDate,
+                    selectedVisibility = selectedVisibility,
+                    password = password
+                )
+
+                if (validationError != null) {
+                    errorMessage = validationError
+                    showErrorDialog = true
+                    return@PrimaryButton
+                }
+
+                // ISO 8601 형식으로 날짜/시간 변환
+                val startAt = convertToIso8601(
+                    date = selectedDate!!,
+                    hour = selectedHour,
+                    minute = selectedMinute,
+                    amPm = selectedAmPm
+                )
+
+                // 거리 변환 (UI -> API)
+                val distanceCode = convertDistanceToCode(selectedDistance!!)
+
+                // 챌린지 생성 API 호출
+                viewModel.createChallenge(
+                    title = title,
+                    description = description,
+                    maxParticipants = maxParticipants.toInt(),
+                    startAt = startAt,
+                    distance = distanceCode,
+                    isPrivate = selectedVisibility == "비공개",
+                    password = if (selectedVisibility == "비공개") password else null,
+                    isBroadcast = broadcastEnabled == "사용",
+                    onSuccess = { challengeId ->
+                        // 생성 성공 시 상세 화면으로 이동
+                        navController?.navigate("challenge_detail/$challengeId") {
+                            popUpTo("challenge") { inclusive = false }
+                        }
+                    },
+                    onError = { error ->
+                        errorMessage = error
+                        showErrorDialog = true
+                    }
+                )
             }
         )
+    }
+
+    // 에러 다이얼로그
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("오류") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+}
+
+/**
+ * 입력값 검증
+ */
+private fun validateInputs(
+    title: String,
+    maxParticipants: String,
+    selectedDistance: String?,
+    selectedDate: LocalDate?,
+    selectedVisibility: String,
+    password: String
+): String? {
+    if (title.isBlank()) {
+        return "챌린지 이름을 입력해주세요"
+    }
+    if (maxParticipants.isBlank()) {
+        return "정원을 입력해주세요"
+    }
+    val participants = maxParticipants.toIntOrNull()
+    if (participants == null || participants < 2) {
+        return "정원은 최소 2명 이상이어야 합니다"
+    }
+    if (participants > 100) {
+        return "정원은 최대 100명까지 가능합니다"
+    }
+    if (selectedDistance == null) {
+        return "거리를 선택해주세요"
+    }
+    if (selectedDate == null) {
+        return "날짜를 선택해주세요"
+    }
+    if (selectedVisibility == "비공개" && password.length != 4) {
+        return "비밀번호는 4자리 숫자여야 합니다"
+    }
+    return null
+}
+
+/**
+ * 날짜/시간을 ISO 8601 형식으로 변환
+ * 예: 2025-11-12T21:00:00
+ */
+private fun convertToIso8601(
+    date: LocalDate,
+    hour: Int,
+    minute: Int,
+    amPm: String
+): String {
+    // 12시간 형식을 24시간 형식으로 변환
+    val hour24 = when {
+        amPm == "am" && hour == 12 -> 0  // 12 am = 0시
+        amPm == "pm" && hour != 12 -> hour + 12  // 1 pm = 13시
+        else -> hour
+    }
+
+    val dateTime = LocalDateTime.of(date.year, date.month, date.dayOfMonth, hour24, minute)
+    return dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+}
+
+/**
+ * UI 거리 값을 API 거리 코드로 변환
+ * 1km -> ONE, 5km -> FIVE, 하프 -> HALF 등
+ */
+private fun convertDistanceToCode(distance: String): String {
+    return when (distance) {
+        "1km" -> "ONE"
+        "2km" -> "TWO"
+        "3km" -> "THREE"
+        "4km" -> "FOUR"
+        "5km" -> "FIVE"
+        "6km" -> "SIX"
+        "7km" -> "SEVEN"
+        "8km" -> "EIGHT"
+        "9km" -> "NINE"
+        "10km" -> "TEN"
+        "15km" -> "FIFTEEN"
+        "하프" -> "HALF"
+        else -> "FIVE"
     }
 }
