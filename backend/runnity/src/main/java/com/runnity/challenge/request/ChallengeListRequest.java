@@ -28,7 +28,7 @@ public record ChallengeListRequest(
         @Schema(description = "공개 여부 (PUBLIC: 공개방만, ALL: 전체)", implementation = ChallengeVisibility.class, defaultValue = "PUBLIC")
         ChallengeVisibility visibility,
 
-        @Schema(description = "정렬 기준 (POPULAR: 인기순, LATEST: 최신순)", implementation = ChallengeSortType.class, defaultValue = "POPULAR")
+        @Schema(description = "정렬 기준 (POPULAR: 인기순, LATEST: 임박순)", implementation = ChallengeSortType.class, defaultValue = "POPULAR")
         ChallengeSortType sort
 ) {
 

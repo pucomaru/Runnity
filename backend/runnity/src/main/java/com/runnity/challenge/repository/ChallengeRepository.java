@@ -44,7 +44,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     );
 
     /**
-     * 챌린지 목록 조회 - 참가자 수 포함 (최신순: 생성일 내림차순)
+     * 챌린지 목록 조회 - 참가자 수 포함 (임박순: 시작일 오름차순 - 빨리 시작하는 순)
      * Object[] 반환: [Challenge, Long participantCount]
      */
     @Query("""
@@ -62,7 +62,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND (:endAt IS NULL OR c.startAt <= :endAt)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
-        ORDER BY c.createdAt DESC
+        ORDER BY c.startAt ASC
     """)
     Page<Object[]> findChallengesWithParticipantCountOrderByLatest(
             @Param("keyword") String keyword,

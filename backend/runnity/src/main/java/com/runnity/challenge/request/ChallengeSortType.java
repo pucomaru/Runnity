@@ -8,7 +8,7 @@ import java.util.Optional;
 public enum ChallengeSortType {
 
     POPULAR("POPULAR", "인기순 (참가자 수 기준)"),
-    LATEST("LATEST", "최신순 (생성일 기준)");
+    LATEST("LATEST", "임박순 (빨리 시작하는 순)");
 
     private final String code;
     private final String label;
