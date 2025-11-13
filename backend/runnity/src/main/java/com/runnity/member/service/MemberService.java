@@ -183,23 +183,24 @@ public class MemberService {
 
             String prefix = "profile-photos/" + memberId;
 
-            // 프로필 사진 저장 (있을 경우)
             if (profileImage != null && !profileImage.isEmpty()) {
-
-                // 이전 파일 삭제(있는 경우)
+                // 이전 파일 삭제
                 if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
                     fileStorage.delete(member.getProfileImage());
                 }
 
-                String profileImagePath = fileStorage.upload(prefix, profileImage);
+                // S3 업로드 → Public URL 반환
+                String publicUrl = fileStorage.upload(prefix, profileImage);
+
                 member.updateProfileWithImage(
                         request.getNickname(),
-                        profileImagePath,
+                        publicUrl,  // Public URL 저장
                         request.getHeight(),
                         request.getWeight(),
                         request.getGender(),
                         request.getBirth()
                 );
+                log.info("신규 정보 입력 + 이미지저장, 경로 : {}", publicUrl);
             } else {
                 member.updateProfile(
                         request.getNickname(),
@@ -208,6 +209,7 @@ public class MemberService {
                         request.getGender(),
                         request.getBirth()
                 );
+                log.info("신규 정보만 입력");
             }
 
             new AddInfoResponseDto("신규 회원 정보가 저장되었습니다.");
@@ -272,38 +274,49 @@ public class MemberService {
 
     @Transactional
     public void updateProfile(Long memberId, ProfileUpdateRequestDto request, MultipartFile profileImage) {
-        // 회원 조회
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
+        try {
+            // 회원 조회
+            Member member = memberRepository.findById(memberId)
+                    .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
 
-        if (request != null && request.getNickname() != null) {
-            String nick = request.getNickname().trim();
-            if (!nick.isBlank()) {
-                validateFormat(nick);
-                if (memberRepository.nicknameCheckWithMemberId(nick, memberId)) {
-                    throw new IllegalArgumentException("NICKNAME_CONFLICT");
+            if (request != null && request.getNickname() != null) {
+                String nick = request.getNickname().trim();
+                if (!nick.isBlank()) {
+                    validateFormat(nick);
+                    if (memberRepository.nicknameCheckWithMemberId(nick, memberId)) {
+                        throw new IllegalArgumentException("NICKNAME_CONFLICT");
+                    }
+                    member.setNickname(nick);
                 }
-                member.setNickname(nick);
             }
-        }
 
-        // 이미지 교체 처리
-        if (profileImage != null && !profileImage.isEmpty()) {
-            // 기존 이미지 있으면 삭제
-            if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
-                fileStorage.delete(member.getProfileImage());
+            // 이미지 교체 처리
+            if (profileImage != null && !profileImage.isEmpty()) {
+                if (member.getProfileImage() != null && !member.getProfileImage().isBlank()) {
+                    fileStorage.delete(member.getProfileImage());
+                }
+
+                String prefix = "profile-photos/" + memberId;
+                String publicUrl = fileStorage.upload(prefix, profileImage);
+                member.setProfileImage(publicUrl);
+                log.info("내 정보 수정 + 이미지저장, 경로 : {}", publicUrl);
             }
-            String prefix = "profile-photos/" + memberId;
-            String newUrl = fileStorage.upload(prefix, profileImage);
-            member.setProfileImage(newUrl);
-        }
 
-        // 부분 업데이트(전달된 필드만 변경)
-        if (request != null && request.getHeight() != null && request.getHeight() > 0) {
-            member.setHeight(request.getHeight());
-        }
-        if (request != null && request.getWeight() != null && request.getWeight() > 0) {
-            member.setWeight(request.getWeight());
+            // 부분 업데이트(전달된 필드만 변경)
+            if (request != null && request.getHeight() != null && request.getHeight() > 0) {
+                member.setHeight(request.getHeight());
+            }
+            if (request != null && request.getWeight() != null && request.getWeight() > 0) {
+                member.setWeight(request.getWeight());
+            }
+            log.info("내 정보 수정 완료");
+
+        } catch (IllegalArgumentException e) {
+            log.error("회원 정보 수정 실패 (잘못된 요청): {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("회원 정보 수정 실패 (서버 에러): {}", e.getMessage(), e);
+            throw new RuntimeException("회원 정보 수정 중 오류가 발생했습니다", e);
         }
     }
 
@@ -330,15 +343,5 @@ public class MemberService {
             log.error("로그아웃 처리 실패: memberId={}", memberId, e);
             throw new RuntimeException("Logout failed", e);
         }
-    }
-
-    /**
-     * 프로필 이미지 S3 키 조회 (프록시 엔드포인트에서 사용)
-     */
-    @Transactional(readOnly = true)
-    public String getProfileImageKey(Long memberId) {
-        return memberRepository.findById(memberId)
-                .map(Member::getProfileImage)
-                .orElse(null);
     }
 }

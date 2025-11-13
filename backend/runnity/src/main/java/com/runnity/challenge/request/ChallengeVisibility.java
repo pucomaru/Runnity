@@ -1,5 +1,7 @@
 package com.runnity.challenge.request;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -16,6 +18,7 @@ public enum ChallengeVisibility {
         this.label = label;
     }
 
+    @JsonValue
     public String code() {
         return code;
     }
@@ -28,10 +31,5 @@ public enum ChallengeVisibility {
         return Arrays.stream(values())
                 .filter(visibility -> visibility.code.equalsIgnoreCase(code))
                 .findFirst();
-    }
-
-    @Override
-    public String toString() {
-        return label + " (" + code + ")";
     }
 }

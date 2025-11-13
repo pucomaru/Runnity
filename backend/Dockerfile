@@ -9,6 +9,7 @@ COPY runnity/ ./
 
 RUN gradle build -x test
 
+
 # -------- runtime --------
 FROM eclipse-temurin:21-jdk
 WORKDIR /app

@@ -66,7 +66,8 @@ public record ChallengeCreateRequest(
         if (isPrivate) {
             return password != null && !password.isBlank();
         }
-        return password == null || password.isBlank();
+        // 비밀방이 아니면 비밀번호 유무와 상관없이 통과
+        return true;
     }
 
     public Challenge toEntity() {
@@ -77,7 +78,8 @@ public record ChallengeCreateRequest(
                 .startAt(this.startAt)
                 .distance(this.distance)
                 .isPrivate(this.isPrivate)
-                .password(password)
+                // 비밀방이 아니면 password를 null로 설정
+                .password(isPrivate ? password : null)
                 .isBroadcast(this.isBroadcast)
                 .build();
     }

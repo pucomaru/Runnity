@@ -31,16 +31,30 @@ public class AwsS3FileStorage implements FileStorage {
 
     @Override
     public String upload(String prefix, MultipartFile file) {
-        String key = prefix + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
+        String fileName = generateFileName(file);
+        String s3Key = prefix + "/" + fileName;
+
         try {
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentType(file.getContentType());
             metadata.setContentLength(file.getSize());
 
-            amazonS3.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), metadata));
+            // ACL을 PUBLIC_READ로 설정
+            PutObjectRequest putRequest = new PutObjectRequest(
+                    bucket,
+                    s3Key,
+                    file.getInputStream(),  // ← IOException 발생 가능
+                    metadata
+            );
 
-            return key;  // ← S3 키만 반환 (URL 아님!)
+            amazonS3.putObject(putRequest);
+
+            // Public URL 반환
+            return String.format("https://%s.s3.%s.amazonaws.com/%s",
+                    bucket, region, s3Key);
+
         } catch (IOException e) {
+            log.error("S3 upload failed: {}", e.getMessage(), e);
             throw new RuntimeException("S3 upload failed", e);
         }
     }
@@ -63,5 +77,16 @@ public class AwsS3FileStorage implements FileStorage {
         } catch (Exception e) {
             log.warn("S3 delete fail: {}", e.getMessage());
         }
+    }
+
+    private String generateFileName(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        return UUID.randomUUID() + extension;
     }
 }

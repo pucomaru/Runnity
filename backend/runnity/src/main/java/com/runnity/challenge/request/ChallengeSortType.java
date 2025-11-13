@@ -1,12 +1,14 @@
 package com.runnity.challenge.request;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import java.util.Arrays;
 import java.util.Optional;
 
 public enum ChallengeSortType {
 
     POPULAR("POPULAR", "인기순 (참가자 수 기준)"),
-    LATEST("LATEST", "최신순 (생성일 기준)");
+    LATEST("LATEST", "임박순 (빨리 시작하는 순)");
 
     private final String code;
     private final String label;
@@ -16,6 +18,7 @@ public enum ChallengeSortType {
         this.label = label;
     }
 
+    @JsonValue
     public String code() {
         return code;
     }
@@ -28,10 +31,5 @@ public enum ChallengeSortType {
         return Arrays.stream(values())
                 .filter(type -> type.code.equalsIgnoreCase(code))
                 .findFirst();
-    }
-
-    @Override
-    public String toString() {
-        return label + " (" + code + ")";
     }
 }

@@ -85,7 +85,7 @@ public class ChallengeParticipation extends BaseEntity {
      * 활성 참가 상태인지 확인 (LEFT 제외)
      */
     public boolean isActive() {
-        return ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES.contains(this.status);
+        return ParticipationStatus.TOTAL_APPLICANT_STATUSES.contains(this.status);
     }
 
     /**

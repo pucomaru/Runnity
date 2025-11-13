@@ -1,17 +1,8 @@
 package com.runnity.challenge.service;
 
 import com.runnity.challenge.domain.*;
-import com.runnity.challenge.request.ChallengeCreateRequest;
-import com.runnity.challenge.request.ChallengeListRequest;
-import com.runnity.challenge.request.ChallengeSortType;
-import com.runnity.challenge.request.ChallengeVisibility;
-import com.runnity.challenge.request.ChallengeJoinRequest;
-import com.runnity.challenge.response.ChallengeEnterResponse;
-import com.runnity.challenge.response.ChallengeJoinResponse;
-import com.runnity.challenge.response.ChallengeListItemResponse;
-import com.runnity.challenge.response.ChallengeListResponse;
-import com.runnity.challenge.response.ChallengeParticipantResponse;
-import com.runnity.challenge.response.ChallengeResponse;
+import com.runnity.challenge.request.*;
+import com.runnity.challenge.response.*;
 import com.runnity.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.challenge.repository.ChallengeRepository;
 import com.runnity.global.config.WebSocketServerConfig;
@@ -25,15 +16,13 @@ import com.runnity.scheduler.domain.ScheduleOutbox;
 import com.runnity.scheduler.repository.ScheduleOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -52,7 +41,7 @@ public class ChallengeService {
     @Transactional
     public ChallengeResponse createChallenge(ChallengeCreateRequest request, Long memberId) {
         Member member = memberRepository.findById(memberId)
-                        .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
         LocalDateTime startAt = request.startAt();
         LocalDateTime endAt = startAt.plusMinutes(request.distance().durationMinutes());
@@ -68,7 +57,7 @@ public class ChallengeService {
         String payload = createSchedulePayload(challenge.getChallengeId(), startAt, endAt);
         ScheduleOutbox outbox = ScheduleOutbox.builder()
                 .challengeId(challenge.getChallengeId())
-                .eventType("SCHEDULE_CREATE")
+                .eventType(ScheduleOutbox.ScheduleEventType.SCHEDULE_CREATE)
                 .payload(payload)
                 .build();
         scheduleOutboxRepository.save(outbox);
@@ -90,39 +79,45 @@ public class ChallengeService {
     public ChallengeListResponse getChallenges(ChallengeListRequest request, Pageable pageable, Long memberId) {
         Boolean isPrivateFilter = request.visibility() == ChallengeVisibility.PUBLIC ? false : null;
 
+        List<ChallengeDistance> distances = (request.distances() == null || request.distances().isEmpty())
+                ? null
+                : request.distances();
+
+        Pageable pageableWithoutSort = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+        );
+
         Page<Object[]> result = request.sort() == ChallengeSortType.POPULAR
                 ? challengeRepository.findChallengesWithParticipantCountOrderByPopular(
-                        request.keyword(),
-                        request.distance(),
-                        request.startAt(),
-                        request.endAt(),
-                        isPrivateFilter,
-                        pageable
-                )
+                request.keyword(),
+                distances,
+                request.startAt(),
+                request.endAt(),
+                isPrivateFilter,
+                pageableWithoutSort
+        )
                 : challengeRepository.findChallengesWithParticipantCountOrderByLatest(
-                        request.keyword(),
-                        request.distance(),
-                        request.startAt(),
-                        request.endAt(),
-                        isPrivateFilter,
-                        pageable
-                );
+                request.keyword(),
+                distances,
+                request.startAt(),
+                request.endAt(),
+                isPrivateFilter,
+                pageableWithoutSort
+        );
 
-        // 챌린지 ID 추출
         List<Long> challengeIds = result.stream()
                 .map(arr -> ((Challenge) arr[0]).getChallengeId())
                 .toList();
 
-        // 사용자 참가 여부 조회
         Set<Long> joinedIds = challengeIds.isEmpty()
                 ? Set.of()
                 : Set.copyOf(participationRepository.findJoinedChallengeIds(
-                        challengeIds,
-                        memberId,
-                        ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
-                ));
+                challengeIds,
+                memberId,
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
+        ));
 
-        // DTO 변환
         Page<ChallengeListItemResponse> items = result.map(arr ->
                 ChallengeListItemResponse.from(
                         (Challenge) arr[0],
@@ -142,29 +137,24 @@ public class ChallengeService {
             throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
         }
 
-        // 참가자 목록 조회 (LEFT 제외)
         List<ChallengeParticipation> participations = participationRepository.findByChallengeIdAndActiveStatus(
                 challengeId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         );
 
-        int currentParticipants = participations.size();
-
-        // 참가 여부 확인
         boolean joined = participationRepository.existsByChallengeIdAndMemberIdAndActiveStatus(
                 challengeId,
                 memberId,
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         );
 
-        // 참가자 DTO 변환
         List<ChallengeParticipantResponse> participants = participations.stream()
                 .map(ChallengeParticipantResponse::from)
                 .toList();
 
         return ChallengeResponse.from(
                 challenge,
-                currentParticipants,
+                participations.size(),
                 joined,
                 participants
         );
@@ -182,51 +172,38 @@ public class ChallengeService {
 
     @Transactional
     public ChallengeJoinResponse joinChallenge(Long challengeId, ChallengeJoinRequest request, Long memberId) {
-        // 1. 회원 조회 (평균 페이스 필요)
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
-        // 2. 챌린지 검증
         Challenge challenge = validateAndGetChallenge(challengeId);
-        
+
         if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
             throw new GlobalException(ErrorStatus.CHALLENGE_NOT_RECRUITING);
         }
 
-        // 3. 비밀번호 검증
         validatePassword(challenge, request);
-
-        // 4. 참가 제한 조건 검증
         validateTimeOverlap(memberId, challenge.getStartAt(), challenge.getEndAt());
         validateParticipantLimit(challenge);
 
-        // 5. 참가 정보 조회 또는 생성
         ChallengeParticipation participation = participationRepository
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElse(null);
 
         if (participation != null) {
-            // 기존 참가 정보가 있는 경우
             if (participation.isActive()) {
                 throw new GlobalException(ErrorStatus.CHALLENGE_ALREADY_JOINED);
             }
-            // LEFT 상태인 경우 재참가
             participation.rejoin();
-            participation = participationRepository.save(participation);
-            log.info("챌린지 재참가 신청 완료: challengeId={}, memberId={}, participantId={}",
-                    challengeId, memberId, participation.getParticipantId());
+            participationRepository.save(participation);
         } else {
-            // 새로운 참가 신청
-            participation = ChallengeParticipation.builder()
-                    .challenge(challenge)
-                    .member(member)
-                    .build();
-            participation = participationRepository.save(participation);
-            log.info("챌린지 참가 신청 완료: challengeId={}, memberId={}, participantId={}",
-                    challengeId, memberId, participation.getParticipantId());
+            participation = participationRepository.save(
+                    ChallengeParticipation.builder()
+                            .challenge(challenge)
+                            .member(member)
+                            .build()
+            );
         }
 
-        // 6. Response 반환
         return new ChallengeJoinResponse(
                 participation.getParticipantId(),
                 challenge.getChallengeId(),
@@ -239,26 +216,20 @@ public class ChallengeService {
 
     @Transactional
     public ChallengeJoinResponse cancelParticipation(Long challengeId, Long memberId) {
-        // 1. 챌린지 검증
         Challenge challenge = validateAndGetChallenge(challengeId);
 
-        // 2. 회원 조회 (평균 페이스 필요)
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
 
-        // 3. 참가 정보 조회
         ChallengeParticipation participation = participationRepository
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
 
-        // 4. 참가 취소 처리 (도메인 로직 활용)
         participation.cancel();
         participationRepository.save(participation);
 
-        log.info("챌린지 참가 취소 완료: challengeId={}, memberId={}, participantId={}",
-                challengeId, memberId, participation.getParticipantId());
+        deleteChallengeIfNoParticipants(challenge);
 
-        // 5. Response 반환
         return new ChallengeJoinResponse(
                 participation.getParticipantId(),
                 challenge.getChallengeId(),
@@ -269,28 +240,22 @@ public class ChallengeService {
         );
     }
 
-    /**
-     * 챌린지 존재 및 삭제 여부 검증
-     */
     private Challenge validateAndGetChallenge(Long challengeId) {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
-        
+
         if (challenge.isDeleted()) {
             throw new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND);
         }
-        
+
         return challenge;
     }
 
-    /**
-     * 비밀번호 검증
-     */
     private void validatePassword(Challenge challenge, ChallengeJoinRequest request) {
         if (!challenge.getIsPrivate()) {
             return;
         }
-        
+
         String password = request != null ? request.password() : null;
         if (password == null || password.isBlank()) {
             throw new GlobalException(ErrorStatus.CHALLENGE_PASSWORD_MISMATCH);
@@ -300,122 +265,107 @@ public class ChallengeService {
         }
     }
 
-    /**
-     * 참가 인원 제한 검증
-     */
     private void validateParticipantLimit(Challenge challenge) {
-        long currentCount = participationRepository.findByChallengeIdAndActiveStatus(
+        long count = participationRepository.findByChallengeIdAndActiveStatus(
                 challenge.getChallengeId(),
-                ParticipationStatus.ACTIVE_PARTICIPATION_STATUSES
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
         ).size();
 
-        if (currentCount >= challenge.getMaxParticipants()) {
+        if (count >= challenge.getMaxParticipants()) {
             throw new GlobalException(ErrorStatus.CHALLENGE_PARTICIPANT_LIMIT_EXCEEDED);
         }
     }
 
-    /**
-     * 시간 중복 검증
-     */
     private void validateTimeOverlap(Long memberId, LocalDateTime startAt, LocalDateTime endAt) {
         boolean hasOverlap = participationRepository.existsByMemberAndTimeOverlapAndStatusIn(
                 memberId, startAt, endAt, ParticipationStatus.TIME_OVERLAP_STATUSES);
 
         if (hasOverlap) {
-            log.warn("시간 중복 챌린지 생성 시도: memberId={}, startAt={}, endAt={}",
-                    memberId, startAt, endAt);
             throw new GlobalException(ErrorStatus.CHALLENGE_TIME_OVERLAP);
         }
     }
 
-    /**
-     * 챌린지 입장 (WAITING → RUNNING)
-     */
     @Transactional
     public ChallengeEnterResponse enterChallenge(Long challengeId, Long memberId) {
-        // 1. 챌린지 조회 및 입장 가능 여부 검증 (도메인 규칙)
         Challenge challenge = validateAndGetChallenge(challengeId);
         challenge.validateEnterable();
 
-        // 2. 참가자 조회 및 상태 전이 (도메인 규칙)
         ChallengeParticipation participation = participationRepository
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
+
         participation.startRunning();
-        
-        // 상태 변경을 즉시 DB에 반영 (WebSocket 서버가 바로 읽을 수 있도록)
         participationRepository.save(participation);
         participationRepository.flush();
 
-        // 3. WebSocket 티켓 발급 (인프라 제어)
         String ticket = wsTicketService.issueTicket(
-                memberId, 
-                challengeId, 
+                memberId,
+                challengeId,
                 WebSocketTicketService.TicketType.ENTER
         );
 
-        // 4. WebSocket 서버 선택 (인프라 제어)
         String wsUrl = selectWebSocketServer(memberId, challengeId);
 
-        log.info("챌린지 입장 완료: challengeId={}, memberId={}, participantId={}, ticket={}, wsUrl={}",
-                challengeId, memberId, participation.getParticipantId(), ticket, wsUrl);
-
         return new ChallengeEnterResponse(
-                ticket, 
-                memberId, 
-                challengeId, 
+                ticket,
+                memberId,
+                challengeId,
                 wsUrl,
                 wsTicketService.getTicketTtl()
         );
     }
 
-    /**
-     * WebSocket 서버 선택 (해시 기반 샤딩 + Health Check + Fallback + Circuit Breaker)
-     * 1. 해시 기반으로 Primary 서버 선택
-     * 2. Health Check 실패 시 Circuit Breaker 활성화 후 다른 서버로 Fallback
-     * 3. 모든 서버가 다운되면 예외 발생
-     */
     private String selectWebSocketServer(Long memberId, Long challengeId) {
-        int serverCount = wsServerConfig.getServerCount();
-        if (serverCount == 0) {
-            log.error("WebSocket 서버 설정이 없습니다. application.yml을 확인하세요.");
+        int count = wsServerConfig.getServerCount();
+        if (count == 0) {
             throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
 
-        // 1. 해시 기반으로 Primary 서버 선택
         String hashKey = memberId + ":" + challengeId;
-        int hash = hashKey.hashCode();
-        int primaryIndex = Math.abs(hash) % serverCount;
-
-        // 2. Primary 서버가 살아있으면 사용
+        int primaryIndex = Math.abs(hashKey.hashCode()) % count;
         String primaryUrl = wsServerConfig.getServerUrl(primaryIndex);
+
         if (wsHealthCheckService.isHealthy(primaryUrl)) {
-            log.debug("WebSocket 서버 선택 (Primary): memberId={}, challengeId={}, serverIndex={}, wsUrl={}",
-                    memberId, challengeId, primaryIndex, primaryUrl);
             return primaryUrl;
         }
 
-        log.warn("WebSocket Primary 서버 다운: index={}, url={}", primaryIndex, primaryUrl);
-        
-        // Circuit Breaker 활성화 (일정 시간 동안 해당 서버 차단)
         wsHealthCheckService.markAsDown(primaryUrl);
 
-        // 3. Fallback: 다른 서버들 중 살아있는 서버 찾기
-        for (int i = 0; i < serverCount; i++) {
-            if (i == primaryIndex) {
-                continue; // Primary는 이미 체크했으므로 스킵
-            }
+        for (int i = 0; i < count; i++) {
+            if (i == primaryIndex) continue;
 
-            String fallbackUrl = wsServerConfig.getServerUrl(i);
-            if (wsHealthCheckService.isHealthy(fallbackUrl)) {
-                log.info("WebSocket Fallback 서버 선택: memberId={}, challengeId={}, serverIndex={}, wsUrl={}",
-                        memberId, challengeId, i, fallbackUrl);
-                return fallbackUrl;
+            String fallback = wsServerConfig.getServerUrl(i);
+            if (wsHealthCheckService.isHealthy(fallback)) {
+                return fallback;
             }
         }
 
-        // 4. 모든 서버가 다운된 경우
-        log.error("모든 WebSocket 서버 다운: serverCount={}", serverCount);
         throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private void deleteChallengeIfNoParticipants(Challenge challenge) {
+        if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
+            return;
+        }
+
+        long activeCount = participationRepository.findByChallengeIdAndActiveStatus(
+                challenge.getChallengeId(),
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
+        ).size();
+
+        if (activeCount == 0) {
+            challenge.delete();
+            challengeRepository.save(challenge);
+
+            String payload = String.format("{\"challengeId\":%d}", challenge.getChallengeId());
+            ScheduleOutbox outbox = ScheduleOutbox.builder()
+                    .challengeId(challenge.getChallengeId())
+                    .eventType(ScheduleOutbox.ScheduleEventType.SCHEDULE_DELETE)
+                    .payload(payload)
+                    .build();
+            scheduleOutboxRepository.save(outbox);
+
+            log.info("참가자 0명으로 인한 챌린지 삭제 완료: challengeId={}", challenge.getChallengeId());
+        }
     }
 }

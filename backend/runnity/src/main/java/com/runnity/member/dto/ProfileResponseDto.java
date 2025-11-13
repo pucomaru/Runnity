@@ -32,7 +32,7 @@ public class ProfileResponseDto {
     @Schema(description = "평균 페이스(초)", example = "305")
     private Integer averagePace;
     @Schema(description = "추가 정보 입력 필요 여부", example = "false")
-    boolean needAdditionalInfo;
+    private Boolean needAdditionalInfo;
 
     public static ProfileResponseDto from(Member member) {
         boolean needInfo = member.getNickname() == null || member.getNickname().isBlank();
@@ -49,16 +49,5 @@ public class ProfileResponseDto {
                 .averagePace(member.getAveragePace())
                 .needAdditionalInfo(needInfo)
                 .build();
-    }
-
-    /**
-     * S3 키 → 프록시 URL 변환
-     */
-    private static String buildProxyUrl(Long memberId, String s3Key) {
-        if (s3Key == null || s3Key.isBlank()) {
-            return null;  // 프로필 이미지 없음
-        }
-        // 프록시 API 경로 반환
-        return "/api/v1/images/profile/" + memberId;
     }
 }

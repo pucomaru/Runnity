@@ -1,16 +1,12 @@
 package com.runnity.member.controller;
 
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runnity.global.status.ErrorStatus;
 import com.runnity.global.status.SuccessStatus;
 import com.runnity.member.dto.*;
 import com.runnity.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,10 +14,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -310,67 +302,6 @@ public class MemberController {
         } catch (Exception e) {
             return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    @GetMapping("/images/profile/{memberId}")
-    @Operation(
-            summary = "프로필 이미지 조회 (프록시)",
-            description = "S3 Private 버킷에서 프로필 이미지를 중계합니다. " +
-                    "프로필 조회 API에서 반환된 profileImageUrl을 브라우저가 호출하면 " +
-                    "백엔드가 S3에서 이미지를 가져와 반환합니다. " +
-                    "이미지는 1시간 동안 브라우저에 캐싱됩니다."
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "이미지 반환 성공",
-                    content = @Content(mediaType = "image/jpeg")
-            ),
-            @ApiResponse(responseCode = "404", description = "이미지 없음"),
-            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
-    })
-    public ResponseEntity<Resource> getProfileImage(@PathVariable Long memberId) {
-        try {
-            // 1. DB에서 S3 키 조회
-            String s3Key = memberService.getProfileImageKey(memberId);
-
-            if (s3Key == null || s3Key.isBlank()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            // 2. S3에서 파일 다운로드
-            S3Object s3Object = amazonS3.getObject(bucket, s3Key);
-            S3ObjectInputStream inputStream = s3Object.getObjectContent();
-
-            // 3. Content-Type 결정
-            String contentType = determineContentType(s3Key);
-
-            // 4. 응답 반환 (1시간 캐싱)
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                    .body(new InputStreamResource(inputStream));
-
-        } catch (AmazonS3Exception e) {
-            if (e.getStatusCode() == 404) {
-                return ResponseEntity.notFound().build();
-            }
-            log.error("S3 에러: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        } catch (Exception e) {
-            log.error("이미지 조회 실패: memberId={}", memberId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    private String determineContentType(String s3Key) {
-        String lower = s3Key.toLowerCase();
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-        if (lower.endsWith(".png")) return "image/png";
-        if (lower.endsWith(".gif")) return "image/gif";
-        if (lower.endsWith(".webp")) return "image/webp";
-        return "application/octet-stream";
     }
 
     /**

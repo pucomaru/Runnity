@@ -1,5 +1,7 @@
 package com.runnity.challenge.domain;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -28,6 +30,7 @@ public enum ChallengeDistance {
         this.durationMinutes = durationMinutes;
     }
 
+    @JsonValue
     public String code() {
         return code;
     }
@@ -44,10 +47,5 @@ public enum ChallengeDistance {
         return Arrays.stream(values())
                 .filter(d -> Float.compare(d.value, value) == 0)
                 .findFirst();
-    }
-
-    @Override
-    public String toString() {
-        return value + "km (" + code + ")";
     }
 }
