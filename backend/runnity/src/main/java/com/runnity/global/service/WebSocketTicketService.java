@@ -40,14 +40,18 @@ public class WebSocketTicketService {
      * @param memberId 사용자 ID
      * @param challengeId 챌린지 ID
      * @param ticketType 티켓 타입 (ENTER, REENTER)
+     * @param nickname 사용자 닉네임
+     * @param profileImage 사용자 프로필 이미지 URL
      * @return 발급된 티켓 (UUID)
      */
-    public String issueTicket(Long memberId, Long challengeId, TicketType ticketType) {
+    public String issueTicket(Long memberId, Long challengeId, TicketType ticketType, 
+                              String nickname, String profileImage) {
         // UUID 생성
         String ticket = UUID.randomUUID().toString();
 
         // 티켓 데이터 생성
-        TicketData ticketData = new TicketData(memberId, challengeId, ticketType.name());
+        TicketData ticketData = new TicketData(memberId, challengeId, ticketType.name(), 
+                                               nickname, profileImage);
 
         try {
             String ticketJson = objectMapper.writeValueAsString(ticketData);
@@ -65,7 +69,7 @@ public class WebSocketTicketService {
                 log.warn("티켓 중복 발생 (재시도 권장): ticket={}, memberId={}, challengeId={}",
                         ticket, memberId, challengeId);
                 // 극히 드문 경우지만, 재귀 호출로 재시도
-                return issueTicket(memberId, challengeId, ticketType);
+                return issueTicket(memberId, challengeId, ticketType, nickname, profileImage);
             }
 
             log.info("WebSocket 티켓 발급: ticket={}, memberId={}, challengeId={}, type={}, ttl={}초",
@@ -96,6 +100,8 @@ public class WebSocketTicketService {
         private Long userId;
         private Long challengeId;
         private String ticketType;
+        private String nickname;
+        private String profileImage;
     }
 
     /**

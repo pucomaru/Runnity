@@ -294,6 +294,10 @@ public class ChallengeService {
         Challenge challenge = validateAndGetChallenge(challengeId);
         challenge.validateEnterable();
 
+        // Member 정보 조회
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.MEMBER_NOT_FOUND));
+
         ChallengeParticipation participation = participationRepository
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
@@ -305,7 +309,9 @@ public class ChallengeService {
         String ticket = wsTicketService.issueTicket(
                 memberId,
                 challengeId,
-                WebSocketTicketService.TicketType.ENTER
+                WebSocketTicketService.TicketType.ENTER,
+                member.getNickname(),
+                member.getProfileImage()
         );
 
         String wsUrl = selectWebSocketServer(memberId, challengeId);
