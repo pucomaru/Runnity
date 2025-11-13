@@ -2,18 +2,20 @@ package com.runnity.global.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
  * WebSocket 서버 헬스 체크 서비스
  * 
  * Redis를 통해 각 WebSocket 서버의 상태를 추적합니다.
- * - WebSocket 서버가 주기적으로 Redis에 heartbeat를 기록 (ws_health:서버URL = "UP")
- * - 비즈니스 서버는 Redis를 조회하여 서버 상태를 확인
+ * - WebSocket 서버가 주기적으로 Redis에 TTL 기반 heartbeat를 갱신 (10초 주기)
+ * - 비즈니스 서버는 Redis Key EXISTS 여부만으로 서버 상태를 확인
+ * - TTL이 만료되면 자동으로 서버가 다운된 것으로 간주
  * 
  * Heartbeat 기록은 WebSocket 서버에서 수행합니다.
  */
@@ -22,31 +24,46 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class WebSocketHealthCheckService {
 
+    @Qualifier("stringRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
 
+    @Value("${websocket.health.circuit-breaker-ttl:30}")
+    private int circuitBreakerTtl;
+
     private static final String HEALTH_KEY_PREFIX = "ws_health:";
-    private static final Duration CIRCUIT_BREAKER_TTL = Duration.ofSeconds(30);
+    private static final String CIRCUIT_BREAKER_PREFIX = "ws_circuit_breaker:";
 
     /**
      * WebSocket 서버가 살아있는지 확인
      * 
-     * Redis에 저장된 heartbeat 정보를 조회하여 판단합니다.
-     * WebSocket 서버가 주기적으로 기록한 heartbeat가 있으면 살아있는 것으로 간주합니다.
+     * Redis Key의 존재 여부만으로 판단합니다.
+     * WebSocket 서버가 주기적으로 TTL을 갱신하므로, Key가 존재하면 살아있는 것입니다.
      * 
      * @param serverUrl WebSocket 서버 URL
      * @return 서버가 살아있으면 true, 다운되었거나 응답 없으면 false
      */
     public boolean isHealthy(String serverUrl) {
         try {
-            String key = HEALTH_KEY_PREFIX + normalizeUrl(serverUrl);
-            String value = redisTemplate.opsForValue().get(key);
+            String normalizedUrl = normalizeUrl(serverUrl);
             
-            if (value == null) {
-                log.warn("WebSocket 서버 heartbeat 없음: {}", serverUrl);
+            // Circuit Breaker로 차단된 서버인지 먼저 확인
+            String breakerKey = CIRCUIT_BREAKER_PREFIX + normalizedUrl;
+            Boolean isBlocked = redisTemplate.hasKey(breakerKey);
+            if (Boolean.TRUE.equals(isBlocked)) {
+                log.debug("WebSocket 서버 Circuit Breaker 차단 중: {}", serverUrl);
                 return false;
             }
             
-            return "UP".equals(value);
+            // Heartbeat Key 존재 여부로 상태 확인
+            String healthKey = HEALTH_KEY_PREFIX + normalizedUrl;
+            Boolean exists = redisTemplate.hasKey(healthKey);
+            
+            if (Boolean.TRUE.equals(exists)) {
+                return true;
+            }
+            
+            log.warn("WebSocket 서버 heartbeat 만료: {}", serverUrl);
+            return false;
         } catch (Exception e) {
             log.error("WebSocket 서버 health check 실패: {}", serverUrl, e);
             return false;
@@ -63,11 +80,11 @@ public class WebSocketHealthCheckService {
      */
     public void markAsDown(String serverUrl) {
         try {
-            String key = HEALTH_KEY_PREFIX + normalizeUrl(serverUrl);
-            redisTemplate.opsForValue().set(key, "DOWN", CIRCUIT_BREAKER_TTL.getSeconds(), TimeUnit.SECONDS);
-            log.warn("WebSocket 서버 차단: {} ({}초간)", serverUrl, CIRCUIT_BREAKER_TTL.getSeconds());
+            String key = CIRCUIT_BREAKER_PREFIX + normalizeUrl(serverUrl);
+            redisTemplate.opsForValue().set(key, "BLOCKED", circuitBreakerTtl, TimeUnit.SECONDS);
+            log.warn("WebSocket 서버 Circuit Breaker 활성화: {} ({}초간)", serverUrl, circuitBreakerTtl);
         } catch (Exception e) {
-            log.error("서버 차단 실패: {}", serverUrl, e);
+            log.error("Circuit Breaker 설정 실패: {}", serverUrl, e);
         }
     }
 

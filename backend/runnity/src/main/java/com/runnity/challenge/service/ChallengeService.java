@@ -342,9 +342,17 @@ public class ChallengeService {
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
         participation.startRunning();
+        
+        // 상태 변경을 즉시 DB에 반영 (WebSocket 서버가 바로 읽을 수 있도록)
+        participationRepository.save(participation);
+        participationRepository.flush();
 
         // 3. WebSocket 티켓 발급 (인프라 제어)
-        String ticket = wsTicketService.issueTicket(memberId, challengeId);
+        String ticket = wsTicketService.issueTicket(
+                memberId, 
+                challengeId, 
+                WebSocketTicketService.TicketType.ENTER
+        );
 
         // 4. WebSocket 서버 선택 (인프라 제어)
         String wsUrl = selectWebSocketServer(memberId, challengeId);
@@ -352,18 +360,25 @@ public class ChallengeService {
         log.info("챌린지 입장 완료: challengeId={}, memberId={}, participantId={}, ticket={}, wsUrl={}",
                 challengeId, memberId, participation.getParticipantId(), ticket, wsUrl);
 
-        return new ChallengeEnterResponse(ticket, memberId, challengeId, wsUrl);
+        return new ChallengeEnterResponse(
+                ticket, 
+                memberId, 
+                challengeId, 
+                wsUrl,
+                wsTicketService.getTicketTtl()
+        );
     }
 
     /**
-     * WebSocket 서버 선택 (해시 기반 샤딩 + Health Check + Fallback)
+     * WebSocket 서버 선택 (해시 기반 샤딩 + Health Check + Fallback + Circuit Breaker)
      * 1. 해시 기반으로 Primary 서버 선택
-     * 2. Health Check 실패 시 다른 서버로 Fallback
+     * 2. Health Check 실패 시 Circuit Breaker 활성화 후 다른 서버로 Fallback
      * 3. 모든 서버가 다운되면 예외 발생
      */
     private String selectWebSocketServer(Long memberId, Long challengeId) {
         int serverCount = wsServerConfig.getServerCount();
         if (serverCount == 0) {
+            log.error("WebSocket 서버 설정이 없습니다. application.yml을 확인하세요.");
             throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
         }
 
@@ -381,6 +396,9 @@ public class ChallengeService {
         }
 
         log.warn("WebSocket Primary 서버 다운: index={}, url={}", primaryIndex, primaryUrl);
+        
+        // Circuit Breaker 활성화 (일정 시간 동안 해당 서버 차단)
+        wsHealthCheckService.markAsDown(primaryUrl);
 
         // 3. Fallback: 다른 서버들 중 살아있는 서버 찾기
         for (int i = 0; i < serverCount; i++) {
