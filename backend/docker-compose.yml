@@ -6,6 +6,9 @@ services:
       - "8080:8080"
     env_file:
       - .env   # 배포 서버에 있는 .env 사용
+    volumes:
+      - ./fcmservice-account-key.json:/fcmservice-account-key.json:ro
+
     environment:
       # ===== Database =====
       SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
