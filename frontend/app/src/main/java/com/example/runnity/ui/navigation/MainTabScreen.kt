@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -232,24 +233,48 @@ fun MainTabScreen(
                 route = BottomNavItem.Challenge.graphRoute
             ) {
                 // 챌린지 리스트 화면 (전체 챌린지)
-                composable(BottomNavItem.Challenge.route) {
+                composable(BottomNavItem.Challenge.route) { backStackEntry ->
+                    // ViewModel을 navigation graph 레벨에서 공유 (필터/생성 화면과 공유)
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeScreen(
                         navController = navController,           // 세부 화면으로 이동용
-                        parentNavController = parentNavController
+                        parentNavController = parentNavController,
+                        viewModel = challengeViewModel
                     )
                 }
 
                 // 챌린지 필터 화면 (네비바 있음)
-                composable("challenge_filter") {
+                composable("challenge_filter") { backStackEntry ->
+                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeFilterScreen(
-                        navController = navController  // 뒤로가기용
+                        navController = navController,  // 뒤로가기용
+                        viewModel = challengeViewModel
                     )
                 }
 
                 // 챌린지 생성 화면 (네비바 있음)
-                composable("challenge_create") {
+                composable("challenge_create") { backStackEntry ->
+                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeCreateScreen(
-                        navController = navController  // 뒤로가기용
+                        navController = navController,  // 뒤로가기용
+                        viewModel = challengeViewModel
                     )
                 }
 

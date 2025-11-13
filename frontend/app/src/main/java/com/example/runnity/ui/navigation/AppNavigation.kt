@@ -11,11 +11,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.runnity.data.util.TokenManager
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.screens.login.LoginScreen
 import com.example.runnity.ui.screens.login.OnboardingScreen
 import com.example.runnity.ui.screens.login.ProfileSetupScreen
 import com.example.runnity.ui.screens.login.WelcomeScreen
+import timber.log.Timber
 
 /**
  * 앱 최상위 네비게이션 구조
@@ -29,9 +31,24 @@ fun AppNavigation() {
     val viewModel: AppNavigationViewModel = viewModel()
     val startDestination by viewModel.startDestination.collectAsState()
 
+    // 인증 상태 관찰 (토큰 삭제 시 자동 로그인 화면 이동)
+    val isAuthenticated by TokenManager.authenticationState.collectAsState()
+
     // 앱 시작 시 자동으로 시작 화면 결정
     LaunchedEffect(Unit) {
         viewModel.checkStartDestination()
+    }
+
+    // 런타임 중 토큰이 삭제되면 로그인 화면으로 이동
+    LaunchedEffect(isAuthenticated) {
+        if (!isAuthenticated && startDestination != null && startDestination != "welcome" && startDestination != "login") {
+            Timber.w("AppNavigation: 인증 상태 변경 감지 (false) → 로그인 화면으로 이동")
+            navController.navigate("login") {
+                // 백스택을 모두 지우고 login을 새로운 루트로 설정
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
     }
 
     // 로딩 중 (시작 화면 결정 중)

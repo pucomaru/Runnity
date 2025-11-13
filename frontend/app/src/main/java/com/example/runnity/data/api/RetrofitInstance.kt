@@ -5,6 +5,7 @@ import com.example.runnity.data.remote.api.AuthApiService
 import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
+import com.example.runnity.data.remote.interceptor.TokenRefreshInterceptor
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -53,6 +54,7 @@ object RetrofitInstance {
     /**
      * OkHttpClient 설정
      * - AuthInterceptor: 모든 요청에 Access Token 자동 추가
+     * - TokenRefreshInterceptor: 403 에러 시 자동 토큰 갱신 및 재시도
      * - TokenAuthenticator: 401 에러 시 자동 토큰 갱신 및 재시도
      */
     private val okHttpClient = OkHttpClient.Builder()
@@ -60,6 +62,7 @@ object RetrofitInstance {
         .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
         .addInterceptor(AuthInterceptor())           // 토큰 자동 추가
+        .addInterceptor(TokenRefreshInterceptor())   // 403 에러 시 자동 토큰 갱신
         .addInterceptor(loggingInterceptor)          // HTTP 로깅
         .authenticator(TokenAuthenticator())         // 401 에러 시 자동 토큰 갱신
         .build()
