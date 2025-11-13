@@ -15,6 +15,7 @@ import java.util.*;
 public class BroadcastRedisUtil {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> stringRedisTemplate;
 
     // redis에서 활성화된 방송리스트 담는 Set
     private static final String ACTIVE_SET = "broadcast:active";
@@ -43,11 +44,11 @@ public class BroadcastRedisUtil {
         hashOps.put(key, "viewerCount", 0);
         hashOps.put(key, "participantCount", participantCount);
         hashOps.put(key, "createdAt", LocalDateTime.now().toString());
-    
+
         // 활성 방송 목록에 추가
         redisTemplate.opsForSet().add(ACTIVE_SET, challengeId.toString());
     }
-    
+
     // 방송 상태 갱신
     // WAITING -> LIVE -> ENDED
     public void updateStatus(Long challengeId, String status){
@@ -87,17 +88,17 @@ public class BroadcastRedisUtil {
         redisTemplate.opsForSet().remove(ACTIVE_SET, challengeId.toString());
 
     }
-    
+
     // 현지 활성화된 방송 세션 목록 조회
     // broadcast:active Set에 등록된 모든 challengeId 기반으로 Hash 조회
-    public List<Map<Object,Object>> getActiveSessions(){
-        Set<Object> ids = redisTemplate.opsForSet().members(ACTIVE_SET);
+    public List<Map<String,String>> getActiveSessions(){
+        Set<String> ids = stringRedisTemplate.opsForSet().members(ACTIVE_SET);
         if (ids == null) return Collections.emptyList();
 
-        List<Map<Object,Object>> sessions = new ArrayList<>();
-        HashOperations<String, Object, Object> hashOps = redisTemplate.opsForHash();
+        List<Map<String,String>> sessions = new ArrayList<>();
+        HashOperations<String, String, String> hashOps = stringRedisTemplate.opsForHash();
 
-        for (Object id:ids){
+        for (String id:ids){
             sessions.add(hashOps.entries(PREFIX +id));
         }
         return sessions;
@@ -132,10 +133,4 @@ public class BroadcastRedisUtil {
             return 0.0;
         }
     }
-
-
-
-
-
-    
 }
