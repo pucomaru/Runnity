@@ -7,6 +7,7 @@ import com.example.runnity.data.model.request.JoinChallengeRequest
 import com.example.runnity.data.model.response.ChallengeDetailResponse
 import com.example.runnity.data.model.response.ChallengeListResponse
 import com.example.runnity.data.model.response.ChallengeParticipantResponse
+import com.example.runnity.data.model.response.ChallengeEnterResponse
 import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.util.safeApiCall
 
@@ -130,6 +131,19 @@ class ChallengeRepository(
     ): ApiResponse<ChallengeDetailResponse> {
         return safeApiCall {
             challengeApiService.getChallengeDetail(challengeId)
+        }
+    }
+
+    /**
+     * 챌린지 입장(티켓 발급)
+     * @param challengeId 챌린지 ID
+     * @return ApiResponse<ChallengeEnterResponse>
+     */
+    suspend fun enterChallenge(
+        challengeId: Long
+    ): ApiResponse<ChallengeEnterResponse> {
+        return safeApiCall {
+            challengeApiService.enterChallenge(challengeId)
         }
     }
 }

@@ -13,6 +13,9 @@ import com.example.runnity.ui.components.ChallengeListItem
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.example.runnity.data.repository.ChallengeRepository
+import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.util.TokenManager
 
 /**
  * 홈 화면 ViewModel
@@ -31,6 +34,8 @@ class HomeViewModel : ViewModel() {
     val reservedChallenges: StateFlow<List<ChallengeListItem>> = _reservedChallenges.asStateFlow()
 
     private val runHistoryRepository = RunHistoryRepository()
+    private val challengeRepository = ChallengeRepository()
+    private val joinInFlight = mutableSetOf<String>()
 
     init {
         loadHomeData()
@@ -50,6 +55,32 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // 참여하기 버튼 처리: enter API 호출 후 티켓으로 WebSocket 연결
+    fun joinChallengeAndConnect(challengeId: String) {
+        if (challengeId.isBlank() || joinInFlight.contains(challengeId)) return
+        joinInFlight.add(challengeId)
+        viewModelScope.launch {
+            try {
+                val idLong = challengeId.toLongOrNull()
+                if (idLong == null) return@launch
+                when (val resp = challengeRepository.enterChallenge(idLong)) {
+                    is ApiResponse.Success -> {
+                        val ticket = resp.data.ticket
+                        val wsUrl = resp.data.wsUrl
+                        val url = "$wsUrl?ticket=$ticket"
+                        WebSocketManager.connect(
+                            url = url,
+                            tokenProvider = { TokenManager.getAccessToken() }
+                        )
+                    }
+                    else -> Unit
+                }
+            } finally {
+                joinInFlight.remove(challengeId)
+            }
+        }
+    }
+
     // 예약한 챌린지 조회: enterableChallenge를 최상단에 배치
     fun fetchReservedChallenges() {
         viewModelScope.launch {
@@ -57,7 +88,12 @@ class HomeViewModel : ViewModel() {
                 is ApiResponse.Success -> {
                     val data = resp.data
                     val list = buildList {
-                        data.enterableChallenge?.let { add(mapToListItem(it)) }
+                        data.enterableChallenge?.let {
+                            val item = mapToListItem(it).copy(
+                                buttonState = com.example.runnity.ui.components.ChallengeButtonState.Join
+                            )
+                            add(item)
+                        }
                         data.joinedChallenges.forEach { add(mapToListItem(it)) }
                     }
                     _reservedChallenges.value = list
@@ -95,10 +131,12 @@ class HomeViewModel : ViewModel() {
 
     private fun formatIsoToLocal(iso: String): String {
         return try {
-            val instant = Instant.parse(iso)
-            val zoned = instant.atZone(ZoneId.systemDefault())
+            // 서버 시간이 이미 한국 시간 기준인데 Z(UTC)로 표시되는 상황을 고려하여
+            // Z를 제거하고 로컬 DateTime으로 그대로 해석
+            val trimmed = iso.removeSuffix("Z")
+            val localDt = java.time.LocalDateTime.parse(trimmed)
             val formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
-            zoned.format(formatter)
+            localDt.format(formatter)
         } catch (e: Exception) {
             iso
         }

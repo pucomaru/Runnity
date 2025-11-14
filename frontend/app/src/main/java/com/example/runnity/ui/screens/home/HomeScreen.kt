@@ -166,9 +166,7 @@ fun HomeScreen(
                             navController?.navigate("challenge_detail/${challenge.id}")
                         },
                         onButtonClick = {
-                            // TODO: 참가하기 버튼 클릭 처리 (Join 버튼)
-                            // - 챌린지 참가 API 호출
-                            // - 러닝 화면으로 이동
+                            viewModel.joinChallengeAndConnect(challenge.id)
                         }
                     )
                 }
