@@ -122,10 +122,10 @@ public class BroadcastSessionService {
 
     // 현재 활성 방송 목록 조회
     public List<BroadcastResponse> getActiveBroadcasts () {
-        List<Map<Object, Object>> rawList = redisUtil.getActiveSessions();
+        List<Map<String, String>> rawList = redisUtil.getActiveSessions();
         List<BroadcastResponse> result = new ArrayList<>();
 
-        for (Map<Object, Object> map : rawList) {
+        for (Map<String, String> map : rawList) {
             try {
                 Long challengeId = Long.parseLong(String.valueOf(map.get("challengeId")));
                 String title = String.valueOf(map.get("title"));
