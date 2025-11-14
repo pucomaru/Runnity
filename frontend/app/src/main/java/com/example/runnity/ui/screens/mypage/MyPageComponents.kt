@@ -152,7 +152,9 @@ fun PeriodSelector(
 ) {
     Row(
         modifier = Modifier
+            .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(40.dp) // 고정 높이 설정
             .then(
                 if (showDropdownIcon) {
                     Modifier.clickable { onClick() }
@@ -189,9 +191,9 @@ fun StatsSection(stats: RunningStats) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        // 총 거리
+        // 총 거리 (소수점 첫째 자리까지)
         Text(
-            text = "${stats.totalDistance} Km",
+            text = String.format("%.1f Km", stats.totalDistance),
             style = Typography.LargeTitle,
             color = ColorPalette.Light.primary,
             modifier = Modifier.fillMaxWidth()

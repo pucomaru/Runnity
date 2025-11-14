@@ -19,9 +19,9 @@ interface StatsApiService {
      * 특정 기간의 총 거리, 총 시간, 평균 페이스 및 기간별 통계 조회
      * 개인/챌린지 러닝 기록 5개씩 포함
      *
-     * @param startDate 시작 날짜 (ISO 8601, 예: "2025-11-01")
-     * @param endDate 종료 날짜 (ISO 8601, 예: "2025-11-30")
-     * @param period 기간 단위 (WEEK: 주별, MONTH: 월별, YEAR: 년별, ALL: 전체)
+     * @param startDate 시작 날짜 (ISO 8601 DateTime, 예: "2025-11-01T00:00:00")
+     * @param endDate 종료 날짜 (ISO 8601 DateTime, 예: "2025-11-30T23:59:59")
+     * @param period 기간 단위 (week: 주별, month: 월별, year: 년별, all: 전체)
      * @return 기간별 러닝 통계
      */
     @GET("api/v1/stats/summary")
