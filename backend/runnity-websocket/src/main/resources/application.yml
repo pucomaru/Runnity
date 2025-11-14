@@ -49,7 +49,7 @@ websocket:
   allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://runnity.p-e.kr}
   health:
     server-url: ${WEBSOCKET_SERVER_URL:wss://runnity.p-e.kr/ws/server-0}
-    heartbeat-ttl: ${WEBSOCKET_HEARTBEAT_TTL:10}
+    heartbeat-ttl: ${WEBSOCKET_HEARTBEAT_TTL:30}
     heartbeat-interval-millis: ${WEBSOCKET_HEARTBEAT_INTERVAL_MILLIS:5000}
 
 logging:
