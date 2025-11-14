@@ -16,7 +16,9 @@ import com.runnity.scheduler.domain.ScheduleOutbox;
 import com.runnity.scheduler.repository.ScheduleOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.*;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,8 @@ public class ChallengeService {
     private final WebSocketTicketService wsTicketService;
     private final WebSocketServerConfig wsServerConfig;
     private final WebSocketHealthCheckService wsHealthCheckService;
+    @Qualifier("stringRedisTemplate")
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Transactional
     public ChallengeResponse createChallenge(ChallengeCreateRequest request, Long memberId) {
@@ -306,6 +310,9 @@ public class ChallengeService {
         participationRepository.save(participation);
         participationRepository.flush();
 
+        // Redis에 저장된 actualParticipantCount 증가
+        incrementActualParticipantCount(challengeId);
+
         String ticket = wsTicketService.issueTicket(
                 memberId,
                 challengeId,
@@ -351,6 +358,24 @@ public class ChallengeService {
         }
 
         throw new GlobalException(ErrorStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Redis에 저장된 actualParticipantCount 증가
+     * 챌린지 입장 시 호출됩니다.
+     * 
+     * @param challengeId 챌린지 ID
+     */
+    private void incrementActualParticipantCount(Long challengeId) {
+        try {
+            String metaKey = "challenge:" + challengeId + ":meta";
+            Long newCount = redisTemplate.opsForHash().increment(metaKey, "actualParticipantCount", 1);
+            
+            log.debug("actualParticipantCount 증가: challengeId={}, newCount={}", challengeId, newCount);
+        } catch (Exception e) {
+            log.error("actualParticipantCount 증가 실패: challengeId={}", challengeId, e);
+            // Redis 업데이트 실패해도 입장 처리는 계속 진행
+        }
     }
 
     private void deleteChallengeIfNoParticipants(Challenge challenge) {

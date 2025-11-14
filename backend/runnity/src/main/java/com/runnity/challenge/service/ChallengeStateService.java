@@ -1,6 +1,8 @@
 package com.runnity.challenge.service;
 
 import com.runnity.challenge.domain.Challenge;
+import com.runnity.challenge.domain.ParticipationStatus;
+import com.runnity.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.challenge.repository.ChallengeRepository;
 import com.runnity.global.exception.GlobalException;
 import com.runnity.global.status.ErrorStatus;
@@ -8,6 +10,8 @@ import com.runnity.notification.domain.NotificationOutbox;
 import com.runnity.notification.repository.NotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChallengeStateService {
 
     private final ChallengeRepository challengeRepository;
+    private final ChallengeParticipationRepository participationRepository;
     private final NotificationOutboxRepository notificationOutboxRepository;
+    @Qualifier("stringRedisTemplate")
+    private final RedisTemplate<String, String> redisTemplate;
 
     /**
      * 챌린지 상태를 RECRUITING → READY로 변경하고 알림 Outbox 생성
+     * 챌린지 시작 5분 전에 호출되며, Redis에 meta 정보를 저장합니다.
+     * 
      * @param challengeId 챌린지 ID
      */
     @Transactional
@@ -30,6 +39,9 @@ public class ChallengeStateService {
 
         challenge.ready();
 
+        // Redis에 챌린지 meta 정보 저장 (웹소켓 서버에서 조회용)
+        saveChallengeMetaToRedis(challengeId, challenge);
+
         // 알림 Outbox 생성
         NotificationOutbox outbox = NotificationOutbox.builder()
                 .challengeId(challengeId)
@@ -37,7 +49,51 @@ public class ChallengeStateService {
                 .build();
         notificationOutboxRepository.save(outbox);
 
-        log.info("챌린지 READY 상태 전환 완료: challengeId={}", challengeId);
+        log.info("챌린지 READY 상태 전환 완료: challengeId={}, distance={}, isBroadcast={}", 
+                challengeId, challenge.getDistance().value(), challenge.getIsBroadcast());
+    }
+
+    /**
+     * Redis에 챌린지 meta 정보 저장
+     * challenge:{challengeId}:meta에 다음 정보 저장:
+     * - title: 챌린지 제목
+     * - totalApplicantCount: 전체 신청자 수 (TOTAL_APPLICANT_STATUSES)
+     * - actualParticipantCount: 실제 참여자 수 (초기값 0, 입장 시 +1)
+     * - distance: 목표 거리 (km)
+     * - isBroadcast: 브로드캐스트 여부
+     * 
+     * @param challengeId 챌린지 ID
+     * @param challenge 챌린지 엔티티
+     */
+    private void saveChallengeMetaToRedis(Long challengeId, Challenge challenge) {
+        try {
+            String metaKey = "challenge:" + challengeId + ":meta";
+            
+            // 1. title 저장
+            redisTemplate.opsForHash().put(metaKey, "title", challenge.getTitle());
+            
+            // 2. totalApplicantCount 조회 및 저장 (TOTAL_APPLICANT_STATUSES)
+            long totalApplicantCount = participationRepository.findByChallengeIdAndActiveStatus(
+                    challengeId, ParticipationStatus.TOTAL_APPLICANT_STATUSES).size();
+            redisTemplate.opsForHash().put(metaKey, "totalApplicantCount", String.valueOf(totalApplicantCount));
+            
+            // 3. actualParticipantCount 초기값 0 저장 (입장 시 +1)
+            redisTemplate.opsForHash().put(metaKey, "actualParticipantCount", "0");
+            
+            // 4. distance 저장
+            String distanceValue = String.valueOf(challenge.getDistance().value());
+            redisTemplate.opsForHash().put(metaKey, "distance", distanceValue);
+            
+            // 5. isBroadcast 저장
+            String isBroadcastValue = Boolean.TRUE.equals(challenge.getIsBroadcast()) ? "true" : "false";
+            redisTemplate.opsForHash().put(metaKey, "isBroadcast", isBroadcastValue);
+
+            log.info("챌린지 meta 저장 완료: challengeId={}, title={}, totalApplicantCount={}, distance={}, isBroadcast={}", 
+                    challengeId, challenge.getTitle(), totalApplicantCount, distanceValue, isBroadcastValue);
+        } catch (Exception e) {
+            log.error("챌린지 meta 저장 실패: challengeId={}", challengeId, e);
+            // Redis 저장 실패해도 챌린지 상태 전환은 계속 진행
+        }
     }
 
     /**
