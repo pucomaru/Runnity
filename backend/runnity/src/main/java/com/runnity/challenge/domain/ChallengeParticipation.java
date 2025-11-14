@@ -173,12 +173,16 @@ public class ChallengeParticipation extends BaseEntity {
     }
 
     /**
-     * 시간 종료 처리 (RUNNING → EXPIRED)
+     * 시간 종료 처리 (RUNNING, TIMEOUT, DISCONNECTED, ERROR, KICKED → EXPIRED)
      * 
-     * @throws GlobalException RUNNING 상태가 아닌 경우
+     * @throws GlobalException 허용된 상태가 아닌 경우
      */
     public void expire() {
-        if (this.status != ParticipationStatus.RUNNING) {
+        if (this.status != ParticipationStatus.RUNNING
+                && this.status != ParticipationStatus.TIMEOUT
+                && this.status != ParticipationStatus.DISCONNECTED
+                && this.status != ParticipationStatus.ERROR
+                && this.status != ParticipationStatus.KICKED) {
             throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
         }
         this.status = ParticipationStatus.EXPIRED;

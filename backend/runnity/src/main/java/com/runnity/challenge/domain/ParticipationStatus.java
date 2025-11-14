@@ -71,6 +71,13 @@ public enum ParticipationStatus {
     public static final EnumSet<ParticipationStatus> ACTUAL_PARTICIPANT_STATUSES =
             EnumSet.of(RUNNING, COMPLETED, QUIT, TIMEOUT, DISCONNECTED, ERROR, KICKED, EXPIRED);
 
+    /**
+     * 챌린지 종료 시 EXPIRED로 변경해야 하는 대상 상태
+     * RUNNING, TIMEOUT, DISCONNECTED, ERROR, KICKED 상태의 참가자는 챌린지 종료 시 EXPIRED로 변경됨
+     */
+    public static final EnumSet<ParticipationStatus> EXPIRED_TARGET_STATUSES =
+            EnumSet.of(RUNNING, TIMEOUT, DISCONNECTED, ERROR, KICKED);
+
     @Override
     public String toString() {
         return label + " (" + code + ")";

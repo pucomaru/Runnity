@@ -102,4 +102,34 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
             @Param("challengeId") Long challengeId,
             @Param("memberId") Long memberId
     );
+
+    /**
+     * 특정 챌린지의 특정 상태 참가자 목록 조회
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId = :challengeId
+        AND cp.isDeleted = false
+        AND cp.status = :status
+    """)
+    List<ChallengeParticipation> findByChallengeIdAndStatus(
+            @Param("challengeId") Long challengeId,
+            @Param("status") ParticipationStatus status
+    );
+
+    /**
+     * 특정 챌린지의 특정 상태들에 해당하는 참가자 목록 조회
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.challenge.challengeId = :challengeId
+        AND cp.isDeleted = false
+        AND cp.status IN :statuses
+    """)
+    List<ChallengeParticipation> findByChallengeIdAndStatusIn(
+            @Param("challengeId") Long challengeId,
+            @Param("statuses") Set<ParticipationStatus> statuses
+    );
 }

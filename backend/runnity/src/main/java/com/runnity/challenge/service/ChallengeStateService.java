@@ -1,6 +1,8 @@
 package com.runnity.challenge.service;
 
 import com.runnity.challenge.domain.Challenge;
+import com.runnity.challenge.domain.ChallengeParticipation;
+import com.runnity.challenge.domain.ChallengeStatus;
 import com.runnity.challenge.domain.ParticipationStatus;
 import com.runnity.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.challenge.repository.ChallengeRepository;
@@ -14,6 +16,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -112,6 +116,10 @@ public class ChallengeStateService {
 
     /**
      * 챌린지 상태를 RUNNING → DONE으로 변경하고 알림 Outbox 생성
+     * 
+     * 중복 실행 방지: 이미 DONE 상태이면 무시
+     * EXPIRED 처리: RUNNING 상태 참가자를 EXPIRED로 변경
+     * 
      * @param challengeId 챌린지 ID
      */
     @Transactional
@@ -119,6 +127,37 @@ public class ChallengeStateService {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
 
+        // 중복 실행 방지: 이미 DONE 상태이면 무시
+        if (challenge.getStatus() == ChallengeStatus.DONE) {
+            log.debug("이미 DONE 상태인 챌린지: challengeId={}", challengeId);
+            return;
+        }
+
+        // RUNNING 상태가 아니면 에러
+        if (challenge.getStatus() != ChallengeStatus.RUNNING) {
+            log.warn("RUNNING 상태가 아닌 챌린지에 대해 handleDone 호출: challengeId={}, status={}", 
+                    challengeId, challenge.getStatus());
+            return;
+        }
+
+        // EXPIRED 처리 대상 상태의 참가자들을 EXPIRED로 변경
+        List<ChallengeParticipation> expiredTargetParticipants = participationRepository.findByChallengeIdAndStatusIn(
+                challengeId, ParticipationStatus.EXPIRED_TARGET_STATUSES);
+
+        for (ChallengeParticipation participation : expiredTargetParticipants) {
+            try {
+                ParticipationStatus previousStatus = participation.getStatus();
+                participation.expire();
+                participationRepository.save(participation);
+                log.debug("참가자 상태 EXPIRED로 변경: challengeId={}, userId={}, previousStatus={}", 
+                        challengeId, participation.getMember().getMemberId(), previousStatus);
+            } catch (Exception e) {
+                log.error("참가자 EXPIRED 처리 실패: challengeId={}, participantId={}", 
+                        challengeId, participation.getParticipantId(), e);
+            }
+        }
+
+        // 챌린지 상태를 DONE으로 변경
         challenge.complete();
 
         // 알림 Outbox 생성
@@ -128,7 +167,8 @@ public class ChallengeStateService {
                 .build();
         notificationOutboxRepository.save(outbox);
 
-        log.info("챌린지 DONE 상태 전환 완료: challengeId={}", challengeId);
+        log.info("챌린지 DONE 상태 전환 완료: challengeId={}, expiredCount={}", 
+                challengeId, expiredTargetParticipants.size());
     }
 }
 
