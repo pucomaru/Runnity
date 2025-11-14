@@ -1,0 +1,118 @@
+pipeline {
+  agent any
+
+  environment {
+    DOCKERHUB_USERNAME = 'daum0604'
+    IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-websocket"
+  }
+
+  options { disableConcurrentBuilds(); timestamps() }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.TAG = sh(returnStdout: true, script: "git rev-parse --short=7 HEAD").trim()
+          if (!env.TAG) { env.TAG = 'manual' }
+          echo "Using TAG: ${env.TAG}"
+        }
+      }
+    }
+
+    stage('Docker Build & Push') {
+      steps {
+        // 웹소켓 타겟 프로젝트: backend/runnity-websocket
+        dir('backend/runnity-websocket') {
+          sh "pwd && ls -al"
+          withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+            sh """
+              set -euxo pipefail
+              echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+
+              # 현재 디렉토리(backend/runnity-websocket)에 있는 Dockerfile 기준 빌드
+              docker build -t ${IMAGE}:${env.TAG} -t ${IMAGE}:latest -f Dockerfile .
+
+              docker push ${IMAGE}:${env.TAG}
+              docker push ${IMAGE}:latest
+              docker logout || true
+            """
+          }
+        }
+      }
+    }
+
+    stage('Deploy to websocket servers') {
+      parallel {
+        stage('Deploy 43.203.217.82') {
+          steps {
+            sshagent (credentials: ['ssh_deploy_key']) {
+              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+                sh """
+                  set -euxo pipefail
+                  test -f backend/deploy_bundle.tgz
+
+                  # 원격 디렉토리 생성
+                  ssh -o StrictHostKeyChecking=no ubuntu@43.203.217.82 'set -eux; mkdir -p ~/${DEPLOY_DIR}'
+                  scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@43.203.217.82:~/${DEPLOY_DIR}/
+
+                  # 원격에서 번들 풀고, TAG를 주입해서 websocket 컨테이너 배포
+                  ssh -o StrictHostKeyChecking=no ubuntu@43.203.217.82 "
+                    set -euxo pipefail
+                    cd ~/${DEPLOY_DIR}
+                    ls -al
+                    tar xzf deploy_bundle.tgz
+                    test -f docker-compose.yml
+
+                    echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+
+                    TAG=${env.TAG} docker compose pull
+                    TAG=${env.TAG} docker compose up -d
+
+                    docker logout || true
+                    docker image prune -f || true
+                    docker compose ps
+                  "
+                """
+              }
+            }
+          }
+        }
+
+        stage('Deploy 13.125.163.87') {
+          steps {
+            sshagent (credentials: ['ssh_deploy_key']) {
+              withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+                sh """
+                  set -euxo pipefail
+                  test -f backend/deploy_bundle.tgz
+
+                  ssh -o StrictHostKeyChecking=no ubuntu@13.125.163.87 'set -eux; mkdir -p ~/${DEPLOY_DIR}'
+                  scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@13.125.163.87:~/${DEPLOY_DIR}/
+
+                  ssh -o StrictHostKeyChecking=no ubuntu@13.125.163.87 "
+                    set -euxo pipefail
+                    cd ~/${DEPLOY_DIR}
+                    ls -al
+                    tar xzf deploy_bundle.tgz
+                    test -f docker-compose.yml
+
+                    echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+
+                    TAG=${env.TAG} docker compose pull
+                    TAG=${env.TAG} docker compose up -d
+
+                    docker logout || true
+                    docker image prune -f || true
+                    docker compose ps
+                  "
+                """
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+}
