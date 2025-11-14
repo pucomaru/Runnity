@@ -347,8 +347,8 @@
 ### 채널: `challenge:expired`
 
 #### 2.4. CHALLENGE_EXPIRED
-**발행 시점**: 챌린지 종료 시간이 되었을 때  
-**발행자**: 스케줄러 서버  
+**발행 시점**: 비즈니스 서버에서 챌린지 종료 처리 후 (handleDone()에서 challenge:*:done 처리 후)  
+**발행자**: 비즈니스 서버  
 **구독자**: 모든 WebSocket 서버  
 **구조**:
 ```json
@@ -361,7 +361,7 @@
 **처리**:
 - WebSocket 서버들이 이 메시지를 받아서
 - 해당 챌린지의 모든 참가자에 대해 EXPIRED 처리
-- 참가자 상태를 DB에 `EXPIRED`로 업데이트
+- 참가자 상태는 이미 비즈니스 서버에서 DB에 `EXPIRED`로 업데이트됨
 - 세션/Redis 정리, Redis Pub/Sub 발행 (USER_LEFT, reason: EXPIRED), Kafka 이벤트 발행 (LEAVE, reason: EXPIRED)
 
 ---

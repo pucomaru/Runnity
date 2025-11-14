@@ -10,7 +10,6 @@ import com.runnity.websocket.dto.websocket.server.UserEnteredMessage;
 import com.runnity.websocket.dto.websocket.server.UserLeftMessage;
 import com.runnity.websocket.enums.LeaveReason;
 import com.runnity.websocket.service.ChallengeKafkaProducer;
-import com.runnity.websocket.service.ChallengeParticipationService;
 import com.runnity.websocket.service.RedisPubSubService;
 import com.runnity.websocket.service.TimeoutCheckService;
 import com.runnity.websocket.manager.SessionManager;
@@ -43,7 +42,6 @@ public class RedisMessageListener implements MessageListener {
     private final ObjectMapper objectMapper;
     private final ChallengeKafkaProducer kafkaProducer;
     private final RedisPubSubService redisPubSubService;
-    private final ChallengeParticipationService participationService;
     private final TimeoutCheckService timeoutCheckService;
 
     private static final String CHANNEL_ENTER = "challenge:enter";
@@ -208,7 +206,8 @@ public class RedisMessageListener implements MessageListener {
 
     /**
      * 챌린지 종료 시간 만료 이벤트 처리
-     * 스케줄러에서 챌린지 종료 시간이 되었을 때 발행하는 이벤트
+     * 비즈니스 서버에서 챌린지 종료 처리 후 발행하는 이벤트
+     * (비즈니스 서버의 handleDone()에서 challenge:*:done 처리 후 발행)
      */
     private void handleChallengeExpired(String payload) {
         try {
@@ -270,8 +269,8 @@ public class RedisMessageListener implements MessageListener {
                 nickname = "User_" + userId;
             }
 
-            // 참가자 상태 DB 업데이트 (EXPIRED)
-            participationService.updateParticipationStatus(challengeId, userId, LeaveReason.EXPIRED.getValue());
+            // 참가자 상태는 이미 비즈니스 서버에서 DB에 EXPIRED로 업데이트됨
+            // 웹소켓 서버는 세션 정리 및 이벤트 발행만 수행
 
             // 타임아웃 체크 서비스에서 마지막 RECORD 시간 제거
             timeoutCheckService.removeLastRecordTime(challengeId, userId);

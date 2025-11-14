@@ -3,7 +3,8 @@ package com.runnity.websocket.dto.redis;
 /**
  * CHALLENGE_EXPIRED 이벤트 (Redis Pub/Sub)
  * 
- * 스케줄러 서버에서 챌린지 종료 시간이 되었을 때 발행하는 이벤트
+ * 비즈니스 서버에서 챌린지 종료 처리 후 발행하는 이벤트
+ * (비즈니스 서버의 handleDone()에서 challenge:*:done 처리 후 발행)
  * 채널: challenge:expired
  * 
  * @param challengeId 챌린지 ID
