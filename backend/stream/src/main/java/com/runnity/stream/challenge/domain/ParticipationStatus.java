@@ -77,6 +77,20 @@ public enum ParticipationStatus {
     public static final EnumSet<ParticipationStatus> CHALLENGE_END_STATUS =
             EnumSet.of(COMPLETED);
 
+    /**
+     * 챌린지 종료 상태 (모든 참가자가 종료되었는지 확인할 때 사용)
+     * COMPLETED, QUIT, KICKED, NOT_STARTED, EXPIRED, LEFT
+     */
+    public static final EnumSet<ParticipationStatus> FINISHED_STATUSES =
+            EnumSet.of(COMPLETED, QUIT, KICKED, NOT_STARTED, EXPIRED, LEFT);
+
+    /**
+     * 챌린지 진행 중 상태 (아직 종료되지 않은 상태)
+     * WAITING, RUNNING, TIMEOUT, DISCONNECTED, ERROR
+     */
+    public static final EnumSet<ParticipationStatus> IN_PROGRESS_STATUSES =
+            EnumSet.of(RUNNING, TIMEOUT, DISCONNECTED, ERROR);
+
 
     @Override
     public String toString() {

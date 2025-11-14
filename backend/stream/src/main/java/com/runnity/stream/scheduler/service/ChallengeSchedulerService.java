@@ -3,8 +3,11 @@ package com.runnity.stream.scheduler.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runnity.stream.challenge.domain.Challenge;
 import com.runnity.stream.challenge.domain.ChallengeStatus;
+import com.runnity.stream.challenge.domain.ParticipationStatus;
+import com.runnity.stream.challenge.repository.ChallengeParticipationRepository;
 import com.runnity.stream.challenge.repository.ChallengeRepository;
 import com.runnity.stream.scheduler.domain.ScheduleOutbox;
+import com.runnity.stream.scheduler.dto.UserLeftEvent;
 import com.runnity.stream.scheduler.repository.ScheduleOutboxRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,7 @@ public class ChallengeSchedulerService implements MessageListener {
     private final RedisTemplate<String, String> pubsubRedisTemplate;
     private final ScheduleOutboxRepository outboxRepository;
     private final ChallengeRepository challengeRepository;
+    private final ChallengeParticipationRepository participationRepository;
     private final ObjectMapper objectMapper;
 
     public ChallengeSchedulerService(
@@ -45,12 +49,14 @@ public class ChallengeSchedulerService implements MessageListener {
             @Qualifier("pubsubRedisTemplate") RedisTemplate<String, String> pubsubRedisTemplate,
             ScheduleOutboxRepository outboxRepository,
             ChallengeRepository challengeRepository,
+            ChallengeParticipationRepository participationRepository,
             ObjectMapper objectMapper) {
         this.listenerContainer = listenerContainer;
         this.redisTemplate = redisTemplate;
         this.pubsubRedisTemplate = pubsubRedisTemplate;
         this.outboxRepository = outboxRepository;
         this.challengeRepository = challengeRepository;
+        this.participationRepository = participationRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -59,6 +65,7 @@ public class ChallengeSchedulerService implements MessageListener {
     @PostConstruct
     public void init() {
         listenerContainer.addMessageListener(this, new ChannelTopic("challenge:schedule:create"));
+        listenerContainer.addMessageListener(this, new ChannelTopic("challenge:leave"));
         log.info("ChallengeSchedulerService 초기화 완료");
 
         rescheduleOnStartup();
@@ -106,7 +113,26 @@ public class ChallengeSchedulerService implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
+            String channel = new String(message.getChannel());
             String payload = new String(message.getBody());
+
+            if ("challenge:schedule:create".equals(channel)) {
+                handleScheduleCreate(payload);
+            } else if ("challenge:leave".equals(channel)) {
+                handleUserLeft(payload);
+            } else {
+                log.warn("알 수 없는 채널: {}", channel);
+            }
+        } catch (Exception e) {
+            log.error("메시지 처리 실패: channel={}", new String(message.getChannel()), e);
+        }
+    }
+
+    /**
+     * 스케줄 생성 이벤트 처리
+     */
+    private void handleScheduleCreate(String payload) {
+        try {
             log.info("스케줄 생성 이벤트 수신: {}", payload);
 
             Map<String, Object> data = objectMapper.readValue(payload, Map.class);
@@ -117,6 +143,82 @@ public class ChallengeSchedulerService implements MessageListener {
             registerSchedule(challengeId, startAt, endAt);
         } catch (Exception e) {
             log.error("스케줄 등록 실패", e);
+        }
+    }
+
+    /**
+     * USER_LEFT 이벤트 처리
+     * 참가자 상태 변경 시마다 모든 참가자 종료 여부를 체크합니다.
+     */
+    private void handleUserLeft(String payload) {
+        try {
+            UserLeftEvent event = objectMapper.readValue(payload, UserLeftEvent.class);
+            Long challengeId = event.challengeId();
+
+            log.debug("USER_LEFT 이벤트 수신: challengeId={}, userId={}, reason={}", 
+                    challengeId, event.userId(), event.reason());
+
+            // 모든 참가자 종료 여부 체크
+            checkAndCompleteChallengeIfAllFinished(challengeId);
+
+        } catch (Exception e) {
+            log.error("USER_LEFT 이벤트 처리 실패", e);
+        }
+    }
+
+    /**
+     * 모든 참가자가 종료되었는지 체크하고, 종료되었으면 challenge:*:done 발행
+     * 종료 시간 스케줄이 예약되어 있으면 취소합니다.
+     */
+    @Transactional(readOnly = true)
+    public void checkAndCompleteChallengeIfAllFinished(Long challengeId) {
+        try {
+            Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
+            if (challenge == null || challenge.isDeleted()) {
+                log.debug("챌린지를 찾을 수 없거나 삭제됨: challengeId={}", challengeId);
+                return;
+            }
+
+            // 챌린지가 RUNNING 상태가 아니면 무시
+            if (challenge.getStatus() != ChallengeStatus.RUNNING) {
+                log.debug("챌린지가 RUNNING 상태가 아님: challengeId={}, status={}", 
+                        challengeId, challenge.getStatus());
+                return;
+            }
+
+            // 진행 중 상태(IN_PROGRESS_STATUSES) 참가자가 있는지 확인
+            boolean hasInProgressParticipants = participationRepository.existsByChallengeIdAndStatusIn(
+                    challengeId, ParticipationStatus.IN_PROGRESS_STATUSES);
+
+            if (hasInProgressParticipants) {
+                log.debug("아직 진행 중인 참가자가 있음: challengeId={}", challengeId);
+                return;
+            }
+
+            // 모든 참가자가 종료되었으므로 challenge:*:done 발행
+            String channel = "challenge:" + challengeId + ":done";
+            String message = String.format("{\"challengeId\":%d}", challengeId);
+            pubsubRedisTemplate.convertAndSend(channel, message);
+
+            // 종료 시간 스케줄 취소
+            cancelDoneSchedule(challengeId);
+
+            log.info("모든 참가자 종료 확인, challenge:*:done 발행: challengeId={}", challengeId);
+
+        } catch (Exception e) {
+            log.error("모든 참가자 종료 체크 실패: challengeId={}", challengeId, e);
+        }
+    }
+
+    /**
+     * 종료 시간 스케줄 취소 (Redis ZSET에서 제거)
+     */
+    private void cancelDoneSchedule(Long challengeId) {
+        try {
+            redisTemplate.opsForZSet().remove("schedule:done", challengeId + ":DONE");
+            log.debug("종료 시간 스케줄 취소: challengeId={}", challengeId);
+        } catch (Exception e) {
+            log.error("종료 시간 스케줄 취소 실패: challengeId={}", challengeId, e);
         }
     }
 
@@ -152,15 +254,50 @@ public class ChallengeSchedulerService implements MessageListener {
 
         scheduler.schedule(() -> {
             try {
-                String channel = "challenge:" + challengeId + ":" + eventType.toLowerCase();
-                String message = String.format("{\"challengeId\":%d,\"timestamp\":\"%s\"}",
-                        challengeId, LocalDateTime.now().toString());
-                pubsubRedisTemplate.convertAndSend(channel, message);
-                log.info("스케줄 이벤트 발행: channel={}, challengeId={}", channel, challengeId);
+                // DONE 스케줄 실행 시 챌린지 상태 확인
+                if ("DONE".equals(eventType)) {
+                    handleDoneSchedule(challengeId);
+                } else {
+                    String channel = "challenge:" + challengeId + ":" + eventType.toLowerCase();
+                    String message = String.format("{\"challengeId\":%d,\"timestamp\":\"%s\"}",
+                            challengeId, LocalDateTime.now().toString());
+                    pubsubRedisTemplate.convertAndSend(channel, message);
+                    log.info("스케줄 이벤트 발행: channel={}, challengeId={}", channel, challengeId);
+                }
             } catch (Exception e) {
                 log.error("스케줄 이벤트 발행 실패: challengeId={}, type={}", challengeId, eventType, e);
             }
         }, delay, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * DONE 스케줄 실행 처리
+     * 챌린지가 이미 DONE 상태인지 확인하고, 아니면 challenge:*:done 발행
+     */
+    @Transactional(readOnly = true)
+    private void handleDoneSchedule(Long challengeId) {
+        try {
+            Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
+            if (challenge == null || challenge.isDeleted()) {
+                log.debug("챌린지를 찾을 수 없거나 삭제됨: challengeId={}", challengeId);
+                return;
+            }
+
+            // 이미 DONE 상태이면 스케줄 무시 (중복 방지)
+            if (challenge.getStatus() == ChallengeStatus.DONE) {
+                log.debug("이미 DONE 상태인 챌린지, 스케줄 무시: challengeId={}", challengeId);
+                return;
+            }
+
+            // DONE이 아니면 challenge:*:done 발행
+            String channel = "challenge:" + challengeId + ":done";
+            String message = String.format("{\"challengeId\":%d}", challengeId);
+            pubsubRedisTemplate.convertAndSend(channel, message);
+            log.info("종료 시간 도달, challenge:*:done 발행: challengeId={}", challengeId);
+
+        } catch (Exception e) {
+            log.error("DONE 스케줄 처리 실패: challengeId={}", challengeId, e);
+        }
     }
 
     private void rescheduleOnStartup() {
