@@ -15,7 +15,7 @@ import java.util.List;
 public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
 
     /**
-     * 챌린지 목록 조회 - 참가자 수 포함 (인기순: 참가자 수 내림차순, 생성일 내림차순)
+     * 챌린지 목록 조회 - 참가자 수 포함 (인기순: 참가자 수 내림차순, 임박순, 생성일 내림차순)
      * Object[] 반환: [Challenge, Long participantCount]
      */
     @Query("""
@@ -35,7 +35,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
         AND (:endTime IS NULL OR CAST(c.startAt AS TIME) <= :endTime)
         AND (:isPrivate IS NULL OR c.isPrivate = :isPrivate)
         GROUP BY c.challengeId
-        ORDER BY COUNT(cp) DESC, c.createdAt DESC
+        ORDER BY COUNT(cp) DESC, c.startAt ASC, c.createdAt DESC
     """)
     Page<Object[]> findChallengesWithParticipantCountOrderByPopular(
             @Param("keyword") String keyword,
