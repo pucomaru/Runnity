@@ -47,6 +47,10 @@ server:
 websocket:
   server-id: ${WEBSOCKET_SERVER_ID:ws-local-1}
   allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:3000}
+  health:
+    server-url: ${WEBSOCKET_SERVER_URL:ws://localhost:${WEBSOCKET_SERVER_PORT:8081}/ws/${WEBSOCKET_SERVER_ID:ws-local-1}}
+    heartbeat-ttl: ${WEBSOCKET_HEARTBEAT_TTL:10}
+    heartbeat-interval-millis: ${WEBSOCKET_HEARTBEAT_INTERVAL_MILLIS:5000}
 
 logging:
   level:
