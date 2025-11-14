@@ -7,7 +7,7 @@ services:
     env_file:
       - .env   # 배포 서버에 있는 .env 사용
     volumes:
-      - ./fcmservice-account-key.json:/fcmservice-account-key.json:ro
+      - ./fcmservice-account-key.json:/app/fcmservice-account-key.json:ro
 
     environment:
       # ===== Database =====
