@@ -29,8 +29,6 @@ class WatchCountdownActivity : ComponentActivity() {
             RunnityTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
                     CountdownScreen(seconds = seconds, modifier = Modifier.padding(inner)) {
-                        // 카운트 완료 후 운동 화면으로 전환
-                        startActivity(Intent(this, WatchWorkoutActivity::class.java))
                         finish()
                     }
                 }
@@ -64,6 +62,5 @@ private fun CountdownScreen(seconds: Int, modifier: Modifier = Modifier, onFinis
             fontWeight = FontWeight.Bold,
             fontSize = 42.sp
         )
-        Text(text = "Get Ready", fontSize = 14.sp)
     }
 }

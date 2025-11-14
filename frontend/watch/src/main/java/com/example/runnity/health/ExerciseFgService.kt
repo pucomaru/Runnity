@@ -23,6 +23,7 @@ import androidx.health.services.client.data.ExerciseLapSummary
 import androidx.health.services.client.data.Availability
 import java.util.concurrent.Executors
 import com.example.runnity.R
+import com.example.runnity.MainActivity
 import com.example.runnity.ui.WatchWorkoutActivity
 import com.google.android.gms.wearable.Wearable
 import org.json.JSONObject
@@ -38,6 +39,8 @@ private const val ACTION_PREPARE = "com.example.runnity.action.PREPARE"
 private const val ACTION_PAUSE = "com.example.runnity.action.PAUSE"
 private const val ACTION_RESUME = "com.example.runnity.action.RESUME"
 private const val ACTION_STOP = "com.example.runnity.action.STOP"
+private const val ACTION_METRICS_BROADCAST = "com.example.runnity.action.METRICS"
+private const val ACTION_FINISH_UI = "com.example.runnity.action.FINISH_UI"
 
 // 포그라운드 서비스: 운동 측정을 백그라운드에서도 유지
 class ExerciseFgService : Service() {
@@ -59,6 +62,7 @@ class ExerciseFgService : Service() {
     private var sessionStartMs: Long = 0L
     private var activeStartMs: Long = 0L
     private var activeElapsedAccumMs: Long = 0L
+    private var lastStopAtMs: Long = 0L
 
     // 운동 업데이트 콜백: 상태/가용성/랩 요약 수신
     private val updateCallback = object : ExerciseUpdateCallback {
@@ -158,6 +162,17 @@ class ExerciseFgService : Service() {
                         .sendMessage(node.id, "/metrics/update", bytes)
                 }
             }
+
+        // Also broadcast locally on watch for UI updates
+        val intent = Intent(ACTION_METRICS_BROADCAST).apply {
+            setPackage(packageName)
+            putExtra("elapsed_ms", activeElapsed)
+            latestHrBpm?.let { putExtra("hr_bpm", it) }
+            dist?.let { putExtra("distance_m", it) }
+            if (paceSpKm != null && paceSpKm.isFinite()) putExtra("pace_spkm", paceSpKm)
+            latestCaloriesKcal?.let { putExtra("cal_kcal", it) }
+        }
+        sendBroadcast(intent)
     }
 
     override fun onCreate() {
@@ -190,21 +205,25 @@ class ExerciseFgService : Service() {
                     val uiIntent = Intent(
                         this,
                         WatchWorkoutActivity::class.java
-                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
                     startActivity(uiIntent)
                 } catch (t: Throwable) {
                     Log.w("ExerciseFgService", "failed to launch WatchWorkoutActivity", t)
                 }
             }
             ACTION_PAUSE -> {
+                if (!isRunning) {
+                    Log.d("ExerciseFgService", "PAUSE ignored: not running")
+                    return START_STICKY
+                }
                 ensureExerciseClient()
                 pauseExercise()
                 stopMetricsTicker()
-                if (isRunning) {
-                    val now = System.currentTimeMillis()
-                    activeElapsedAccumMs += (now - activeStartMs)
-                    isRunning = false
-                }
+                val now = System.currentTimeMillis()
+                activeElapsedAccumMs += (now - activeStartMs)
+                isRunning = false
             }
             ACTION_RESUME -> {
                 ensureExerciseClient()
@@ -216,6 +235,23 @@ class ExerciseFgService : Service() {
                 }
             }
             ACTION_STOP -> {
+                val now = System.currentTimeMillis()
+                if (!isRunning) {
+                    Log.d("ExerciseFgService", "STOP ignored: not running")
+                    return START_STICKY
+                }
+                // Grace period: ignore STOP within first 4 seconds after START
+                if (sessionStartMs > 0L && now - sessionStartMs < 4000L) {
+                    Log.d("ExerciseFgService", "STOP ignored: within grace period ${(now - sessionStartMs)}ms after start")
+                    return START_STICKY
+                }
+                // Debounce rapid duplicate STOPs within 2 seconds
+                if (lastStopAtMs > 0L && now - lastStopAtMs < 2000L) {
+                    Log.d("ExerciseFgService", "STOP ignored: debounced ${(now - lastStopAtMs)}ms since last stop")
+                    return START_STICKY
+                }
+                lastStopAtMs = now
+
                 stopRunningSession()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopMetricsTicker()
