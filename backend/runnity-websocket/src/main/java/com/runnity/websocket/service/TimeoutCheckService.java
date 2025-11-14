@@ -2,7 +2,6 @@ package com.runnity.websocket.service;
 
 import com.runnity.websocket.enums.LeaveReason;
 import com.runnity.websocket.manager.SessionManager;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -20,18 +19,29 @@ import java.util.Set;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TimeoutCheckService {
 
     private static final String LAST_RECORD_TIME_PREFIX = "challenge:%d:user:%d:lastRecord";
     private static final long TIMEOUT_SECONDS = 60; // 60초 동안 RECORD 없으면 타임아웃
 
-    @Qualifier("stringRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
     private final SessionManager sessionManager;
     private final ChallengeParticipationService participationService;
     private final RedisPubSubService redisPubSubService;
     private final ChallengeKafkaProducer kafkaProducer;
+
+    public TimeoutCheckService(
+            @Qualifier("stringRedisTemplate") RedisTemplate<String, String> redisTemplate,
+            SessionManager sessionManager,
+            ChallengeParticipationService participationService,
+            RedisPubSubService redisPubSubService,
+            ChallengeKafkaProducer kafkaProducer) {
+        this.redisTemplate = redisTemplate;
+        this.sessionManager = sessionManager;
+        this.participationService = participationService;
+        this.redisPubSubService = redisPubSubService;
+        this.kafkaProducer = kafkaProducer;
+    }
 
     /**
      * 마지막 RECORD 시간 업데이트
