@@ -228,7 +228,7 @@ private fun HourSpinnerComponent(
 
     // LazyColumn 상태
     val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = startOffset + (selectedHour - 1)
+        initialFirstVisibleItemIndex = startOffset + (selectedHour % 12)
     )
 
     // 스크롤 멈췄을 때 중앙 아이템 선택
