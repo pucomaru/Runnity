@@ -1,12 +1,5 @@
 package com.runnity.websocket.dto.websocket.client;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-
-import java.util.Set;
-
 /**
  * KICKED 메시지 (클라이언트 → 서버)
  * 
@@ -17,18 +10,15 @@ import java.util.Set;
  * @param timestamp 타임스탬프
  */
 public record KickedMessage(
-    @NotNull String type,
-    @NotNull Long timestamp
+    String type,
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public KickedMessage {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("type은 필수입니다");
+        }
         if (timestamp == null) {
             timestamp = System.currentTimeMillis();
-        }
-        Set<ConstraintViolation<KickedMessage>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
     
