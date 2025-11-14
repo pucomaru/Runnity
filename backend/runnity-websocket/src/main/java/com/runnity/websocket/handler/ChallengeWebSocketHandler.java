@@ -15,7 +15,6 @@ import com.runnity.websocket.service.ChallengeParticipationService;
 import com.runnity.websocket.service.RedisPubSubService;
 import com.runnity.websocket.service.TimeoutCheckService;
 import com.runnity.websocket.service.TicketService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -34,7 +33,6 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ChallengeWebSocketHandler extends TextWebSocketHandler {
 
     private final TicketService ticketService;
@@ -44,8 +42,26 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
     private final TimeoutCheckService timeoutCheckService;
     private final ChallengeParticipationService participationService;
     private final ObjectMapper objectMapper;
-    @Qualifier("stringRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
+
+    public ChallengeWebSocketHandler(
+            TicketService ticketService,
+            SessionManager sessionManager,
+            RedisPubSubService redisPubSubService,
+            ChallengeKafkaProducer kafkaProducer,
+            TimeoutCheckService timeoutCheckService,
+            ChallengeParticipationService participationService,
+            ObjectMapper objectMapper,
+            @Qualifier("stringRedisTemplate") RedisTemplate<String, String> redisTemplate) {
+        this.ticketService = ticketService;
+        this.sessionManager = sessionManager;
+        this.redisPubSubService = redisPubSubService;
+        this.kafkaProducer = kafkaProducer;
+        this.timeoutCheckService = timeoutCheckService;
+        this.participationService = participationService;
+        this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
+    }
 
     /**
      * WebSocket 연결 수립 (입장 로직)
