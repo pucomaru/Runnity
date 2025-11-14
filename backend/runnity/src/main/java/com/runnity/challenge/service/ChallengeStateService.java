@@ -102,6 +102,8 @@ public class ChallengeStateService {
 
     /**
      * 챌린지 상태를 READY → RUNNING으로 변경
+     * 참여하지 않은 WAITING 상태 사용자를 NOT_STARTED로 변경
+     * 
      * @param challengeId 챌린지 ID
      */
     @Transactional
@@ -111,7 +113,24 @@ public class ChallengeStateService {
 
         challenge.run();
 
-        log.info("챌린지 RUNNING 상태 전환 완료: challengeId={}", challengeId);
+        // 참여하지 않은 WAITING 상태 참가자들을 NOT_STARTED로 변경
+        List<ChallengeParticipation> waitingParticipants = participationRepository.findByChallengeIdAndStatus(
+                challengeId, ParticipationStatus.WAITING);
+
+        for (ChallengeParticipation participation : waitingParticipants) {
+            try {
+                participation.markAsNotStarted();
+                participationRepository.save(participation);
+                log.debug("참가자 상태 NOT_STARTED로 변경: challengeId={}, userId={}", 
+                        challengeId, participation.getMember().getMemberId());
+            } catch (Exception e) {
+                log.error("참가자 NOT_STARTED 처리 실패: challengeId={}, participantId={}", 
+                        challengeId, participation.getParticipantId(), e);
+            }
+        }
+
+        log.info("챌린지 RUNNING 상태 전환 완료: challengeId={}, notStartedCount={}", 
+                challengeId, waitingParticipants.size());
     }
 
     /**
