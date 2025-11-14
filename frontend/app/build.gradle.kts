@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize") // ✅ Parcelable data class 용 (Intent 등에서 사용)
-
+    id ("com.google.gms.google-services")
 }
 
 // 추가
@@ -178,8 +178,12 @@ dependencies {
     // WearOS
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
+    // fcm
+    implementation("com.google.firebase:firebase-messaging:23.4.0")
+
     // 웹소켓
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
 
     //  테스트 라이브러리
     testImplementation(libs.junit)
