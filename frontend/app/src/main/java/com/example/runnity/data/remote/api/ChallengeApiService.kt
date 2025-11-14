@@ -6,6 +6,7 @@ import com.example.runnity.data.model.request.JoinChallengeRequest
 import com.example.runnity.data.model.response.ChallengeDetailResponse
 import com.example.runnity.data.model.response.ChallengeListResponse
 import com.example.runnity.data.model.response.ChallengeParticipantResponse
+import com.example.runnity.data.model.response.ChallengeEnterResponse
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -106,6 +107,17 @@ interface ChallengeApiService {
     suspend fun getChallengeDetail(
         @Path("challengeId") challengeId: Long
     ): Response<BaseResponse<ChallengeDetailResponse>>
+
+    // ==================== 챌린지 방 입장(티켓 발급) ====================
+    /**
+     * 챌린지 입장 및 WebSocket 티켓 발급
+     * @param challengeId 챌린지 ID
+     * @return ticket, wsUrl, expiresIn 등
+     */
+    @POST("api/v1/challenges/{challengeId}/enter")
+    suspend fun enterChallenge(
+        @Path("challengeId") challengeId: Long
+    ): Response<BaseResponse<ChallengeEnterResponse>>
 
     // 예약한 챌린지 조회
     @GET("api/v1/me/challenges")
