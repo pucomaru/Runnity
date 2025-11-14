@@ -45,10 +45,10 @@ server:
   port: ${WEBSOCKET_SERVER_PORT:8081}
 
 websocket:
-  server-id: ${WEBSOCKET_SERVER_ID:ws-local-1}
-  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:3000}
+  server-id: ${WEBSOCKET_SERVER_ID:server-0}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://runnity.p-e.kr}
   health:
-    server-url: ${WEBSOCKET_SERVER_URL:ws://localhost:${WEBSOCKET_SERVER_PORT:8081}/ws/${WEBSOCKET_SERVER_ID:ws-local-1}}
+    server-url: ${WEBSOCKET_SERVER_URL:wss://runnity.p-e.kr/ws/server-0}
     heartbeat-ttl: ${WEBSOCKET_HEARTBEAT_TTL:10}
     heartbeat-interval-millis: ${WEBSOCKET_HEARTBEAT_INTERVAL_MILLIS:5000}
 
