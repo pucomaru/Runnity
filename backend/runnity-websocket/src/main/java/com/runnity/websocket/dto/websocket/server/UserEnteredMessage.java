@@ -20,7 +20,7 @@ public record UserEnteredMessage(
     String nickname,
     String profileImage,
     Double distance,
-    Double pace,
+    Integer pace,
     Long timestamp
 ) {
     public UserEnteredMessage {
@@ -41,7 +41,7 @@ public record UserEnteredMessage(
         }
     }
     
-    public UserEnteredMessage(Long userId, String nickname, String profileImage, Double distance, Double pace) {
+    public UserEnteredMessage(Long userId, String nickname, String profileImage, Double distance, Integer pace) {
         this("USER_ENTERED", userId, nickname, profileImage, distance, pace, System.currentTimeMillis());
     }
 }

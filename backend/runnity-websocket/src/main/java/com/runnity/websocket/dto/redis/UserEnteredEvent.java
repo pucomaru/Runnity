@@ -10,12 +10,14 @@ package com.runnity.websocket.dto.redis;
  * @param userId 입장한 사용자 ID
  * @param nickname 닉네임
  * @param profileImage 프로필 이미지 URL
+ * @param timestamp 이벤트 발생 시각
  */
 public record UserEnteredEvent(
     Long challengeId,
     Long userId,
     String nickname,
-    String profileImage
+    String profileImage,
+    Long timestamp
 ) {
     public UserEnteredEvent {
         if (challengeId == null || challengeId <= 0) {
@@ -27,6 +29,13 @@ public record UserEnteredEvent(
         if (nickname == null || nickname.isBlank()) {
             throw new IllegalArgumentException("nickname은 필수입니다");
         }
+        if (timestamp == null) {
+            timestamp = System.currentTimeMillis();
+        }
+    }
+    
+    public UserEnteredEvent(Long challengeId, Long userId, String nickname, String profileImage) {
+        this(challengeId, userId, nickname, profileImage, System.currentTimeMillis());
     }
 }
 

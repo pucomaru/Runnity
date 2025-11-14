@@ -51,5 +51,10 @@ public enum WebSocketMessageType {
     /**
      * 연결 유지 응답 (서버 → 클라이언트)
      */
-    PONG
+    PONG,
+    
+    /**
+     * 강제 퇴장 요청 (클라이언트 → 서버)
+     */
+    KICKED
 }

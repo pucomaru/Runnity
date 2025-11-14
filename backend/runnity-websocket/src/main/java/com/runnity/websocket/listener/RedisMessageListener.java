@@ -1,12 +1,18 @@
 package com.runnity.websocket.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runnity.websocket.dto.redis.ChallengeExpiredEvent;
 import com.runnity.websocket.dto.redis.ParticipantUpdateEvent;
 import com.runnity.websocket.dto.redis.UserEnteredEvent;
 import com.runnity.websocket.dto.redis.UserLeftEvent;
 import com.runnity.websocket.dto.websocket.server.ParticipantUpdateMessage;
 import com.runnity.websocket.dto.websocket.server.UserEnteredMessage;
 import com.runnity.websocket.dto.websocket.server.UserLeftMessage;
+import com.runnity.websocket.enums.LeaveReason;
+import com.runnity.websocket.service.ChallengeKafkaProducer;
+import com.runnity.websocket.service.ChallengeParticipationService;
+import com.runnity.websocket.service.RedisPubSubService;
+import com.runnity.websocket.service.TimeoutCheckService;
 import com.runnity.websocket.manager.SessionManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,10 +41,15 @@ public class RedisMessageListener implements MessageListener {
     private final RedisMessageListenerContainer listenerContainer;
     private final SessionManager sessionManager;
     private final ObjectMapper objectMapper;
+    private final ChallengeKafkaProducer kafkaProducer;
+    private final RedisPubSubService redisPubSubService;
+    private final ChallengeParticipationService participationService;
+    private final TimeoutCheckService timeoutCheckService;
 
     private static final String CHANNEL_ENTER = "challenge:enter";
     private static final String CHANNEL_LEAVE = "challenge:leave";
     private static final String CHANNEL_UPDATE = "challenge:update";
+    private static final String CHANNEL_EXPIRED = "challenge:expired";
 
     /**
      * 초기화: 채널 구독 등록
@@ -48,7 +59,9 @@ public class RedisMessageListener implements MessageListener {
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_ENTER));
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_LEAVE));
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_UPDATE));
-        log.info("Redis Pub/Sub 구독 시작: {}, {}, {}", CHANNEL_ENTER, CHANNEL_LEAVE, CHANNEL_UPDATE);
+        listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_EXPIRED));
+        log.info("Redis Pub/Sub 구독 시작: {}, {}, {}, {}", 
+                CHANNEL_ENTER, CHANNEL_LEAVE, CHANNEL_UPDATE, CHANNEL_EXPIRED);
     }
 
     @Override
@@ -63,6 +76,7 @@ public class RedisMessageListener implements MessageListener {
                 case CHANNEL_ENTER -> handleUserEntered(payload);
                 case CHANNEL_LEAVE -> handleUserLeft(payload);
                 case CHANNEL_UPDATE -> handleParticipantUpdate(payload);
+                case CHANNEL_EXPIRED -> handleChallengeExpired(payload);
                 default -> log.warn("알 수 없는 채널: {}", channel);
             }
         } catch (Exception e) {
@@ -88,7 +102,7 @@ public class RedisMessageListener implements MessageListener {
                     event.nickname(),
                     event.profileImage(),
                     0.0,
-                    0.0
+                    0
             );
 
             String wsMessageJson = objectMapper.writeValueAsString(wsMessage);
@@ -133,7 +147,10 @@ public class RedisMessageListener implements MessageListener {
             log.debug("참가자 업데이트 이벤트 수신: challengeId={}, userId={}, distance={}, pace={}", 
                     challengeId, updatedUserId, event.distance(), event.pace());
 
-            // 해당 챌린지의 모든 참가자에게 PARTICIPANT_UPDATE 메시지 전송 (업데이트한 본인 제외)
+            // 1. SessionManager의 참가자 정보도 업데이트 (다른 서버에서 보낸 업데이트 반영)
+            sessionManager.updateParticipantInfo(challengeId, updatedUserId, event.distance(), event.pace());
+
+            // 2. 해당 챌린지의 모든 참가자에게 PARTICIPANT_UPDATE 메시지 전송 (업데이트한 본인 제외)
             ParticipantUpdateMessage wsMessage = new ParticipantUpdateMessage(
                     updatedUserId,
                     event.distance(),
@@ -186,6 +203,102 @@ public class RedisMessageListener implements MessageListener {
         } catch (Exception e) {
             log.error("메시지 브로드캐스트 실패: challengeId={}, excludeUserId={}", 
                     challengeId, excludeUserId, e);
+        }
+    }
+
+    /**
+     * 챌린지 종료 시간 만료 이벤트 처리
+     * 스케줄러에서 챌린지 종료 시간이 되었을 때 발행하는 이벤트
+     */
+    private void handleChallengeExpired(String payload) {
+        try {
+            ChallengeExpiredEvent event = objectMapper.readValue(payload, ChallengeExpiredEvent.class);
+            Long challengeId = event.challengeId();
+
+            log.info("챌린지 종료 시간 만료 이벤트 수신: challengeId={}", challengeId);
+
+            // 해당 챌린지의 모든 참가자 조회
+            Set<String> userIds = sessionManager.getChallengeParticipantIds(challengeId);
+
+            if (userIds == null || userIds.isEmpty()) {
+                log.debug("참가자가 없는 챌린지: challengeId={}", challengeId);
+                return;
+            }
+
+            int processedCount = 0;
+
+            // 모든 참가자에 대해 EXPIRED 처리
+            for (String userIdStr : userIds) {
+                try {
+                    Long userId = Long.parseLong(userIdStr);
+                    processExpiredUser(challengeId, userId);
+                    processedCount++;
+                } catch (Exception e) {
+                    log.error("참가자 EXPIRED 처리 실패: challengeId={}, userId={}", 
+                            challengeId, userIdStr, e);
+                }
+            }
+
+            log.info("챌린지 종료 시간 만료 처리 완료: challengeId={}, 처리된 참가자 수={}", 
+                    challengeId, processedCount);
+
+        } catch (Exception e) {
+            log.error("챌린지 종료 시간 만료 이벤트 처리 실패: payload={}", payload, e);
+        }
+    }
+
+    /**
+     * 개별 참가자 EXPIRED 처리
+     */
+    private void processExpiredUser(Long challengeId, Long userId) {
+        try {
+            // 세션 조회
+            WebSocketSession session = sessionManager.getSession(challengeId, userId);
+            
+            // 참가자 정보 조회
+            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            Double distance = info != null ? info.distance() : 0.0;
+            Integer pace = info != null ? info.pace() : 0;
+            Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+
+            String nickname = session != null ? 
+                    (String) session.getAttributes().get("nickname") : null;
+            String profileImage = session != null ? 
+                    (String) session.getAttributes().get("profileImage") : null;
+
+            if (nickname == null) {
+                nickname = "User_" + userId;
+            }
+
+            // 참가자 상태 DB 업데이트 (EXPIRED)
+            participationService.updateParticipationStatus(challengeId, userId, LeaveReason.EXPIRED.getValue());
+
+            // 타임아웃 체크 서비스에서 마지막 RECORD 시간 제거
+            timeoutCheckService.removeLastRecordTime(challengeId, userId);
+
+            // Redis Pub/Sub으로 퇴장 이벤트 발행
+            redisPubSubService.publishUserLeft(challengeId, userId, LeaveReason.EXPIRED.getValue());
+
+            // Kafka로 LEAVE 이벤트 발행
+            kafkaProducer.publishLeaveEvent(challengeId, userId, nickname, profileImage, 
+                    distance, pace, ranking, LeaveReason.EXPIRED.getValue());
+
+            // 세션 제거
+            sessionManager.removeSession(challengeId, userId);
+
+            // 세션이 있으면 연결 종료
+            if (session != null && session.isOpen()) {
+                try {
+                    session.close();
+                } catch (Exception e) {
+                    log.error("세션 종료 실패: challengeId={}, userId={}", challengeId, userId, e);
+                }
+            }
+
+            log.debug("참가자 EXPIRED 처리 완료: challengeId={}, userId={}", challengeId, userId);
+
+        } catch (Exception e) {
+            log.error("참가자 EXPIRED 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
         }
     }
 }

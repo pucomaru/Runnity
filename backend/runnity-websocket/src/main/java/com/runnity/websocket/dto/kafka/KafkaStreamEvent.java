@@ -33,7 +33,7 @@ public record KafkaStreamEvent(
     String nickname,
     String profileImage,
     @PositiveOrZero Double distance,
-    @PositiveOrZero Double pace,
+    @PositiveOrZero Integer pace,
     Integer ranking,
     Boolean isBroadcast,
     String reason,
