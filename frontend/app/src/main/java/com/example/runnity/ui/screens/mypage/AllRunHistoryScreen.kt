@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
@@ -44,9 +45,11 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AllRunHistoryScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: AllRunHistoryViewModel = viewModel()
 ) {
     val today = LocalDate.now()
+    val uiState by viewModel.uiState.collectAsState()
 
     // 선택된 날짜
     var selectedDate by remember { mutableStateOf<LocalDate?>(today) }
@@ -70,13 +73,24 @@ fun AllRunHistoryScreen(
     val selectedYear = currentYearMonth.year
     val selectedMonth = currentYearMonth.monthValue
 
-    // 운동한 날짜 목록 (임시 - 나중에 API로 대체)
-    val runDates = remember {
-        mapOf(
-            LocalDate.of(2025, 11, 5) to listOf("personal"),
-            LocalDate.of(2025, 11, 10) to listOf("challenge"),
-            LocalDate.of(2025, 11, 14) to listOf("personal", "challenge")
-        )
+    // 페이지 변경 시 해당 월의 데이터 로드
+    LaunchedEffect(selectedYear, selectedMonth) {
+        viewModel.loadMonthlyRuns(selectedYear, selectedMonth)
+    }
+
+    // UI 상태에서 데이터 추출
+    val runDates = remember(uiState) {
+        when (val state = uiState) {
+            is RunHistoryUiState.Success -> state.runDates
+            else -> emptyMap()
+        }
+    }
+
+    val allRecords = remember(uiState) {
+        when (val state = uiState) {
+            is RunHistoryUiState.Success -> state.allRecords
+            else -> emptyMap()
+        }
     }
 
     Column(
@@ -124,72 +138,81 @@ fun AllRunHistoryScreen(
 
         // 4. 선택된 날짜의 운동 기록 리스트 (배경 구분 없이)
         val currentSelectedDate = selectedDate
-        if (currentSelectedDate != null && runDates.containsKey(currentSelectedDate)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                // 날짜 표시
-                Text(
-                    text = "${currentSelectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} 운동 기록",
-                    style = Typography.Subheading,
-                    color = ColorPalette.Light.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
 
-                // 임시 더미 데이터
-                val records = remember(currentSelectedDate) {
-                    listOf(
-                        RunningRecord(
-                            id = "1",
-                            type = "personal",
-                            distance = 5.2,
-                            pace = "5'30\"",
-                            time = "28:36",
-                            date = currentSelectedDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                        ),
-                        RunningRecord(
-                            id = "2",
-                            type = "challenge",
-                            distance = 3.0,
-                            pace = "6'00\"",
-                            time = "18:00",
-                            date = currentSelectedDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                        )
+        when (val state = uiState) {
+            is RunHistoryUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = ColorPalette.Common.accent)
+                }
+            }
+            is RunHistoryUiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = state.message,
+                        style = Typography.Body,
+                        color = ColorPalette.Common.stopAccent
                     )
                 }
+            }
+            is RunHistoryUiState.Success -> {
+                if (currentSelectedDate != null && allRecords.containsKey(currentSelectedDate)) {
+                    val records = allRecords[currentSelectedDate] ?: emptyList()
 
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    items(records) { record ->
-                        RunningRecordItem(
-                            record = record,
-                            onClick = {
-                                // 운동 기록 상세 페이지로 이동
-                                when (record.type) {
-                                    "personal" -> navController.navigate("personal_run_detail/${record.id}")
-                                    "challenge" -> navController.navigate("challenge_run_detail/${record.id}")
-                                }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        // 날짜 표시
+                        Text(
+                            text = "${currentSelectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} 운동 기록",
+                            style = Typography.Subheading,
+                            color = ColorPalette.Light.primary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            items(records) { record ->
+                                RunningRecordItem(
+                                    record = record,
+                                    onClick = {
+                                        // 운동 기록 상세 페이지로 이동
+                                        when (record.type) {
+                                            "personal" -> navController.navigate("personal_run_detail/${record.id}")
+                                            "challenge" -> navController.navigate("challenge_run_detail/${record.id}")
+                                        }
+                                    }
+                                )
                             }
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "운동 기록이 없습니다",
+                            style = Typography.Body,
+                            color = ColorPalette.Light.secondary
                         )
                     }
                 }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "운동 기록이 없습니다",
-                    style = Typography.Body,
-                    color = ColorPalette.Light.secondary
-                )
             }
         }
     }
