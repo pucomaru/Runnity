@@ -315,7 +315,8 @@
 
 **처리**:
 - WebSocket 서버: 다른 참가자들에게 USER_LEFT 메시지 브로드캐스트
-- WebSocket 서버: 참가자 상태를 해당 reason에 맞게 DB에 업데이트 (QUIT, COMPLETE, TIMEOUT, DISCONNECTED, KICKED, ERROR, EXPIRED)
+- WebSocket 서버: 참가자 상태를 해당 reason에 맞게 DB에 업데이트 (QUIT, COMPLETE, TIMEOUT, DISCONNECTED, KICKED, ERROR)
+- EXPIRED는 비즈니스 서버에서만 DB 업데이트 처리
 
 ---
 
