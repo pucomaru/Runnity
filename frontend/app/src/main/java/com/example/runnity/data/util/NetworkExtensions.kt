@@ -36,9 +36,28 @@ suspend fun <T> safeApiCall(
             }
         } else {
             // HTTP 에러 (401, 404, 500 등)
+            // 에러 body에서 상세 메시지 추출 시도
+            val errorBody = response.errorBody()?.string()
+            val errorMessage = try {
+                // errorBody를 파싱하여 message 필드 추출 (간단한 JSON 파싱)
+                errorBody?.let {
+                    val messageStart = it.indexOf("\"message\"")
+                    if (messageStart != -1) {
+                        val valueStart = it.indexOf(":", messageStart) + 1
+                        val valueEnd = it.indexOf(",", valueStart).takeIf { it != -1 } ?: it.indexOf("}", valueStart)
+                        it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
+                    } else {
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to parse error message from response body")
+                null
+            }
+
             ApiResponse.Error(
                 code = response.code(),
-                message = response.message() ?: "HTTP Error ${response.code()}"
+                message = errorMessage ?: response.message() ?: "HTTP Error ${response.code()}"
             )
         }
     } catch (e: IOException) {
@@ -80,9 +99,28 @@ suspend fun <T> safeApiCallUnit(
                 )
             }
         } else {
+            // HTTP 에러 (401, 404, 500 등)
+            // 에러 body에서 상세 메시지 추출 시도
+            val errorBody = response.errorBody()?.string()
+            val errorMessage = try {
+                errorBody?.let {
+                    val messageStart = it.indexOf("\"message\"")
+                    if (messageStart != -1) {
+                        val valueStart = it.indexOf(":", messageStart) + 1
+                        val valueEnd = it.indexOf(",", valueStart).takeIf { it != -1 } ?: it.indexOf("}", valueStart)
+                        it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
+                    } else {
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to parse error message from response body")
+                null
+            }
+
             ApiResponse.Error(
                 code = response.code(),
-                message = response.message() ?: "HTTP Error ${response.code()}"
+                message = errorMessage ?: response.message() ?: "HTTP Error ${response.code()}"
             )
         }
     } catch (e: IOException) {

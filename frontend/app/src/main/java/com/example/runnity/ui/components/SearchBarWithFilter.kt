@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -33,7 +34,7 @@ import com.example.runnity.theme.Typography
  * @param onSearchChange 검색어 변경 이벤트
  * @param onSearchSubmit 검색 실행 이벤트 (키보드 검색 버튼 또는 검색 아이콘 클릭)
  * @param onFilterClick 필터 아이콘 클릭 이벤트 (필터 페이지로 이동)
- * @param placeholder 검색창 placeholder (기본: "방 제목 검색")
+ * @param placeholder 검색창 placeholder (기본: "챌린지 제목 검색")
  * @param modifier Modifier (선택사항)
  *
  * 사용 예시:
@@ -51,7 +52,7 @@ fun SearchBarWithFilter(
     onSearchChange: (String) -> Unit,      // 검색어 변경 콜백
     onSearchSubmit: () -> Unit = {},       // 검색 실행 콜백
     onFilterClick: () -> Unit,             // 필터 버튼 클릭 콜백
-    placeholder: String = "방 제목 검색",   // placeholder 텍스트
+    placeholder: String = "챌린지 제목 검색",   // placeholder 텍스트
     modifier: Modifier = Modifier          // 추가 Modifier
 ) {
     // Row: 가로 배치 (검색창 + 필터 아이콘)
@@ -126,6 +127,21 @@ fun SearchBarWithFilter(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+
+                    // X 버튼 (검색어가 있을 때만 표시)
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onSearchChange("") },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "검색어 지우기",
+                                tint = ColorPalette.Light.component,  // 회색
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

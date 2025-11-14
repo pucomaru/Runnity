@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,10 +50,17 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.route.RouteLine
 import com.kakao.vectormap.route.RouteLineStyles
 import com.kakao.vectormap.label.Label
-import com.kakao.vectormap.label.LabelLayer
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
+import com.kakao.vectormap.label.LabelLayer
+import com.example.runnity.data.repository.RunRepository
+import com.example.runnity.data.model.request.RunCreateRequest
+import com.example.runnity.data.model.request.RunLapCreateRequest
+import com.example.runnity.data.model.common.ApiResponse
+import com.google.gson.Gson
+import java.time.Instant
+import timber.log.Timber
 import com.google.android.gms.location.LocationServices
 
 // 운동 결과 화면
@@ -68,6 +76,62 @@ fun WorkoutResultScreen(
     val sessionViewModel: WorkoutSessionViewModel = viewModel(context as androidx.lifecycle.ViewModelStoreOwner)
     val metrics by sessionViewModel.metrics.collectAsState()
     val route by sessionViewModel.route.collectAsState()
+    val sessionStartTime by sessionViewModel.sessionStartTime.collectAsState()
+    val laps by sessionViewModel.laps.collectAsState()
+
+    var posted by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(sessionStartTime) {
+        if (posted) return@LaunchedEffect
+        // ViewModel 단에서 중복 방지 (네비게이션/재구성 케이스 포함)
+        val first = sessionViewModel.tryMarkPosted()
+        if (!first) return@LaunchedEffect
+        posted = true
+        // 백엔드 DTO: RunRecordType = PERSONAL | CHALLENGE
+        val runType = "PERSONAL"
+        val startMs = sessionStartTime ?: System.currentTimeMillis() - metrics.totalElapsedMs
+        val endMs = startMs + metrics.totalElapsedMs
+        val routeJson = try { Gson().toJson(route) } catch (_: Throwable) { "[]" } ?: "[]"
+        val avgPace = metrics.avgPaceSecPerKm?.toInt() ?: 0
+        val avgBpm = metrics.avgHeartRate ?: 0
+        val lapRequests = laps.map {
+            RunLapCreateRequest(
+                sequence = it.sequence,
+                distance = it.distanceMeters / 1000.0,
+                durationSec = it.durationSec,
+                pace = it.paceSecPerKm,
+                bpm = it.bpm
+            )
+        }
+        val req = RunCreateRequest(
+            runType = runType,
+            distance = metrics.distanceMeters / 1000.0,
+            durationSec = (metrics.activeElapsedMs / 1000L).toInt(),
+            startAt = java.time.Instant.ofEpochMilli(startMs).atZone(java.time.ZoneOffset.UTC).toLocalDateTime().toString(),
+            endAt = java.time.Instant.ofEpochMilli(endMs).atZone(java.time.ZoneOffset.UTC).toLocalDateTime().toString(),
+            pace = avgPace,
+            bpm = avgBpm,
+            calories = metrics.caloriesKcal,
+            route = routeJson,
+            laps = lapRequests
+        )
+        val repository = RunRepository()
+        val result = runCatching { repository.createRun(req) }.getOrNull()
+        when (result) {
+            is ApiResponse.Success -> {
+                Timber.d("createRun success")
+            }
+            is ApiResponse.Error -> {
+                Timber.w("createRun failed: code=${result.code}, message=${result.message}")
+            }
+            ApiResponse.NetworkError -> {
+                Timber.w("createRun failed: network error")
+            }
+            null -> {
+                Timber.w("createRun failed: null response")
+            }
+        }
+    }
 
     // 지도
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
