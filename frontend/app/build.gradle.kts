@@ -178,6 +178,9 @@ dependencies {
     // WearOS
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
+    // 웹소켓
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     //  테스트 라이브러리
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
