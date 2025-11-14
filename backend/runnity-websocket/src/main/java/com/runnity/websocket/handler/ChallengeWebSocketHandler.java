@@ -263,6 +263,12 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
      */
     private void handlePing(WebSocketSession session) {
         try {
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+            if (challengeId != null && userId != null) {
+                timeoutCheckService.updateLastRecordTime(challengeId, userId);
+            }
+
             // PONG 응답
             PongMessage pong = new PongMessage();
             String pongJson = objectMapper.writeValueAsString(pong);
@@ -278,8 +284,16 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
      * PONG 메시지 처리
      */
     private void handlePong(WebSocketSession session) {
-        // PONG은 단순 수신만 (서버가 PING을 보낸 경우 클라이언트가 응답)
-        log.debug("PONG 수신: sessionId={}", session.getId());
+        try {
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+            if (challengeId != null && userId != null) {
+                timeoutCheckService.updateLastRecordTime(challengeId, userId);
+            }
+            log.debug("PONG 수신: sessionId={}", session.getId());
+        } catch (Exception e) {
+            log.error("PONG 처리 실패: sessionId={}", session.getId(), e);
+        }
     }
 
     /**

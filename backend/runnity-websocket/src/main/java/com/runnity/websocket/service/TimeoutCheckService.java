@@ -126,52 +126,6 @@ public class TimeoutCheckService {
     }
     
     /**
-     * 특정 챌린지의 타임아웃 체크
-     * 
-     * @param challengeId 챌린지 ID
-     */
-    public void checkChallengeTimeouts(Long challengeId) {
-        try {
-            long currentTime = Instant.now().getEpochSecond();
-            long timeoutThreshold = currentTime - TIMEOUT_SECONDS;
-
-            // 해당 챌린지의 모든 참가자 조회
-            Set<String> userIds = sessionManager.getChallengeParticipantIds(challengeId);
-            
-            if (userIds == null || userIds.isEmpty()) {
-                return;
-            }
-
-            for (String userIdStr : userIds) {
-                try {
-                    Long userId = Long.parseLong(userIdStr);
-                    
-                    // 마지막 RECORD 시간 조회
-                    String key = String.format(LAST_RECORD_TIME_PREFIX, challengeId, userId);
-                    String lastRecordTimeStr = redisTemplate.opsForValue().get(key);
-                    
-                    if (lastRecordTimeStr == null) {
-                        continue; // RECORD 시간이 없으면 스킵 (이미 처리되었거나 아직 RECORD 없음)
-                    }
-                    
-                    long lastRecordTime = Long.parseLong(lastRecordTimeStr);
-                    
-                    // 타임아웃 체크
-                    if (lastRecordTime < timeoutThreshold) {
-                        log.info("타임아웃 감지: challengeId={}, userId={}, lastRecordTime={}, timeoutThreshold={}", 
-                                challengeId, userId, lastRecordTime, timeoutThreshold);
-                        handleTimeout(challengeId, userId);
-                    }
-                } catch (Exception e) {
-                    log.error("참가자 타임아웃 체크 실패: challengeId={}, userId={}", challengeId, userIdStr, e);
-                }
-            }
-        } catch (Exception e) {
-            log.error("챌린지 타임아웃 체크 실패: challengeId={}", challengeId, e);
-        }
-    }
-
-    /**
      * 개별 참가자 타임아웃 처리
      */
     private void handleTimeout(Long challengeId, Long userId) {
