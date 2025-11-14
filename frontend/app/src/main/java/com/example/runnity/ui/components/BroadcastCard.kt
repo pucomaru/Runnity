@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,9 +21,10 @@ import com.example.runnity.theme.Typography
  */
 @Composable
 fun BroadcastCard(
-    title: String,
-    viewerCount: Int,
-    participantCount: Int,
+    title: String,                          // 제목
+    viewerCount: Int,                       // 중계방 입장수
+    participantCount: Int,                  // 챌린지 참여자 수
+    distance: Int,                          // 거리
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -66,6 +68,11 @@ fun BroadcastCard(
                         icon = Icons.Default.Group,
                         text = "$participantCount 명 참가 중"
                     )
+                    // 거리
+                    InfoChip(
+                        icon = Icons.Default.TrackChanges,
+                        text = "$distance km"
+                    )
                 }
             }
         }
@@ -100,6 +107,7 @@ private fun BroadcastCardPreview() {
         title = "3km 달릴 사람 구한다",
         viewerCount = 120,
         participantCount = 15,
+        distance = 10,
         onCardClick = {}
     )
 }

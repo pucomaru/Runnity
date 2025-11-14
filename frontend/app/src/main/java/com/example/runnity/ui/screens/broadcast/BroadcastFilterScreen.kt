@@ -25,7 +25,7 @@ import java.time.LocalDate
  * @param navController 네비게이션 컨트롤러
  */
 @Composable
-fun ChallengeFilterScreen(
+fun BroadcastFilterScreen(
     navController: NavController? = null
 ) {
     // 거리 선택 상태 (여러 개 선택 가능)

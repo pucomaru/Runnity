@@ -33,6 +33,8 @@ import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.example.runnity.ui.screens.broadcast.BroadcastFilterScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastLiveScreen
 import com.example.runnity.ui.screens.broadcast.BroadcastScreen
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 import com.example.runnity.ui.screens.workout.CountdownScreen
@@ -71,7 +73,8 @@ fun MainTabScreen(
         "challenge",         // 챌린지 리스트 화면
         "challenge_filter",  // 챌린지 필터 화면
         "challenge_create",  // 챌린지 생성 화면
-        "mypage"             // 마이페이지 화면
+        "mypage",             // 마이페이지 화면
+        "broadcast_view"      // 중계목록 화면
     )
 
     // Scaffold: 상단바, 하단바, 플로팅 버튼 등을 배치하는 레이아웃
@@ -264,11 +267,27 @@ fun MainTabScreen(
                     )
                 }
 
-                // 챌린지 중계 화면
+                // 중계 화면 (네비바 있음)
                 composable("broadcast_view") {
                     BroadcastScreen(
                         navController = navController,
                         parentNavController = parentNavController
+                    )
+                }
+
+                // 중계 필터 화면 (네비바 있음)
+                composable("broadcast_filter") {
+                    BroadcastFilterScreen(
+                        navController = navController  // 뒤로가기용
+                    )
+                }
+
+                // 중계 라이브 참여 (네비바 있음)
+                composable("broadcast_live/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    BroadcastLiveScreen(
+                        challengeId = challengeId,
+                        navController = navController
                     )
                 }
             }

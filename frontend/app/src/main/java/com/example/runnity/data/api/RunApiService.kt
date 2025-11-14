@@ -103,15 +103,6 @@ interface RunApiService {
     suspend fun updateProfile(
         @Body request: UpdateProfileRequest
     ): Response<UserProfileResponse>
-
-    // ==================== 중계방 관련 ====================
-
-    /**
-     * 활성화된 중계방 목록 조회
-     * TODO: 백엔드와 맞는 Response 구조
-     */
-    @GET("api/v1/broadcast/active")
-    suspend fun getActiveBroadcasts(): Response<BroadcastResponse>
 }
 
 // ==================== Request/Response 데이터 클래스 ====================
@@ -213,13 +204,4 @@ data class UserProfileResponse(
 data class UpdateProfileRequest(
     val nickname: String?,
     val profileImageUrl: String?
-)
-
-// 중계
-data class BroadcastResponse(
-    val challengeId: Long, // 중계 challengeId
-    val title: String, // 챌린지 제목
-    val viewerCount: Int, // 현재 시청자 수
-    val participantCount: Int, // 챌린지 참가자 수
-    val createdAt: String, // 세션 생성 시작 날짜
 )
