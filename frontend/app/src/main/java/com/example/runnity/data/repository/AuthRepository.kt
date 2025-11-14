@@ -11,14 +11,18 @@ import com.example.runnity.data.model.response.NicknameCheckResponse
 import com.example.runnity.data.model.response.ProfileResponse
 import com.example.runnity.data.model.response.SocialLoginResponse
 import com.example.runnity.data.remote.api.AuthApiService
+import com.example.runnity.data.util.FcmTokenManager
 import com.example.runnity.data.util.TokenManager
 import com.example.runnity.data.util.UserProfileManager
 import com.example.runnity.data.util.safeApiCall
 import com.example.runnity.data.util.safeApiCallUnit
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.gson.Gson
+import kotlinx.coroutines.tasks.await
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import timber.log.Timber
 
 /**
  * Auth 관련 Repository
@@ -89,7 +93,16 @@ class AuthRepository(
         return safeApiCallUnit {
             authApiService.logout()
         }.also {
-            // 성공 여부와 관계없이 로컬 토큰 및 프로필 정보 삭제
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+
+                FcmTokenManager.deleteTokenFromServer(token)
+
+            } catch (e: Exception) {
+                // 실패해도 로그아웃은 진행해야 함
+                Timber.e(e, "로그아웃 중 FCM 토큰 삭제 실패")
+            }
+
             tokenManager.clearTokens()
             UserProfileManager.clearProfile()
         }

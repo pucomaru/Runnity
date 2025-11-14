@@ -3,6 +3,7 @@ package com.example.runnity.data.api
 import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
 import com.example.runnity.data.remote.api.ChallengeApiService
+import com.example.runnity.data.remote.api.NotificationApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.google.gson.GsonBuilder
@@ -113,5 +114,13 @@ object RetrofitInstance {
      */
     val runApi: RunApiService by lazy {
         createService(RunApiService::class.java)
+    }
+
+    /**
+     * NotificationApiService 인스턴스
+     * FCM 토큰 저장/삭제
+     */
+    val notificationApi: NotificationApiService by lazy {
+        createService(NotificationApiService::class.java)
     }
 }
