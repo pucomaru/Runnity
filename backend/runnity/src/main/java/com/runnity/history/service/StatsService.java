@@ -28,7 +28,7 @@ public class StatsService {
 
         List<RunRecord> records = runRecordRepository.findByMemberIdAndPeriod(memberId, startDate, endDate);
 
-        List<String> labels = generatePeriodLabels(period);
+        List<String> labels = generatePeriodLabels(period, startDate.toLocalDate());
         Map<String, PeriodStatResponse> statsMap = labels.stream()
                 .collect(Collectors.toMap(
                         label -> label,
@@ -89,14 +89,14 @@ public class StatsService {
                 .build();
     }
 
-    private List<String> generatePeriodLabels(String period) {
+    private List<String> generatePeriodLabels(String period, LocalDate startDate) {
         return switch (period.toLowerCase()) {
             case "week" -> Arrays.stream(DayOfWeek.values())
                     .map(d -> d.getDisplayName(TextStyle.SHORT, Locale.KOREAN))
                     .toList();
 
             case "month" -> {
-                int days = LocalDate.now().lengthOfMonth();
+                int days = startDate.lengthOfMonth();
                 List<String> list = new ArrayList<>();
                 for (int i = 1; i <= days; i++) list.add(i + "일");
                 yield list;
