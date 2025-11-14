@@ -4,6 +4,8 @@ import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
 import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.remote.api.RunApiService
+import com.example.runnity.data.remote.api.RunHistoryApiService
+import com.example.runnity.data.remote.api.StatsApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.example.runnity.data.remote.interceptor.TokenRefreshInterceptor
@@ -119,5 +121,20 @@ object RetrofitInstance {
         createService(RunApiService::class.java)
     }
 
+    /**
+     * RunHistoryApiService 인스턴스
+     * 러닝 기록 조회, 저장, 참가한 챌린지 조회
+     */
+    val runHistoryApi: RunHistoryApiService by lazy {
+        createService(RunHistoryApiService::class.java)
+    }
+
+    /**
+     * StatsApiService 인스턴스
+     * 개인의 러닝 기록 통계 조회
+     */
+    val statsApi: StatsApiService by lazy {
+        createService(StatsApiService::class.java)
+    }
 
 }
