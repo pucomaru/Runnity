@@ -4,9 +4,18 @@ pipeline {
   environment {
     DOCKERHUB_USERNAME = 'daum0604'
     IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-websocket"
+
+    // backend/ 아래에 있는 웹소켓용 docker-compose.yml 사용
+    COMPOSE_FILE = 'docker-compose.yml'
+
+    // 원격 서버에서 사용할 디렉토리 이름 (~/websocket-app)
+    DEPLOY_DIR = 'websocket-app'
   }
 
-  options { disableConcurrentBuilds(); timestamps() }
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+  }
 
   stages {
     stage('Checkout') {
@@ -22,15 +31,15 @@ pipeline {
 
     stage('Docker Build & Push') {
       steps {
-        // 웹소켓 타겟 프로젝트: backend/runnity-websocket
-        dir('backend/runnity-websocket') {
+        // 👉 Dockerfile, docker-compose.yml 이 있는 위치: backend/
+        dir('backend') {
           sh "pwd && ls -al"
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
               set -euxo pipefail
               echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
 
-              # 현재 디렉토리(backend/runnity-websocket)에 있는 Dockerfile 기준 빌드
+              # backend/Dockerfile 기준으로 빌드
               docker build -t ${IMAGE}:${env.TAG} -t ${IMAGE}:latest -f Dockerfile .
 
               docker push ${IMAGE}:${env.TAG}
@@ -39,6 +48,29 @@ pipeline {
             """
           }
         }
+      }
+    }
+
+    stage('Bundle compose') {
+      steps {
+        dir('backend') {
+          sh """
+            set -euxo pipefail
+            mkdir -p deploy_bundle
+
+            # backend/${COMPOSE_FILE} -> deploy_bundle/docker-compose.yml 로 복사
+            cp -f ${COMPOSE_FILE} deploy_bundle/docker-compose.yml
+
+            # 필요 시 backend/.env 도 같이 번들링 (없으면 무시)
+            [ -f .env ] && cp -f .env deploy_bundle/ || true
+
+            tar czf deploy_bundle.tgz -C deploy_bundle .
+            ls -al deploy_bundle
+          """
+        }
+
+        // workspace 기준 경로 주의: backend/ 안에 있음
+        archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
@@ -52,11 +84,9 @@ pipeline {
                   set -euxo pipefail
                   test -f backend/deploy_bundle.tgz
 
-                  # 원격 디렉토리 생성
                   ssh -o StrictHostKeyChecking=no ubuntu@43.203.217.82 'set -eux; mkdir -p ~/${DEPLOY_DIR}'
                   scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@43.203.217.82:~/${DEPLOY_DIR}/
 
-                  # 원격에서 번들 풀고, TAG를 주입해서 websocket 컨테이너 배포
                   ssh -o StrictHostKeyChecking=no ubuntu@43.203.217.82 "
                     set -euxo pipefail
                     cd ~/${DEPLOY_DIR}
@@ -114,5 +144,4 @@ pipeline {
       }
     }
   }
-  
 }
