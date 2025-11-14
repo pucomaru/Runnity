@@ -2,47 +2,47 @@ import json
 from kafka import KafkaConsumer
 from app.utils.logger import logger
 from app.kafka_client.producer import send_commentary  # 코멘터리 발송 함수 import
+import os
+from app.models.highlight_event import HighlightEvent
+from app.llm.generator import generate_commentary
 
 def start_consumer():
+    bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+
     try:
         consumer = KafkaConsumer(
-            'highlight-event',
-            bootstrap_servers='kafka:9092',
-            auto_offset_reset='latest',
+            "highlight-event",
+            bootstrap_servers=bootstrap,
+            auto_offset_reset="latest",
             enable_auto_commit=True,
-            value_deserializer=lambda v: v.decode('utf-8')
+            value_deserializer=lambda v: v.decode("utf-8")
         )
 
         logger.info("Kafka Consumer thread started.")
         logger.info("Listening for highlight-event messages...")
 
         for message in consumer:
-            raw_value = message.value.strip()  # 공백 제거
-            if not raw_value:
-                continue  # 빈 메시지는 무시
+            raw = message.value.strip()
+            if not raw:
+                continue
 
             try:
-                data = json.loads(raw_value)
-                logger.info(f"Received Kafka event: {data}")
+                data = json.loads(raw)  # json으로 파싱
+                event = HighlightEvent(**data)  # pydantic model로 변환
 
-                # 코멘터리 생성 로직 실행
-                highlight_type = data.get("highlightType")
-                nickname = data.get("nickname")
-                target = data.get("targetNickname")
+                # 1) LLM 멘트 생성
+                commentary_text = generate_commentary(event)
 
-                if highlight_type == "OVERTAKE":
-                    commentary = f"{nickname}님이 {target}님을 추월했습니다!"
-                elif highlight_type == "FINISH":
-                    commentary = f"{nickname}님이 완주했습니다!"
-                else:
-                    commentary = f"{nickname}님의 {highlight_type} 이벤트 감지!"
+                # 2) event.commentary 필드에 담기
+                event.commentary = commentary_text
 
-                # Kafka Producer로 전달 (다른 서비스에 알림)
-                send_commentary(commentary)
-                logger.info(f"Commentary generated & sent: {commentary}")
+                logger.info(f"Received Kafka event: {event}")
 
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parse error: {e} / raw: {raw_value}")
+                # 3) Kafka로 publish
+                send_commentary(event)
+
+            except Exception as e:
+                logger.error(f"Consumer JSON error: {e} / raw: {raw}")
 
     except Exception as e:
         logger.error(f"Kafka consumer failed to start: {e}")
