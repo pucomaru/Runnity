@@ -52,6 +52,22 @@ public class SessionManager {
      * @param session WebSocket 세션
      */
     public void registerSession(Long challengeId, Long userId, String nickname, String profileImage, WebSocketSession session) {
+        registerSession(challengeId, userId, nickname, profileImage, session, null, null);
+    }
+
+    /**
+     * 세션 등록 (메모리 + Redis) - 재접속 시 이전 정보 유지
+     * 
+     * @param challengeId 챌린지 ID
+     * @param userId 사용자 ID
+     * @param nickname 닉네임
+     * @param profileImage 프로필 이미지 URL
+     * @param session WebSocket 세션
+     * @param previousDistance 재접속인 경우 이전 거리 (null이면 0.0)
+     * @param previousPace 재접속인 경우 이전 페이스 (null이면 0)
+     */
+    public void registerSession(Long challengeId, Long userId, String nickname, String profileImage, 
+                               WebSocketSession session, Double previousDistance, Integer previousPace) {
         String sessionKey = makeSessionKey(challengeId, userId);
         
         // 1. 메모리에 세션 저장
@@ -62,18 +78,21 @@ public class SessionManager {
         long now = System.currentTimeMillis();
         redisTemplate.opsForZSet().add(participantsKey, userId.toString(), now);
         
-        // 3. Redis에 참가자 정보 저장 (Hash)
+        // 3. Redis에 참가자 정보 저장
+        // 재접속인 경우 이전 distance, pace 유지, 아니면 0.0 / 0
         String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
         try {
-            ParticipantInfo info = new ParticipantInfo(userId, nickname, profileImage, 0.0, 0.0);
+            Double distance = previousDistance != null ? previousDistance : 0.0;
+            Integer pace = previousPace != null ? previousPace : 0;
+            ParticipantInfo info = new ParticipantInfo(userId, nickname, profileImage, distance, pace);
             String infoJson = objectMapper.writeValueAsString(info);
             redisTemplate.opsForValue().set(infoKey, infoJson);
         } catch (JsonProcessingException e) {
             log.error("참가자 정보 저장 실패: challengeId={}, userId={}", challengeId, userId, e);
         }
         
-        log.info("세션 등록 완료: challengeId={}, userId={}, nickname={}, sessionId={}", 
-                challengeId, userId, nickname, session.getId());
+        log.info("세션 등록 완료: challengeId={}, userId={}, nickname={}, sessionId={}, isReconnect={}", 
+                challengeId, userId, nickname, session.getId(), previousDistance != null);
     }
 
     /**
@@ -178,6 +197,111 @@ public class SessionManager {
     }
 
     /**
+     * 참가자 정보 업데이트 (distance, pace)
+     * 
+     * @param challengeId 챌린지 ID
+     * @param userId 사용자 ID
+     * @param distance 새로운 거리
+     * @param pace 새로운 페이스
+     */
+    public void updateParticipantInfo(Long challengeId, Long userId, Double distance, Integer pace) {
+        try {
+            String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
+            String infoJson = redisTemplate.opsForValue().get(infoKey);
+            
+            if (infoJson == null) {
+                log.warn("참가자 정보 없음: challengeId={}, userId={}", challengeId, userId);
+                return;
+            }
+            
+            ParticipantInfo info = objectMapper.readValue(infoJson, ParticipantInfo.class);
+            ParticipantInfo updatedInfo = new ParticipantInfo(
+                info.userId,
+                info.nickname,
+                info.profileImage,
+                distance,
+                pace
+            );
+            
+            String updatedJson = objectMapper.writeValueAsString(updatedInfo);
+            redisTemplate.opsForValue().set(infoKey, updatedJson);
+            
+            log.debug("참가자 정보 업데이트: challengeId={}, userId={}, distance={}, pace={}", 
+                    challengeId, userId, distance, pace);
+        } catch (Exception e) {
+            log.error("참가자 정보 업데이트 실패: challengeId={}, userId={}", challengeId, userId, e);
+        }
+    }
+
+    /**
+     * 참가자 정보 조회
+     * 
+     * @param challengeId 챌린지 ID
+     * @param userId 사용자 ID
+     * @return 참가자 정보 (없으면 null)
+     */
+    public ParticipantInfo getParticipantInfo(Long challengeId, Long userId) {
+        try {
+            String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
+            String infoJson = redisTemplate.opsForValue().get(infoKey);
+            
+            if (infoJson == null) {
+                return null;
+            }
+            
+            return objectMapper.readValue(infoJson, ParticipantInfo.class);
+        } catch (Exception e) {
+            log.error("참가자 정보 조회 실패: challengeId={}, userId={}", challengeId, userId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 참가자 순위 계산 (distance 기준 내림차순)
+     * 
+     * @param challengeId 챌린지 ID
+     * @param userId 사용자 ID
+     * @return 순위 (1부터 시작, 없으면 null)
+     */
+    public Integer calculateRanking(Long challengeId, Long userId) {
+        try {
+            String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
+            Set<String> userIds = redisTemplate.opsForZSet().range(participantsKey, 0, -1);
+            
+            if (userIds == null || userIds.isEmpty()) {
+                return null;
+            }
+            
+            // 모든 참가자의 distance 조회
+            List<ParticipantDistance> distances = new ArrayList<>();
+            for (String userIdStr : userIds) {
+                Long uid = Long.parseLong(userIdStr);
+                ParticipantInfo info = getParticipantInfo(challengeId, uid);
+                if (info != null) {
+                    distances.add(new ParticipantDistance(uid, info.distance()));
+                }
+            }
+            
+            // distance 기준 내림차순 정렬
+            distances.sort((a, b) -> Double.compare(b.distance(), a.distance()));
+            
+            // 순위 계산
+            int ranking = 1;
+            for (ParticipantDistance pd : distances) {
+                if (pd.userId().equals(userId)) {
+                    return ranking;
+                }
+                ranking++;
+            }
+            
+            return null; // 해당 사용자를 찾지 못함
+        } catch (Exception e) {
+            log.error("순위 계산 실패: challengeId={}, userId={}", challengeId, userId, e);
+            return null;
+        }
+    }
+
+    /**
      * 세션 키 생성
      */
     private String makeSessionKey(Long challengeId, Long userId) {
@@ -192,7 +316,15 @@ public class SessionManager {
         String nickname,
         String profileImage,
         Double distance,
-        Double pace
+        Integer pace
+    ) {}
+
+    /**
+     * 순위 계산용 DTO
+     */
+    private record ParticipantDistance(
+        Long userId,
+        Double distance
     ) {}
 }
 

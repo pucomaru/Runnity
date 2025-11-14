@@ -1,13 +1,5 @@
 package com.runnity.websocket.dto.websocket.client;
 
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
-
-import java.util.Set;
-
 /**
  * RECORD 메시지 (클라이언트 → 서버)
  * 
@@ -21,20 +13,23 @@ import java.util.Set;
  * @param timestamp 타임스탬프
  */
 public record RecordMessage(
-    @NotNull String type,
-    @NotNull @PositiveOrZero Double distance,
-    @NotNull @PositiveOrZero Double pace,
-    @NotNull Long timestamp
+    String type,
+    Double distance,
+    Integer pace,
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public RecordMessage {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("type은 필수입니다");
+        }
+        if (distance == null || distance < 0) {
+            throw new IllegalArgumentException("distance는 0 이상이어야 합니다");
+        }
+        if (pace == null || pace < 0) {
+            throw new IllegalArgumentException("pace는 0 이상이어야 합니다");
+        }
         if (timestamp == null) {
             timestamp = System.currentTimeMillis();
-        }
-        Set<ConstraintViolation<RecordMessage>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
 }

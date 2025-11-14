@@ -9,11 +9,13 @@ package com.runnity.websocket.dto.redis;
  * @param challengeId 챌린지 ID
  * @param userId 퇴장한 사용자 ID
  * @param reason 퇴장 사유 (QUIT, FINISH, TIMEOUT, DISCONNECTED, KICKED, EXPIRED, ERROR)
+ * @param timestamp 이벤트 발생 시각
  */
 public record UserLeftEvent(
     Long challengeId,
     Long userId,
-    String reason
+    String reason,
+    Long timestamp
 ) {
     public UserLeftEvent {
         if (challengeId == null || challengeId <= 0) {
@@ -25,6 +27,13 @@ public record UserLeftEvent(
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("reason은 필수입니다");
         }
+        if (timestamp == null) {
+            timestamp = System.currentTimeMillis();
+        }
+    }
+    
+    public UserLeftEvent(Long challengeId, Long userId, String reason) {
+        this(challengeId, userId, reason, System.currentTimeMillis());
     }
 }
 

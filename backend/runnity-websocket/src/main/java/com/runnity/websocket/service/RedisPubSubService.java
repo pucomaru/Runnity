@@ -81,7 +81,7 @@ public class RedisPubSubService {
      * @param distance 현재 거리
      * @param pace 현재 페이스
      */
-    public void publishParticipantUpdate(Long challengeId, Long userId, Double distance, Double pace) {
+    public void publishParticipantUpdate(Long challengeId, Long userId, Double distance, Integer pace) {
         try {
             ParticipantUpdateEvent event = new ParticipantUpdateEvent(challengeId, userId, distance, pace);
             String message = objectMapper.writeValueAsString(event);

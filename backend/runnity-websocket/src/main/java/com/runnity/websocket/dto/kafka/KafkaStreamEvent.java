@@ -1,13 +1,6 @@
 package com.runnity.websocket.dto.kafka;
 
 import com.runnity.websocket.enums.KafkaEventType;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
-
-import java.util.Set;
 
 /**
  * Kafka 스트림 이벤트
@@ -27,26 +20,36 @@ import java.util.Set;
  * @param timestamp 이벤트 발생 시각
  */
 public record KafkaStreamEvent(
-    @NotNull KafkaEventType eventType,
-    @NotNull Long challengeId,
-    @NotNull Long runnerId,
+    KafkaEventType eventType,
+    Long challengeId,
+    Long runnerId,
     String nickname,
     String profileImage,
-    @PositiveOrZero Double distance,
-    @PositiveOrZero Double pace,
+    Double distance,
+    Integer pace,
     Integer ranking,
     Boolean isBroadcast,
     String reason,
-    @NotNull Long timestamp
+    Long timestamp
 ) {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    
     public KafkaStreamEvent {
-        Set<ConstraintViolation<KafkaStreamEvent>> violations = validator.validate(this);
-        if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(
-                violations.iterator().next().getMessage()
-            );
+        if (eventType == null) {
+            throw new IllegalArgumentException("eventType은 필수입니다");
+        }
+        if (challengeId == null || challengeId <= 0) {
+            throw new IllegalArgumentException("challengeId는 양수여야 합니다");
+        }
+        if (runnerId == null || runnerId <= 0) {
+            throw new IllegalArgumentException("runnerId는 양수여야 합니다");
+        }
+        if (distance != null && distance < 0) {
+            throw new IllegalArgumentException("distance는 0 이상이어야 합니다");
+        }
+        if (pace != null && pace < 0) {
+            throw new IllegalArgumentException("pace는 0 이상이어야 합니다");
+        }
+        if (timestamp == null) {
+            timestamp = System.currentTimeMillis();
         }
     }
 }

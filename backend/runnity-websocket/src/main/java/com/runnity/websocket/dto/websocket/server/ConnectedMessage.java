@@ -62,7 +62,7 @@ public record ConnectedMessage(
         String nickname,
         String profileImage,
         Double distance,
-        Double pace
+        Integer pace
     ) {
         public Participant {
             if (userId == null) {

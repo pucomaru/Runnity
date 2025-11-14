@@ -16,7 +16,7 @@ public record ParticipantUpdateMessage(
     String type,
     Long userId,
     Double distance,
-    Double pace,
+    Integer pace,
     Long timestamp
 ) {
     public ParticipantUpdateMessage {
@@ -34,7 +34,7 @@ public record ParticipantUpdateMessage(
         }
     }
     
-    public ParticipantUpdateMessage(Long userId, Double distance, Double pace) {
+    public ParticipantUpdateMessage(Long userId, Double distance, Integer pace) {
         this("PARTICIPANT_UPDATE", userId, distance, pace, System.currentTimeMillis());
     }
 }

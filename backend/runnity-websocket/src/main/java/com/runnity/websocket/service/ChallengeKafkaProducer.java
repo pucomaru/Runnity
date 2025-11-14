@@ -59,7 +59,7 @@ public class ChallengeKafkaProducer {
                     nickname,
                     profileImage,
                     0.0,  // 초기 distance
-                    0.0,  // 초기 pace
+                    0,    // 초기 pace
                     null, // 초기 ranking (아직 순위 없음)
                     isBroadcast,
                     null, // reason (start는 불필요)
@@ -91,7 +91,7 @@ public class ChallengeKafkaProducer {
      * @param ranking 현재 순위
      */
     public void publishRunningEvent(Long challengeId, Long runnerId, String nickname, String profileImage,
-                                     Double distance, Double pace, Integer ranking) {
+                                     Double distance, Integer pace, Integer ranking) {
         try {
             boolean isBroadcast = isBroadcast(challengeId);
             if (!isBroadcast) {
@@ -135,7 +135,7 @@ public class ChallengeKafkaProducer {
      * @param ranking 최종 순위
      */
     public void publishFinishEvent(Long challengeId, Long runnerId, String nickname, String profileImage,
-                                    Double distance, Double pace, Integer ranking) {
+                                    Double distance, Integer pace, Integer ranking) {
         try {
             boolean isBroadcast = isBroadcast(challengeId);
             if (!isBroadcast) {
@@ -180,7 +180,7 @@ public class ChallengeKafkaProducer {
      * @param reason 퇴장 사유
      */
     public void publishLeaveEvent(Long challengeId, Long runnerId, String nickname, String profileImage,
-                                   Double distance, Double pace, Integer ranking, String reason) {
+                                   Double distance, Integer pace, Integer ranking, String reason) {
         try {
             boolean isBroadcast = isBroadcast(challengeId);
             if (!isBroadcast) {
@@ -221,7 +221,7 @@ public class ChallengeKafkaProducer {
      */
     private boolean isBroadcast(Long challengeId) {
         try {
-            String key = "broadcast:" + challengeId + ":meta";
+            String key = "challenge:" + challengeId + ":meta";
             Object flag = redisTemplate.opsForHash().get(key, "isBroadcast");
             
             if (flag == null) {
