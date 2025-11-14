@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,37 +66,8 @@ fun HomeScreen(
         )
     )
 
-    // 예약한 챌린지 샘플 데이터
-    // TODO: ViewModel에서 실제 데이터 가져오기
-    // TODO: ViewModel에서 실제 챌린지 시작 시간을 확인하여
-    //       시작 5분 전부터 buttonState를 Join으로 변경해야 함
-    //       (HomeViewModel의 startChallengeTimeChecker 구현 필요)
-    val reservedChallenges = listOf(
-        ChallengeListItem(
-            id = "res_1",
-            distance = "3km",
-            title = "아침 러닝 챌린지",
-            startDateTime = "2025.11.05 16:09",
-            participants = "12/20",
-            buttonState = ChallengeButtonState.None  // 기본: 버튼 없음 (이미 예약됨)
-        ),
-        ChallengeListItem(
-            id = "res_2",
-            distance = "5km",
-            title = "주말 마라톤 대회",
-            startDateTime = "2025.11.09 10:00",
-            participants = "45/50",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "res_3",
-            distance = "10km",
-            title = "야간 러닝 챌린지",
-            startDateTime = "2025.11.10 19:00",
-            participants = "8/15",
-            buttonState = ChallengeButtonState.None
-        )
-    )
+    // 예약한 챌린지: ViewModel의 실제 데이터 사용
+    val reservedChallenges = viewModel.reservedChallenges.collectAsState().value
 
     // 전체 레이아웃
     Column(

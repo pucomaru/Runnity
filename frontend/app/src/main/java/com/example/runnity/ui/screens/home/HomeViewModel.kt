@@ -6,6 +6,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.runnity.data.repository.RunHistoryRepository
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.model.response.ChallengeSimpleInfo
+import com.example.runnity.ui.components.ChallengeListItem
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * 홈 화면 ViewModel
@@ -19,9 +26,11 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // TODO: 예약한 챌린지 리스트 State 추가
-    // private val _reservedChallenges = MutableStateFlow<List<ChallengeListItem>>(emptyList())
-    // val reservedChallenges: StateFlow<List<ChallengeListItem>> = _reservedChallenges.asStateFlow()
+    // 예약한 챌린지 리스트 State (enterableChallenge가 최상단)
+    private val _reservedChallenges = MutableStateFlow<List<ChallengeListItem>>(emptyList())
+    val reservedChallenges: StateFlow<List<ChallengeListItem>> = _reservedChallenges.asStateFlow()
+
+    private val runHistoryRepository = RunHistoryRepository()
 
     init {
         loadHomeData()
@@ -32,11 +41,66 @@ class HomeViewModel : ViewModel() {
     private fun loadHomeData() {
         viewModelScope.launch {
             try {
-                // TODO: Repository에서 데이터 로드
+                // 예약한 챌린지 불러오기 (enterable → joined 순)
+                fetchReservedChallenges()
                 _uiState.value = HomeUiState.Success
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "알 수 없는 오류")
             }
+        }
+    }
+
+    // 예약한 챌린지 조회: enterableChallenge를 최상단에 배치
+    fun fetchReservedChallenges() {
+        viewModelScope.launch {
+            when (val resp = runHistoryRepository.getMyChallenges()) {
+                is ApiResponse.Success -> {
+                    val data = resp.data
+                    val list = buildList {
+                        data.enterableChallenge?.let { add(mapToListItem(it)) }
+                        data.joinedChallenges.forEach { add(mapToListItem(it)) }
+                    }
+                    _reservedChallenges.value = list
+                }
+                is ApiResponse.Error -> {
+                    // 에러 시 비워두고 상태만 갱신 (UI는 변경하지 않음)
+                    _reservedChallenges.value = emptyList()
+                }
+                ApiResponse.NetworkError -> {
+                    _reservedChallenges.value = emptyList()
+                }
+            }
+        }
+    }
+
+    // 서버의 간단 챌린지 정보를 홈 리스트 아이템으로 매핑
+    private fun mapToListItem(info: ChallengeSimpleInfo): ChallengeListItem {
+        val distanceText = formatDistance(info.distance)
+        val participants = "${info.currentParticipants}/${info.maxParticipants}명"
+        val startText = formatIsoToLocal(info.startAt)
+        return ChallengeListItem(
+            id = info.challengeId.toString(),
+            distance = distanceText,
+            title = info.title,
+            startDateTime = startText,
+            participants = participants
+        )
+    }
+
+    private fun formatDistance(raw: String): String {
+        val v = raw.toDoubleOrNull() ?: return raw
+        val iv = v.toInt() // 소수점 버림
+        return "${iv}km"
+    }
+
+    private fun formatIsoToLocal(iso: String): String {
+        return try {
+            val instant = Instant.parse(iso)
+            val zoned = instant.atZone(ZoneId.systemDefault())
+            val formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
+            zoned.format(formatter)
+        } catch (e: Exception) {
+            iso
         }
     }
 

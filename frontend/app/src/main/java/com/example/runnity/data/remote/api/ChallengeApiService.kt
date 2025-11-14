@@ -106,4 +106,10 @@ interface ChallengeApiService {
     suspend fun getChallengeDetail(
         @Path("challengeId") challengeId: Long
     ): Response<BaseResponse<ChallengeDetailResponse>>
+
+    // 예약한 챌린지 조회
+    @GET("api/v1/me/challenges")
+    suspend fun gettReservedChallenges(
+
+    )
 }
