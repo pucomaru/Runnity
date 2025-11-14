@@ -57,7 +57,7 @@ websocket:
   ticket:
     ttl: ${WEBSOCKET_TICKET_TTL:30}
   health:
-    circuit-breaker-ttl: ${WEBSOCKET_CIRCUIT_BREAKER_TTL:30}
+    circuit-breaker-ttl: ${WEBSOCKET_CIRCUIT_BREAKER_TTL:5}
 
 # OAuth 설정
 oauth:
