@@ -238,7 +238,8 @@ fun RunningRecordTabSection(
     onTabSelected: (Int) -> Unit,
     personalRecords: List<RunningRecord>,
     challengeRecords: List<RunningRecord>,
-    onViewAllClick: () -> Unit
+    onViewAllClick: () -> Unit,
+    onRecordClick: (RunningRecord) -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -296,7 +297,10 @@ fun RunningRecordTabSection(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     records.take(5).forEach { record ->
-                        RunningRecordItem(record = record)
+                        RunningRecordItem(
+                            record = record,
+                            onClick = { onRecordClick(record) }
+                        )
                     }
                 }
             }
@@ -353,9 +357,21 @@ private fun IconTab(
  * 러닝 기록 아이템 (ChallengeCard 스타일)
  */
 @Composable
-private fun RunningRecordItem(record: RunningRecord) {
+private fun RunningRecordItem(
+    record: RunningRecord,
+    onClick: () -> Unit = {}
+) {
+    // 개인/챌린지에 따라 아이콘 선택
+    val icon = if (record.type == "challenge") {
+        Icons.Filled.Group
+    } else {
+        Icons.Filled.DirectionsRun
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
@@ -382,8 +398,8 @@ private fun RunningRecordItem(record: RunningRecord) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.DirectionsRun,
-                    contentDescription = "러닝",
+                    imageVector = icon,
+                    contentDescription = if (record.type == "challenge") "챌린지" else "러닝",
                     tint = ColorPalette.Common.accent,
                     modifier = Modifier.size(28.dp)
                 )

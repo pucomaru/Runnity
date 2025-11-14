@@ -148,7 +148,15 @@ fun MyPageScreen(
                             personalRecords = state.personalRecords,
                             challengeRecords = state.challengeRecords,
                             onViewAllClick = {
-                                // TODO: 모든 운동 기록 페이지로 이동
+                                // 모든 운동 기록 페이지로 이동
+                                navController?.navigate("all_run_history")
+                            },
+                            onRecordClick = { record ->
+                                // 운동 기록 상세 페이지로 이동 (개인/챌린지 구분)
+                                when (record.type) {
+                                    "personal" -> navController?.navigate("personal_run_detail/${record.id}")
+                                    "challenge" -> navController?.navigate("challenge_run_detail/${record.id}")
+                                }
                             }
                         )
                     }
