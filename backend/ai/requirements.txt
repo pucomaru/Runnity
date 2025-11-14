@@ -3,7 +3,6 @@ bs4==0.0.2
 certifi==2025.6.15
 charset-normalizer==3.4.2
 idna==3.10
-pygame==2.6.1
 soupsieve==2.7
 typing_extensions==4.14.0
 urllib3==2.5.0
@@ -13,3 +12,4 @@ kafka-python==2.0.2
 pydantic==2.6.3
 requests==2.31.0
 python-dotenv==1.0.1
+google-cloud-texttospeech==2.17.0
