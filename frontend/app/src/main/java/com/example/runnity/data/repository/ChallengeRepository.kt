@@ -25,20 +25,24 @@ class ChallengeRepository(
      * 검색, 필터링, 정렬, 페이징 지원
      *
      * @param keyword 검색 키워드 (선택)
-     * @param distance 거리 필터 (FIVE, TEN 등, 선택)
-     * @param startAt 시작 일시 (이 시간 이후 시작하는 챌린지만 조회)
-     * @param endAt 종료 일시 (이 시간 이전에 시작하는 챌린지만 조회)
+     * @param distances 거리 필터 (예: FIVE, TEN, HALF - 여러 개 선택 가능)
+     * @param startDate 시작 날짜 (이 날짜 이후 시작하는 챌린지만 조회, 예: 2025-11-14)
+     * @param endDate 종료 날짜 (이 날짜 이전에 시작하는 챌린지만 조회, 예: 2025-11-17)
+     * @param startTime 시작 시간 (이 시간 이후 시작하는 챌린지만 조회, 예: 09:00:00)
+     * @param endTime 종료 시간 (이 시간 이전에 시작하는 챌린지만 조회, 예: 23:00:00)
      * @param visibility 공개 여부 (PUBLIC: 공개방만, ALL: 전체)
-     * @param sort 정렬 기준 (LATEST, POPULAR 등, 선택)
+     * @param sort 정렬 기준 (LATEST: 임박순, POPULAR: 인기순)
      * @param page 페이지 번호 (기본: 0)
      * @param size 페이지 크기 (기본: 10)
      * @return ApiResponse<ChallengeListResponse>
      */
     suspend fun getChallenges(
         keyword: String? = null,
-        distance: String? = null,
-        startAt: String? = null,
-        endAt: String? = null,
+        distances: List<String>? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        startTime: String? = null,
+        endTime: String? = null,
         visibility: String? = null,
         sort: String? = null,
         page: Int = 0,
@@ -47,9 +51,11 @@ class ChallengeRepository(
         return safeApiCall {
             challengeApiService.getChallenges(
                 keyword = keyword,
-                distance = distance,
-                startAt = startAt,
-                endAt = endAt,
+                distances = distances,
+                startDate = startDate,
+                endDate = endDate,
+                startTime = startTime,
+                endTime = endTime,
                 visibility = visibility,
                 sort = sort,
                 page = page,

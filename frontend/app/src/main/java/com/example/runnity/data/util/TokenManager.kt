@@ -3,12 +3,16 @@ package com.example.runnity.data.util
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 
 /**
  * JWT 토큰 관리 매니저
  * - EncryptedSharedPreferences로 보안성 높은 토큰 저장
  * - Access Token, Refresh Token 관리
+ * - 인증 상태 변화 감지 (로그아웃 시 자동 로그인 화면 이동)
  */
 object TokenManager {
 
@@ -18,6 +22,16 @@ object TokenManager {
     private const val KEY_PROFILE_COMPLETED = "profile_completed"
 
     private var encryptedPrefs: android.content.SharedPreferences? = null
+
+    /**
+     * 인증 상태 Flow
+     * - true: 로그인 상태 (토큰 있음)
+     * - false: 로그아웃 상태 (토큰 없음)
+     *
+     * UI에서 이 Flow를 관찰하여 로그인 화면으로 자동 이동 가능
+     */
+    private val _authenticationState = MutableStateFlow(false)
+    val authenticationState: StateFlow<Boolean> = _authenticationState.asStateFlow()
 
     /**
      * TokenManager 초기화
@@ -36,7 +50,10 @@ object TokenManager {
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
-            Timber.d("TokenManager 초기화 완료")
+
+            // 초기 인증 상태 설정
+            _authenticationState.value = isLoggedIn()
+            Timber.d("TokenManager 초기화 완료 (인증 상태: ${_authenticationState.value})")
         } catch (e: Exception) {
             Timber.e(e, "TokenManager 초기화 실패")
         }
@@ -81,7 +98,8 @@ object TokenManager {
             putString(KEY_REFRESH_TOKEN, refreshToken)
             apply()
         }
-        Timber.d("Access Token & Refresh Token 저장됨")
+        _authenticationState.value = true
+        Timber.d("Access Token & Refresh Token 저장됨 (인증 상태: true)")
     }
 
     /**
@@ -89,7 +107,8 @@ object TokenManager {
      */
     fun clearTokens() {
         encryptedPrefs?.edit()?.clear()?.apply()
-        Timber.d("모든 토큰 삭제됨")
+        _authenticationState.value = false
+        Timber.d("모든 토큰 삭제됨 (인증 상태: false)")
     }
 
     /**

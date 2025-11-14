@@ -18,14 +18,14 @@ import com.example.runnity.theme.Typography
  * 정렬 드롭다운 컴포넌트
  * - 현재 선택된 정렬 기준을 표시하고 클릭 시 드롭다운 메뉴 표시
  * - 오른쪽 정렬로 배치됨
- * - 기본 옵션: "인기순", "최신순"
+ * - 기본 옵션: "임박순", "인기순"
  *
- * @param selectedSort 현재 선택된 정렬 (예: "인기순")
+ * @param selectedSort 현재 선택된 정렬 (예: "임박순")
  * @param onSortSelected 정렬 선택 이벤트
  * @param modifier Modifier (선택사항)
  *
  * 사용 예시:
- * var selectedSort by remember { mutableStateOf("인기순") }
+ * var selectedSort by remember { mutableStateOf("임박순") }
  * SortDropdown(
  *     selectedSort = selectedSort,
  *     onSortSelected = { selectedSort = it }
@@ -37,8 +37,8 @@ fun SortDropdown(
     onSortSelected: (String) -> Unit,      // 정렬 선택 콜백
     modifier: Modifier = Modifier          // 추가 Modifier
 ) {
-    // 정렬 옵션 (고정) - 최신순이 먼저
-    val sortOptions = listOf("최신순", "인기순")
+    // 정렬 옵션 (고정) - 임박순이 먼저
+    val sortOptions = listOf("임박순", "인기순")
 
     // 드롭다운 메뉴 표시 여부 상태
     var expanded by remember { mutableStateOf(false) }
@@ -112,7 +112,7 @@ fun SortDropdown(
 )
 @Composable
 private fun SortDropdownPreview() {
-    var selectedSort by remember { mutableStateOf("인기순") }
+    var selectedSort by remember { mutableStateOf("임박순") }
 
     Column(
         modifier = Modifier.padding(16.dp),
