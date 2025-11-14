@@ -344,9 +344,9 @@
 
 ---
 
-### 채널: `challenge:expired`
+### 채널: `challenge:done`
 
-#### 2.4. CHALLENGE_EXPIRED
+#### 2.4. CHALLENGE_DONE
 **발행 시점**: 비즈니스 서버에서 챌린지 종료 처리 후 (handleDone()에서 challenge:*:done 처리 후)  
 **발행자**: 비즈니스 서버  
 **구독자**: 모든 WebSocket 서버  

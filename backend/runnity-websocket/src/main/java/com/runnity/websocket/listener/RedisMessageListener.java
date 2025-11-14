@@ -1,7 +1,7 @@
 package com.runnity.websocket.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.runnity.websocket.dto.redis.ChallengeExpiredEvent;
+import com.runnity.websocket.dto.redis.ChallengeDoneEvent;
 import com.runnity.websocket.dto.redis.ParticipantUpdateEvent;
 import com.runnity.websocket.dto.redis.UserEnteredEvent;
 import com.runnity.websocket.dto.redis.UserLeftEvent;
@@ -47,7 +47,7 @@ public class RedisMessageListener implements MessageListener {
     private static final String CHANNEL_ENTER = "challenge:enter";
     private static final String CHANNEL_LEAVE = "challenge:leave";
     private static final String CHANNEL_UPDATE = "challenge:update";
-    private static final String CHANNEL_EXPIRED = "challenge:expired";
+    private static final String CHANNEL_DONE = "challenge:done";
 
     /**
      * 초기화: 채널 구독 등록
@@ -57,9 +57,9 @@ public class RedisMessageListener implements MessageListener {
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_ENTER));
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_LEAVE));
         listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_UPDATE));
-        listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_EXPIRED));
+        listenerContainer.addMessageListener(this, new ChannelTopic(CHANNEL_DONE));
         log.info("Redis Pub/Sub 구독 시작: {}, {}, {}, {}", 
-                CHANNEL_ENTER, CHANNEL_LEAVE, CHANNEL_UPDATE, CHANNEL_EXPIRED);
+                CHANNEL_ENTER, CHANNEL_LEAVE, CHANNEL_UPDATE, CHANNEL_DONE);
     }
 
     @Override
@@ -74,7 +74,7 @@ public class RedisMessageListener implements MessageListener {
                 case CHANNEL_ENTER -> handleUserEntered(payload);
                 case CHANNEL_LEAVE -> handleUserLeft(payload);
                 case CHANNEL_UPDATE -> handleParticipantUpdate(payload);
-                case CHANNEL_EXPIRED -> handleChallengeExpired(payload);
+                case CHANNEL_DONE -> handleChallengeDone(payload);
                 default -> log.warn("알 수 없는 채널: {}", channel);
             }
         } catch (Exception e) {
@@ -205,16 +205,16 @@ public class RedisMessageListener implements MessageListener {
     }
 
     /**
-     * 챌린지 종료 시간 만료 이벤트 처리
+     * 챌린지 종료 이벤트 처리
      * 비즈니스 서버에서 챌린지 종료 처리 후 발행하는 이벤트
      * (비즈니스 서버의 handleDone()에서 challenge:*:done 처리 후 발행)
      */
-    private void handleChallengeExpired(String payload) {
+    private void handleChallengeDone(String payload) {
         try {
-            ChallengeExpiredEvent event = objectMapper.readValue(payload, ChallengeExpiredEvent.class);
+            ChallengeDoneEvent event = objectMapper.readValue(payload, ChallengeDoneEvent.class);
             Long challengeId = event.challengeId();
 
-            log.info("챌린지 종료 시간 만료 이벤트 수신: challengeId={}", challengeId);
+            log.info("챌린지 종료 이벤트 수신: challengeId={}", challengeId);
 
             // 해당 챌린지의 모든 참가자 조회
             Set<String> userIds = sessionManager.getChallengeParticipantIds(challengeId);
@@ -238,11 +238,11 @@ public class RedisMessageListener implements MessageListener {
                 }
             }
 
-            log.info("챌린지 종료 시간 만료 처리 완료: challengeId={}, 처리된 참가자 수={}", 
+            log.info("챌린지 종료 처리 완료: challengeId={}, 처리된 참가자 수={}", 
                     challengeId, processedCount);
 
         } catch (Exception e) {
-            log.error("챌린지 종료 시간 만료 이벤트 처리 실패: payload={}", payload, e);
+            log.error("챌린지 종료 이벤트 처리 실패: payload={}", payload, e);
         }
     }
 
