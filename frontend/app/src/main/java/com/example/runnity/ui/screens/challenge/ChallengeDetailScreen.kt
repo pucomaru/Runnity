@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +67,9 @@ fun ChallengeDetailScreen(
     // 다이얼로그 상태
     var showReserveDialog by remember { mutableStateOf(false) }
     var showCancelReserveDialog by remember { mutableStateOf(false) }
+
+    // 비밀번호 입력 상태 (비공개 챌린지용)
+    var passwordInput by remember { mutableStateOf("") }
 
     // 챌린지 정보가 없으면 로딩 표시
     if (challengeDetail == null) {
@@ -245,21 +249,62 @@ fun ChallengeDetailScreen(
     // 예약하기 확인 다이얼로그
     if (showReserveDialog) {
         AlertDialog(
-            onDismissRequest = { showReserveDialog = false },
+            onDismissRequest = {
+                showReserveDialog = false
+                passwordInput = ""  // 다이얼로그 닫을 때 비밀번호 초기화
+            },
             title = { Text("챌린지 예약") },
-            text = { Text("이 챌린지를 예약하시겠습니까?") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("이 챌린지를 예약하시겠습니까?")
+
+                    // 비공개 챌린지인 경우 비밀번호 입력 필드 표시
+                    if (!isPublic) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = passwordInput,
+                            onValueChange = {
+                                // 4자리 숫자만 입력 가능
+                                if (it.length <= 4 && it.all { char -> char.isDigit() }) {
+                                    passwordInput = it
+                                }
+                            },
+                            label = { Text("비밀번호 (4자리)") },
+                            placeholder = { Text("비밀번호를 입력하세요") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.joinChallenge(challengeIdLong)
+                        // 비공개 챌린지인 경우 비밀번호 검증
+                        if (!isPublic && passwordInput.length != 4) {
+                            // 비밀번호가 4자리가 아니면 아무 것도 하지 않음
+                            return@TextButton
+                        }
+
+                        // 비밀번호 전달 (공개 챌린지는 null)
+                        val password = if (!isPublic) passwordInput else null
+                        viewModel.joinChallenge(challengeIdLong, password)
                         showReserveDialog = false
-                    }
+                        passwordInput = ""  // 비밀번호 초기화
+                    },
+                    // 비공개 챌린지인데 비밀번호가 4자리가 아니면 버튼 비활성화
+                    enabled = isPublic || passwordInput.length == 4
                 ) {
                     Text("예약하기")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showReserveDialog = false }) {
+                TextButton(onClick = {
+                    showReserveDialog = false
+                    passwordInput = ""  // 비밀번호 초기화
+                }) {
                     Text("취소")
                 }
             }

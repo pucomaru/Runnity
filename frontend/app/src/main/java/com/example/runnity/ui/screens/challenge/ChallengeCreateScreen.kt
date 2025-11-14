@@ -55,10 +55,26 @@ fun ChallengeCreateScreen(
     // 날짜 선택 상태 (단일 날짜)
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
-    // 시간 선택 상태
-    var selectedHour by remember { mutableStateOf(6) }      // 1~12
-    var selectedMinute by remember { mutableStateOf(0) }    // 0~59
-    var selectedAmPm by remember { mutableStateOf("pm") }   // am, pm
+    // 시간 선택 상태 (현재 시간으로 초기화)
+    var selectedHour by remember {
+        val now = LocalDateTime.now()
+        val currentHour24 = now.hour
+        val currentHour = when {
+            currentHour24 == 0 -> 12  // 0시 = 12 AM
+            currentHour24 > 12 -> currentHour24 - 12  // 13시 = 1 PM
+            else -> currentHour24
+        }
+        mutableStateOf(currentHour)
+    }
+
+    var selectedMinute by remember {
+        mutableStateOf(LocalDateTime.now().minute)
+    }
+
+    var selectedAmPm by remember {
+        val currentHour24 = LocalDateTime.now().hour
+        mutableStateOf(if (currentHour24 < 12) "am" else "pm")
+    }
 
     // 중계방 사용 여부
     var broadcastEnabled by remember { mutableStateOf("미사용") }
