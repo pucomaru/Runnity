@@ -345,6 +345,8 @@ class MyPageViewModel(
             }
 
             RunningRecord(
+                id = record.runRecordId.toString(),
+                type = "personal",
                 date = dateString,
                 distance = record.distance,
                 pace = paceString,
@@ -388,6 +390,8 @@ class MyPageViewModel(
             }
 
             RunningRecord(
+                id = record.runRecordId.toString(),
+                type = "challenge",
                 date = dateString,
                 distance = record.distance,
                 pace = paceString,
@@ -503,6 +507,8 @@ data class GraphPoint(
  * 러닝 기록
  */
 data class RunningRecord(
+    val id: String, // 운동 기록 ID
+    val type: String, // "personal" 또는 "challenge"
     val date: String, // "2025.11.02"
     val distance: Double, // km
     val pace: String, // "6'03\""
