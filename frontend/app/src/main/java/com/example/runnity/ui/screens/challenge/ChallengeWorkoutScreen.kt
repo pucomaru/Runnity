@@ -157,7 +157,7 @@ fun ChallengeWorkoutScreen(
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
             if (distanceKm >= goalKm) {
-                navController.navigate("challenge_result") {
+                navController.navigate("challenge_result/$challengeId") {
                     popUpTo("challenge_workout/$challengeId") { inclusive = true }
                 }
             }

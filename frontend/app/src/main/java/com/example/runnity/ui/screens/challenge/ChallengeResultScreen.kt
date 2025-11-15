@@ -20,14 +20,17 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +39,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.model.request.RunCreateRequest
+import com.example.runnity.data.model.request.RunLapCreateRequest
+import com.example.runnity.data.repository.RunRepository
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.PageHeader
@@ -54,16 +61,83 @@ import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.route.RouteLine
 import com.kakao.vectormap.route.RouteLineStyles
+import com.google.gson.Gson
 import com.google.android.gms.location.LocationServices
+import timber.log.Timber
 
 @Composable
 fun ChallengeResultScreen(
+    challengeId: Int,
     onClose: (() -> Unit)? = null
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val sessionViewModel: WorkoutSessionViewModel = viewModel()
+    val context = LocalContext.current
+    // 개인/챌린지 공통으로 사용하는 WorkoutSessionViewModel
+    // (거리, 시간, 페이스, 랩, 경로 등 모든 운동 기록을 여기서 관리)
+    val sessionViewModel: WorkoutSessionViewModel = viewModel(context as androidx.lifecycle.ViewModelStoreOwner)
     val metrics by sessionViewModel.metrics.collectAsState()
     val route by sessionViewModel.route.collectAsState()
+    val sessionStartTime by sessionViewModel.sessionStartTime.collectAsState()
+    val laps by sessionViewModel.laps.collectAsState()
+
+    var posted by rememberSaveable { mutableStateOf(false) }
+
+    // 챌린지 결과 화면 진입 시, 챌린지 러닝 기록을 백엔드에 한 번만 저장
+    // - runType: CHALLENGE
+    // - challengeId: 현재 챌린지 ID
+    // - 나머지 필드(distance, durationSec, pace, bpm, calories, route, laps)는 개인 운동 결과 저장과 동일
+    LaunchedEffect(sessionStartTime, challengeId) {
+        if (challengeId <= 0) return@LaunchedEffect
+        if (posted) return@LaunchedEffect
+        val first = sessionViewModel.tryMarkPosted()
+        if (!first) return@LaunchedEffect
+        posted = true
+
+        val runType = "CHALLENGE"
+        val startMs = sessionStartTime ?: System.currentTimeMillis() - metrics.totalElapsedMs
+        val endMs = startMs + metrics.totalElapsedMs
+        val routeJson = try { Gson().toJson(route) } catch (_: Throwable) { "[]" } ?: "[]"
+        val avgPace = metrics.avgPaceSecPerKm?.toInt() ?: 0
+        val avgBpm = metrics.avgHeartRate ?: 0
+        val lapRequests = laps.map {
+            RunLapCreateRequest(
+                sequence = it.sequence,
+                distance = it.distanceMeters / 1000.0,
+                durationSec = it.durationSec,
+                pace = it.paceSecPerKm,
+                bpm = it.bpm
+            )
+        }
+        val req = RunCreateRequest(
+            runType = runType,
+            distance = metrics.distanceMeters / 1000.0,
+            durationSec = (metrics.activeElapsedMs / 1000L).toInt(),
+            startAt = java.time.Instant.ofEpochMilli(startMs).atZone(java.time.ZoneOffset.UTC).toLocalDateTime().toString(),
+            endAt = java.time.Instant.ofEpochMilli(endMs).atZone(java.time.ZoneOffset.UTC).toLocalDateTime().toString(),
+            pace = avgPace,
+            bpm = avgBpm,
+            calories = metrics.caloriesKcal,
+            route = routeJson,
+            laps = lapRequests,
+            challengeId = challengeId
+        )
+        val repository = RunRepository()
+        val result = runCatching { repository.createRun(req) }.getOrNull()
+        when (result) {
+            is ApiResponse.Success -> {
+                Timber.d("createRun (challenge) success")
+            }
+            is ApiResponse.Error -> {
+                Timber.w("createRun (challenge) failed: code=${result.code}, message=${result.message}")
+            }
+            ApiResponse.NetworkError -> {
+                Timber.w("createRun (challenge) failed: network error")
+            }
+            null -> {
+                Timber.w("createRun (challenge) failed: null response")
+            }
+        }
+    }
 
     val socketViewModel: ChallengeSocketViewModel = viewModel()
     val participants by socketViewModel.participants.collectAsState()

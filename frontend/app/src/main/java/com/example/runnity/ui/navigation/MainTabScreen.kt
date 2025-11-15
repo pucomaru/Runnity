@@ -199,8 +199,10 @@ fun MainTabScreen(
                 }
 
                 // 챌린지 결과 화면
-                composable("challenge_result") {
+                composable("challenge_result/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id")?.toIntOrNull() ?: 0
                     ChallengeResultScreen(
+                        challengeId = challengeId,
                         onClose = { navController.navigate("home") }
                     )
                 }
