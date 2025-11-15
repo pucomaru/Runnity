@@ -236,20 +236,32 @@ public class ChallengeSchedulerService implements MessageListener {
         redisTemplate.opsForZSet().add("schedule:running", challengeId + ":RUNNING", toTimestamp(startAt));
         redisTemplate.opsForZSet().add("schedule:done", challengeId + ":DONE", toTimestamp(endAt));
 
-        // 내부 스케줄러에 등록
-        scheduleTask(challengeId, readyAt, "READY");
-        scheduleTask(challengeId, startAt, "RUNNING");
-        scheduleTask(challengeId, endAt, "DONE");
+        // 내부 스케줄러에 등록 (새로 생성된 챌린지이므로 타이밍 이슈 대응을 위해 즉시 실행 허용)
+        scheduleTask(challengeId, readyAt, "READY", true);
+        scheduleTask(challengeId, startAt, "RUNNING", true);
+        scheduleTask(challengeId, endAt, "DONE", true);
 
         log.info("스케줄 등록 완료: challengeId={}, ready={}, start={}, end={}",
                 challengeId, readyAt, startAt, endAt);
     }
 
     private void scheduleTask(Long challengeId, LocalDateTime executeAt, String eventType) {
+        scheduleTask(challengeId, executeAt, eventType, false);
+    }
+
+    private void scheduleTask(Long challengeId, LocalDateTime executeAt, String eventType, boolean allowImmediateExecution) {
         long delay = calculateDelay(executeAt);
         if (delay < 0) {
-            log.warn("과거 시간은 스케줄링 불가: challengeId={}, executeAt={}", challengeId, executeAt);
-            return;
+            if (allowImmediateExecution) {
+                // 새로 생성된 챌린지의 타이밍 이슈 대응: 즉시 실행
+                log.warn("과거 시간 감지, 즉시 실행: challengeId={}, executeAt={}, eventType={}", 
+                        challengeId, executeAt, eventType);
+                delay = 0;
+            } else {
+                // 서버 재시작 시 리스케줄링: 과거 시간은 스킵
+                log.warn("과거 시간은 스케줄링 불가: challengeId={}, executeAt={}", challengeId, executeAt);
+                return;
+            }
         }
 
         scheduler.schedule(() -> {
@@ -352,7 +364,7 @@ public class ChallengeSchedulerService implements MessageListener {
                 continue;
             }
 
-            // 활성 챌린지만 재등록
+            // 활성 챌린지만 재등록 (상태에 따라 적절한 이벤트만 재등록)
             if (challenge.getStatus() != ChallengeStatus.DONE) {
                 // Challenge 테이블의 startAt, endAt을 기반으로 스케줄 재등록
                 LocalDateTime executeAt = switch (eventType) {
@@ -361,10 +373,27 @@ public class ChallengeSchedulerService implements MessageListener {
                     case "DONE" -> challenge.getEndAt();
                     default -> null;
                 };
-                if (executeAt != null && executeAt.isAfter(now)) {
-                    scheduleTask(challengeId, executeAt, eventType);
-                    log.info("리스케줄링: challengeId={}, type={}, executeAt={}",
-                            challengeId, eventType, executeAt);
+                
+                if (executeAt != null) {
+                    // 상태에 따라 적절한 이벤트만 재등록 (중복 실행 방지)
+                    boolean shouldReschedule = switch (eventType) {
+                        case "READY" -> challenge.getStatus() == ChallengeStatus.RECRUITING;
+                        case "RUNNING" -> challenge.getStatus() == ChallengeStatus.READY;
+                        case "DONE" -> challenge.getStatus() == ChallengeStatus.RUNNING;
+                        default -> false;
+                    };
+                    
+                    if (shouldReschedule && executeAt.isAfter(now)) {
+                        // 미래 시간인 경우에만 재등록 (과거 시간은 스킵)
+                        scheduleTask(challengeId, executeAt, eventType, false);
+                        log.info("리스케줄링: challengeId={}, type={}, executeAt={}, status={}",
+                                challengeId, eventType, executeAt, challenge.getStatus());
+                    } else {
+                        // 이미 처리된 이벤트는 Redis에서 제거
+                        redisTemplate.opsForZSet().remove(zsetKey, event);
+                        log.info("이미 처리된 이벤트 스케줄 제거: challengeId={}, type={}, status={}",
+                                challengeId, eventType, challenge.getStatus());
+                    }
                 }
             } else {
                 // 완료된 챌린지는 Redis에서 제거
