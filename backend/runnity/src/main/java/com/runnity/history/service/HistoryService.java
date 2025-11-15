@@ -187,6 +187,7 @@ public class HistoryService {
         }
     }
 
+    @Transactional
     public void handleChallengeFinish(Member member, RunRecord runRecord, Long challengeId) {
 
         var cp = repository.findCompletedByMemberIdAndChallengeId(member.getMemberId(), challengeId)
