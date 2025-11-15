@@ -11,7 +11,8 @@ data class RunCreateRequest(
     val bpm: Int,
     val calories: Double,
     val route: String?,
-    val laps: List<RunLapCreateRequest>? = null
+    val laps: List<RunLapCreateRequest>? = null,
+    val challengeId: Int? = null
 )
 
 data class RunLapCreateRequest(
