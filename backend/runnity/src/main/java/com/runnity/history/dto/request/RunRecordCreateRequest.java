@@ -15,6 +15,9 @@ public record RunRecordCreateRequest(
         @Schema(description = "러닝 타입 (ENUM: PERSONAL, CHALLENGE)", example = "PERSONAL")
         RunRecordType runType,
 
+        @Schema(description = "챌린지 아이디(개인 달리기의 경우 null", example = "3")
+        Long challengeId,
+
         @NotNull(message = "총 거리는 필수입니다.")
         @Schema(description = "총 거리 (km)", example = "5.2")
         Float distance,
