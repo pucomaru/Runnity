@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,10 +15,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +47,15 @@ fun HomeScreen(
     parentNavController: NavController? = null,  // 앱 전체 이동용
     viewModel: HomeViewModel = viewModel()       // viewModel(): ViewModel 자동 생성
 ) {
+    val context = LocalContext.current
+
+    // 홈 입장/소켓 연결 관련 에러 메시지 토스트 표시
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // TODO: ViewModel에서 실제 데이터 가져오기
     // 현재는 임시 데이터 사용
 
@@ -68,63 +81,41 @@ fun HomeScreen(
         )
     )
 
-    // 예약한 챌린지 샘플 데이터
-    // TODO: ViewModel에서 실제 데이터 가져오기
-    // TODO: ViewModel에서 실제 챌린지 시작 시간을 확인하여
-    //       시작 5분 전부터 buttonState를 Join으로 변경해야 함
-    //       (HomeViewModel의 startChallengeTimeChecker 구현 필요)
-    val reservedChallenges = listOf(
-        ChallengeListItem(
-            id = "res_1",
-            distance = "3km",
-            title = "아침 러닝 챌린지",
-            startDateTime = "2025.11.05 16:09",
-            participants = "12/20",
-            buttonState = ChallengeButtonState.None  // 기본: 버튼 없음 (이미 예약됨)
-        ),
-        ChallengeListItem(
-            id = "res_2",
-            distance = "5km",
-            title = "주말 마라톤 대회",
-            startDateTime = "2025.11.09 10:00",
-            participants = "45/50",
-            buttonState = ChallengeButtonState.None
-        ),
-        ChallengeListItem(
-            id = "res_3",
-            distance = "10km",
-            title = "야간 러닝 챌린지",
-            startDateTime = "2025.11.10 19:00",
-            participants = "8/15",
-            buttonState = ChallengeButtonState.None
-        )
-    )
+    // 예약한 챌린지: ViewModel의 실제 데이터 사용
+    val reservedChallenges = viewModel.reservedChallenges.collectAsState().value
 
     // 전체 레이아웃
-    Box(modifier = Modifier.fillMaxSize()) {
-
+    Box(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 96.dp) // FAB 여백
+            contentPadding = PaddingValues(bottom = 96.dp)
         ) {
-            // 1. 상단 앱바
             item {
+
+                // 1. 상단 앱바 (로고 + 알람)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(ColorPalette.Common.accent)
+                        .background(ColorPalette.Common.accent)  // 액센트 색상 배경
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 로고 (이미지)
                     Image(
                         painter = painterResource(id = R.drawable.runnity_logo),
                         contentDescription = "Runnity Logo",
                         modifier = Modifier.height(32.dp),
                         contentScale = ContentScale.Fit
                     )
-                    IconButton(onClick = { /* TODO */ }) {
+
+                    // 알람 아이콘
+                    IconButton(
+                        onClick = {
+                            // TODO: 알람 페이지로 이동
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.Notifications,
                             contentDescription = "알림",
@@ -135,12 +126,13 @@ fun HomeScreen(
                 }
             }
 
-            // 2-1. 날씨 카드
+            // 2. 스크롤 가능한 내용
             item {
+                // 2-1. 날씨 카드
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(ColorPalette.Common.accent)
+                        .background(ColorPalette.Common.accent)  // 액센트 색상 배경
                         .padding(16.dp)
                 ) {
                     WeatherCard(
@@ -149,12 +141,12 @@ fun HomeScreen(
                         weather = "Cloudy",
                         temperature = "10°",
                         time = "9:41 AM",
-                        backgroundImageUrl = null
+                        backgroundImageUrl = null  // TODO: 실제 날씨 배경 이미지 URL
                     )
                 }
             }
 
-            // 2-2. 운영진 추천 섹션 헤더
+            // 2-2. 운영진 추천 챌린지 섹션
             item {
                 SectionHeader(
                     subtitle = "운영진 추천 챌린지",
@@ -162,7 +154,6 @@ fun HomeScreen(
                 )
             }
 
-            // 2-2. 추천 캐러셀 (가로 스크롤은 OK)
             item {
                 RecommendedChallengeCarousel(
                     challenges = recommendedChallenges,
@@ -172,34 +163,38 @@ fun HomeScreen(
                 )
             }
 
-            // 2-3. 예약한 챌린지 섹션 헤더
             item {
+                // 2-3. 예약한 챌린지 섹션
                 SectionHeader(
                     subtitle = "예약한 챌린지",
                     caption = "내가 예약한 챌린지를 확인하세요"
                 )
             }
 
-            // 2-3. 예약한 챌린지 리스트
-            items(reservedChallenges.size) { index ->
-                val c = reservedChallenges[index]
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
+            items(reservedChallenges, key = { it.id }) { challenge ->
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    // 예약한 챌린지 리스트
                     ChallengeCard(
-                        distance = c.distance,
-                        title = c.title,
-                        startDateTime = c.startDateTime,
-                        participants = c.participants,
-                        buttonState = c.buttonState,
-                        onCardClick = { navController?.navigate("challenge_detail/${c.id}") }
+                        distance = challenge.distance,
+                        title = challenge.title,
+                        startDateTime = challenge.startDateTime,
+                        participants = challenge.participants,
+                        buttonState = challenge.buttonState,
+                        onCardClick = {
+                            navController?.navigate("challenge_detail/${challenge.id}")
+                        },
+                        onButtonClick = {
+                            viewModel.joinChallengeAndConnect(challenge.id) {
+                                navController?.navigate("challenge_waiting/${challenge.id}")
+                            }
+                        }
                     )
                 }
             }
         }
 
+        // 하단 여백
+        Spacer(modifier = Modifier.height(16.dp))
 
         FloatingActionButton(
             onClick = { navController?.navigate("broadcast_view") },

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.repository.AuthRepository
+import com.example.runnity.data.util.FcmTokenManager
 import com.example.runnity.data.util.TokenManager
 import com.example.runnity.data.util.UserProfileManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,7 +107,7 @@ class LoginViewModel(
 
     /**
      * 프로필 조회 및 저장
-     * 로그인 성공 후 기존 회원의 프로필 정보를 가져와 저장
+     * 로그인 성공 후 기존 회원ㅅ의 프로필 정보를 가져와 저장
      */
     private suspend fun fetchAndSaveProfile() {
         Timber.d("Login: 프로필 조회 API 호출")
@@ -115,6 +116,7 @@ class LoginViewModel(
                 Timber.d("Login: 프로필 조회 성공, 저장 중...")
                 UserProfileManager.saveProfile(profileResult.data)
                 Timber.d("Login: 프로필 저장 완료 - nickname=${profileResult.data.nickname}")
+                FcmTokenManager.updateTokenToServer()
                 _uiState.value = LoginUiState.Success
             }
             is ApiResponse.Error -> {

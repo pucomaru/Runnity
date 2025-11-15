@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -26,11 +27,17 @@ import com.example.runnity.theme.Typography
 import com.example.runnity.ui.screens.home.HomeScreen
 import com.example.runnity.ui.screens.startrun.StartRunScreen
 import com.example.runnity.ui.screens.challenge.ChallengeScreen
+import com.example.runnity.ui.screens.challenge.ChallengeWorkoutScreen
 import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
 import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
+import com.example.runnity.ui.screens.challenge.ChallengeWaitingScreen
+import com.example.runnity.ui.screens.challenge.ChallengeCountdownScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
+import com.example.runnity.ui.screens.mypage.PersonalRunDetailScreen
+import com.example.runnity.ui.screens.mypage.ChallengeRunDetailScreen
+import com.example.runnity.ui.screens.mypage.AllRunHistoryScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.runnity.ui.screens.broadcast.BroadcastFilterScreen
@@ -73,9 +80,11 @@ fun MainTabScreen(
         "challenge",         // 챌린지 리스트 화면
         "challenge_filter",  // 챌린지 필터 화면
         "challenge_create",  // 챌린지 생성 화면
-        "mypage",             // 마이페이지 화면
+        "mypage",            // 마이페이지 화면
+        "all_run_history",    // 운동 기록 화면 (달력)
         "broadcast_view"      // 중계목록 화면
-    )
+    ) || currentRoute?.startsWith("personal_run_detail/") == true  // 개인 운동 기록 상세
+       || currentRoute?.startsWith("challenge_run_detail/") == true // 챌린지 운동 기록 상세
 
     // Scaffold: 상단바, 하단바, 플로팅 버튼 등을 배치하는 레이아웃
     Scaffold(
@@ -164,6 +173,33 @@ fun MainTabScreen(
                         navController = navController  // 뒤로가기용
                     )
                 }
+
+                // 챌린지 대기방 화면 (소켓 입장 후)
+                composable("challenge_waiting/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWaitingScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
+
+                // 챌린지 카운트다운 화면 (홈 탭에서 접근하는 경우)
+                composable("challenge_countdown/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeCountdownScreen(
+                        navController = navController,
+                        challengeId = challengeId
+                    )
+                }
+
+                // 챌린지 운동 화면 (홈 탭에서 접근하는 경우)
+                composable("challenge_workout/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWorkoutScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
             }
 
             // ========== 개인 러닝 그래프 ==========
@@ -236,24 +272,48 @@ fun MainTabScreen(
                 route = BottomNavItem.Challenge.graphRoute
             ) {
                 // 챌린지 리스트 화면 (전체 챌린지)
-                composable(BottomNavItem.Challenge.route) {
+                composable(BottomNavItem.Challenge.route) { backStackEntry ->
+                    // ViewModel을 navigation graph 레벨에서 공유 (필터/생성 화면과 공유)
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeScreen(
                         navController = navController,           // 세부 화면으로 이동용
-                        parentNavController = parentNavController
+                        parentNavController = parentNavController,
+                        viewModel = challengeViewModel
                     )
                 }
 
                 // 챌린지 필터 화면 (네비바 있음)
-                composable("challenge_filter") {
+                composable("challenge_filter") { backStackEntry ->
+                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeFilterScreen(
-                        navController = navController  // 뒤로가기용
+                        navController = navController,  // 뒤로가기용
+                        viewModel = challengeViewModel
                     )
                 }
 
                 // 챌린지 생성 화면 (네비바 있음)
-                composable("challenge_create") {
+                composable("challenge_create") { backStackEntry ->
+                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeCreateScreen(
-                        navController = navController  // 뒤로가기용
+                        navController = navController,  // 뒤로가기용
+                        viewModel = challengeViewModel
                     )
                 }
 
@@ -262,6 +322,15 @@ fun MainTabScreen(
                 composable("challenge_detail/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id") ?: ""
                     ChallengeDetailScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
+
+                // 챌린지 대기방 화면 (챌린지 탭에서 접근하는 경우)
+                composable("challenge_waiting/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWaitingScreen(
                         challengeId = challengeId,
                         navController = navController
                     )
@@ -309,6 +378,31 @@ fun MainTabScreen(
                     ProfileSettingScreen(
                         navController = navController,
                         parentNavController = parentNavController
+                    )
+                }
+
+                // 운동 기록 화면 (네비바 있음)
+                composable("all_run_history") {
+                    AllRunHistoryScreen(
+                        navController = navController
+                    )
+                }
+
+                // 개인 운동 기록 상세 화면 (네비바 있음)
+                composable("personal_run_detail/{id}") { backStackEntry ->
+                    val runId = backStackEntry.arguments?.getString("id") ?: ""
+                    PersonalRunDetailScreen(
+                        runId = runId,
+                        navController = navController
+                    )
+                }
+
+                // 챌린지 운동 기록 상세 화면 (네비바 있음)
+                composable("challenge_run_detail/{id}") { backStackEntry ->
+                    val runId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeRunDetailScreen(
+                        runId = runId,
+                        navController = navController
                     )
                 }
             }

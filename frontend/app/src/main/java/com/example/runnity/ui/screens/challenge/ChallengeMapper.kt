@@ -64,7 +64,7 @@ object ChallengeMapper {
 
     /**
      * 버튼 상태 결정 (리스트 전용)
-     * - 시작 5분 전이고 예약한 챌린지: Join 버튼 (웹소켓 참가하기)
+     * - 시작 5분 전 ~ 시작 10초 전까지 예약한 챌린지: Join 버튼 (웹소켓 참가하기)
      * - 그 외 모든 경우: None (버튼 없음)
      *
      * 참고: 예약하기/예약 취소하기 버튼은 상세 화면에서만 제공
@@ -73,10 +73,11 @@ object ChallengeMapper {
         return try {
             val startTime = LocalDateTime.parse(startAt, DateTimeFormatter.ISO_DATE_TIME)
             val now = LocalDateTime.now()
-            val minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime)
+            val secondsUntilStart = ChronoUnit.SECONDS.between(now, startTime)
 
-            // 시작 5분 전이고 예약한 챌린지인 경우에만 참가하기 버튼 표시 (웹소켓 참가용)
-            if (isJoined && minutesUntilStart in 0..5) {
+            // 시작 10초 전(예: 20:59:50)부터 시작 5분 전(20:55:00)까지 참가하기 버튼 표시 (웹소켓 참가용)
+            // 예: 21:00 시작 -> 20:55:00 ~ 20:59:50 활성화, 20:59:51부터 비활성화
+            if (isJoined && secondsUntilStart in 10..300) {
                 ChallengeButtonState.Join
             } else {
                 ChallengeButtonState.None

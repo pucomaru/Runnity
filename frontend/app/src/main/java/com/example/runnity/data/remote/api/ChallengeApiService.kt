@@ -6,6 +6,7 @@ import com.example.runnity.data.model.request.JoinChallengeRequest
 import com.example.runnity.data.model.response.ChallengeDetailResponse
 import com.example.runnity.data.model.response.ChallengeListResponse
 import com.example.runnity.data.model.response.ChallengeParticipantResponse
+import com.example.runnity.data.model.response.ChallengeEnterResponse
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -22,11 +23,13 @@ interface ChallengeApiService {
      * 검색, 필터링, 정렬, 페이징 지원
      *
      * @param keyword 검색 키워드 (선택)
-     * @param distance 거리 필터 (FIVE, TEN 등, 선택)
-     * @param startAt 시작 일시 (이 시간 이후 시작하는 챌린지만 조회)
-     * @param endAt 종료 일시 (이 시간 이전에 시작하는 챌린지만 조회)
+     * @param distances 거리 필터 (예: FIVE, TEN, HALF - 여러 개 선택 가능)
+     * @param startDate 시작 날짜 (이 날짜 이후 시작하는 챌린지만 조회, 최소 오늘, 예: 2025-11-14)
+     * @param endDate 종료 날짜 (이 날짜 이전에 시작하는 챌린지만 조회, 최대 일주일 후, 예: 2025-11-17)
+     * @param startTime 시작 시간 (이 시간 이후 시작하는 챌린지만 조회, 예: 09:00:00)
+     * @param endTime 종료 시간 (이 시간 이전에 시작하는 챌린지만 조회, 예: 23:00:00)
      * @param visibility 공개 여부 (PUBLIC: 공개방만, ALL: 전체)
-     * @param sort 정렬 기준 (LATEST, POPULAR 등, 선택)
+     * @param sort 정렬 기준 (LATEST: 임박순, POPULAR: 인기순)
      * @param page 페이지 번호 (기본: 0)
      * @param size 페이지 크기 (기본: 10)
      * @return 챌린지 목록
@@ -34,9 +37,11 @@ interface ChallengeApiService {
     @GET("api/v1/challenges")
     suspend fun getChallenges(
         @Query("keyword") keyword: String? = null,
-        @Query("distance") distance: String? = null,
-        @Query("startAt") startAt: String? = null,
-        @Query("endAt") endAt: String? = null,
+        @Query("distances") distances: List<String>? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
+        @Query("startTime") startTime: String? = null,
+        @Query("endTime") endTime: String? = null,
         @Query("visibility") visibility: String? = null,
         @Query("sort") sort: String? = null,
         @Query("page") page: Int = 0,
@@ -102,4 +107,21 @@ interface ChallengeApiService {
     suspend fun getChallengeDetail(
         @Path("challengeId") challengeId: Long
     ): Response<BaseResponse<ChallengeDetailResponse>>
+
+    // ==================== 챌린지 방 입장(티켓 발급) ====================
+    /**
+     * 챌린지 입장 및 WebSocket 티켓 발급
+     * @param challengeId 챌린지 ID
+     * @return ticket, wsUrl, expiresIn 등
+     */
+    @POST("api/v1/challenges/{challengeId}/enter")
+    suspend fun enterChallenge(
+        @Path("challengeId") challengeId: Long
+    ): Response<BaseResponse<ChallengeEnterResponse>>
+
+    // 예약한 챌린지 조회
+    @GET("api/v1/me/challenges")
+    suspend fun gettReservedChallenges(
+
+    )
 }

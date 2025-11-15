@@ -70,6 +70,17 @@ class WorkoutSessionViewModel : ViewModel() {
     private val _currentPaceSecPerKm = MutableStateFlow<Double?>(null)
     val currentPaceSecPerKm: StateFlow<Double?> = _currentPaceSecPerKm.asStateFlow()
 
+    // 랩(1분 단위) 집계 상태
+    data class LapStat(
+        val sequence: Int,
+        val durationSec: Int,
+        val distanceMeters: Double,
+        val paceSecPerKm: Int,
+        val bpm: Int
+    )
+    private val _laps = MutableStateFlow<List<LapStat>>(emptyList())
+    val laps: StateFlow<List<LapStat>> = _laps.asStateFlow()
+
     // 시간 계산용 기준값들
     private var sessionStartMs: Long? = null
     private val _sessionStartTime = MutableStateFlow<Long?>(null)
@@ -78,6 +89,25 @@ class WorkoutSessionViewModel : ViewModel() {
     private var activeBaseOnResumeMs: Long = 0L
     private var tickerJob: Job? = null
     private var stopping: Boolean = false
+    // 결과 저장 중복 방지 플래그 (화면 재구성/재진입 대비)
+    private var hasPostedResult: Boolean = false
+
+    // 최초 1회만 true 반환, 이후에는 false
+    fun tryMarkPosted(): Boolean {
+        return if (!hasPostedResult) {
+            hasPostedResult = true
+            true
+        } else false
+    }
+
+    // 랩 집계용 버퍼
+    private var lapSeq: Int = 1
+    private var lapActiveMs: Long = 0L
+    private var lapDistanceM: Double = 0.0
+    private var lapHrSum: Long = 0L
+    private var lapHrCount: Int = 0
+    private var lastDistanceSnapshotM: Double? = null
+    private var lastInstantHr: Int? = null
 
     // 워치 메트릭 우선 적용을 위한 최근 수신 시각
     private var lastWatchMetricsAt: Long = 0L
@@ -101,6 +131,7 @@ class WorkoutSessionViewModel : ViewModel() {
             avgHeartRate = newHr
         )
         if (paceSpKm != null) _currentPaceSecPerKm.value = paceSpKm
+        if (hrBpm != null) lastInstantHr = hrBpm
     }
 
     // 목표 관련 상태
@@ -160,6 +191,15 @@ class WorkoutSessionViewModel : ViewModel() {
         _goalProgress.value = null
         _remainingTimeMs.value = null
         _remainingDistanceMeters.value = null
+        // 랩 리셋
+        _laps.value = emptyList()
+        lapSeq = 1
+        lapActiveMs = 0L
+        lapDistanceM = 0.0
+        lapHrSum = 0L
+        lapHrCount = 0
+        lastDistanceSnapshotM = null
+        lastInstantHr = null
     }
 
     // 외부에서 목표 설정 (null이면 자유 달리기)
@@ -193,14 +233,15 @@ class WorkoutSessionViewModel : ViewModel() {
     fun pause() {
         if (_phase.value != WorkoutPhase.Running) return
         val now = System.currentTimeMillis()
-        val prevActiveStart = activeStartMs ?: now
-        val addActive = now - prevActiveStart
+        // 현재까지의 활동 시간 정확히 산출 (중복 누적 방지)
+        val active = currentActiveElapsedMs()
         _metrics.value = _metrics.value.copy(
-            totalElapsedMs = (sessionStartMs?.let { now - it } ?: _metrics.value.totalElapsedMs),
-            activeElapsedMs = _metrics.value.activeElapsedMs + addActive
+            totalElapsedMs = sessionStartMs?.let { now - it } ?: _metrics.value.totalElapsedMs,
+            activeElapsedMs = active
         )
+        // 다음 재개 시점을 위해 기준만 갱신
         activeStartMs = null
-        activeBaseOnResumeMs = _metrics.value.activeElapsedMs
+        activeBaseOnResumeMs = active
         _phase.value = WorkoutPhase.Paused
         stopTicker()
     }
@@ -220,13 +261,44 @@ class WorkoutSessionViewModel : ViewModel() {
         stopping = true
         // Cancel ticker immediately to avoid a post-stop tick
         stopTicker()
-        // Freeze to the last emitted ticker values
-        val snap = _metrics.value
-        _metrics.value = snap.copy(totalElapsedMs = snap.totalElapsedMs, activeElapsedMs = snap.activeElapsedMs)
+        // 부분 랩이 남아있으면 최종 확정
+        if (lapActiveMs > 0L) {
+            finalizeLap(partial = true)
+        }
+        // 현재 시각 기준으로 총/활동 시간 정확히 확정
+        val now = System.currentTimeMillis()
+        val total = sessionStartMs?.let { now - it } ?: _metrics.value.totalElapsedMs
+        val active = currentActiveElapsedMs()
+        _metrics.value = _metrics.value.copy(totalElapsedMs = total, activeElapsedMs = active)
         _phase.value = WorkoutPhase.Ended
         // Ensure activeStartMs is cleared to prevent any further active calculations
         activeStartMs = null
         stopping = false
+    }
+
+    // 랩 확정
+    private fun finalizeLap(partial: Boolean = false) {
+        val durationSec = (lapActiveMs / 1000L).toInt().coerceAtLeast(0)
+        val distanceKm = lapDistanceM / 1000.0
+        val pace = if (distanceKm > 0.0 && durationSec > 0) {
+            kotlin.math.round(durationSec / distanceKm).toInt()
+        } else 0
+        val bpm = if (lapHrCount > 0) ((lapHrSum.toDouble() / lapHrCount.toDouble()).let { kotlin.math.round(it).toInt() }) else 0
+        if (durationSec > 0) {
+            _laps.value = _laps.value + LapStat(
+                sequence = lapSeq,
+                durationSec = durationSec,
+                distanceMeters = lapDistanceM,
+                paceSecPerKm = pace,
+                bpm = bpm
+            )
+            lapSeq += 1
+        }
+        // 랩 버퍼 리셋
+        lapActiveMs = 0L
+        lapDistanceM = 0.0
+        lapHrSum = 0L
+        lapHrCount = 0
     }
 
     // 위치 업데이트 주입: 현재 위치 갱신 + Running 상태에서만 경로에 추가
@@ -355,16 +427,38 @@ class WorkoutSessionViewModel : ViewModel() {
         if (tickerJob != null) return
         tickerJob = viewModelScope.launch {
             while (isActive) {
-                // Respect phase and delay first to avoid immediate post-press jump
                 if (_phase.value != WorkoutPhase.Running) break
                 delay(1000L)
                 if (_phase.value != WorkoutPhase.Running) break
+
                 val now = System.currentTimeMillis()
                 val total = sessionStartMs?.let { now - it } ?: 0L
                 val active = currentActiveElapsedMs()
                 _metrics.value = _metrics.value.copy(totalElapsedMs = total, activeElapsedMs = active)
 
-                // 목표가 시간일 때 진행도/잔여 갱신 및 자동 종료
+                // 랩 집계: 거리/HR 누적 (watch-primary 우선)
+                val currentDistance = if (isWatchPrimaryActive()) {
+                    _metrics.value.distanceMeters
+                } else {
+                    totalDistanceMetersInternal
+                }
+                val prev = lastDistanceSnapshotM
+                if (prev != null && currentDistance >= prev) {
+                    lapDistanceM += (currentDistance - prev)
+                }
+                lastDistanceSnapshotM = currentDistance
+
+                lastInstantHr?.let {
+                    lapHrSum += it
+                    lapHrCount += 1
+                }
+                lapActiveMs += 1000L
+
+                if (lapActiveMs >= 60_000L) {
+                    finalizeLap()
+                }
+
+                // 목표 진행도 갱신 및 자동 종료
                 val g = _goal.value
                 if (g?.type == "time") {
                     val target = g.targetTimeMs ?: 0L
@@ -372,6 +466,16 @@ class WorkoutSessionViewModel : ViewModel() {
                         val progress = (total.toFloat() / target.toFloat()).coerceIn(0f, 1f)
                         _goalProgress.value = progress
                         _remainingTimeMs.value = (target - total).coerceAtLeast(0L)
+                        if (progress >= 1f && _phase.value == WorkoutPhase.Running) {
+                            stop()
+                        }
+                    }
+                } else if (g?.type == "distance") {
+                    val target = g.targetDistanceMeters ?: 0.0
+                    if (target > 0.0) {
+                        val progress = (_metrics.value.distanceMeters / target).toFloat().coerceIn(0f, 1f)
+                        _goalProgress.value = progress
+                        _remainingDistanceMeters.value = (target - _metrics.value.distanceMeters).coerceAtLeast(0.0)
                         if (progress >= 1f && _phase.value == WorkoutPhase.Running) {
                             stop()
                         }

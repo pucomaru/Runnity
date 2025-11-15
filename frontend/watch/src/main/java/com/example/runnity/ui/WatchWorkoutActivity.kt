@@ -3,39 +3,57 @@ package com.example.runnity.ui
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.runnity.theme.RunnityTheme
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import android.content.Intent
-import com.example.runnity.health.ExerciseFgService
 import com.example.runnity.data.datalayer.sendSessionControlFromWatch
+import com.example.runnity.health.ExerciseFgService
+import com.example.runnity.theme.RunnityTheme
+import kotlinx.coroutines.delay
+import com.example.runnity.R
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 
 class WatchWorkoutActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             RunnityTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ) { inner ->
                     WorkoutScreen(modifier = Modifier.padding(inner))
                 }
             }
@@ -46,57 +64,126 @@ class WatchWorkoutActivity : ComponentActivity() {
 @Composable
 fun WorkoutScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val isPaused = remember { mutableStateOf(false) }
-    Column(
+    val activity = (context as? ComponentActivity)
+    var isPaused by remember { mutableStateOf(false) }
+    var elapsedSec by remember { mutableStateOf(0) }
+    var distanceKm by remember { mutableStateOf(0.0) }
+    var paceSecPerKm by remember { mutableStateOf<Int?>(null) }
+    var hrBpm by remember { mutableStateOf<Int?>(null) }
+
+    // Receive metrics from ExerciseFgService local broadcast
+    LaunchedEffect(Unit) {
+        val filter = IntentFilter("com.example.runnity.action.METRICS")
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                intent ?: return
+                val elapsed = intent.getLongExtra("elapsed_ms", -1L)
+                if (elapsed >= 0) elapsedSec = (elapsed / 1000L).toInt()
+                if (intent.hasExtra("distance_m")) {
+                    val dm = intent.getDoubleExtra("distance_m", 0.0)
+                    distanceKm = dm / 1000.0
+                }
+                if (intent.hasExtra("pace_spkm")) {
+                    val p = intent.getDoubleExtra("pace_spkm", Double.NaN)
+                    if (p.isFinite() && p > 0) paceSecPerKm = kotlin.math.round(p).toInt() else paceSecPerKm = null
+                }
+                if (intent.hasExtra("hr_bpm")) {
+                    hrBpm = intent.getIntExtra("hr_bpm", 0)
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(receiver, filter)
+        }
+        try {
+            while (true) {
+                if (!isPaused) elapsedSec += 0 // keep composition alive; metrics will override
+                delay(1000)
+            }
+        } finally {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
+    // FINISH_UI 브로드캐스트는 현재 사용하지 않음 (서비스에서도 송신하지 않음)
+
+    // 시간은 서비스 브로드캐스트 값을 우선 사용
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color.Black)
+            .padding(16.dp)
     ) {
-        Text(text = "Running", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(text = "Distance: -- km", fontSize = 14.sp)
-        Text(text = "Pace: --'--\" /km", fontSize = 14.sp)
-        Text(text = "HR: -- bpm", fontSize = 14.sp)
-        Text(text = "Calories: -- kcal", fontSize = 14.sp)
+        val pretendard = remember {
+            FontFamily(
+                Font(R.font.pretendard_bold, weight = FontWeight.Bold),
+                Font(R.font.pretendard_medium, weight = FontWeight.Medium)
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val h = elapsedSec / 3600
+            val m = (elapsedSec % 3600) / 60
+            val s = elapsedSec % 60
+            val timeText = if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+            Text(
+                text = timeText,
+                color = Color.White,
+                fontSize = 44.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = pretendard
+            )
 
-        Spacer(Modifier.height(16.dp))
-        Row {
-            if (!isPaused.value) {
-                Button(onClick = {
-                    // local pause
-                    ContextCompat.startForegroundService(
-                        context,
-                        Intent(context, ExerciseFgService::class.java).apply {
-                            action = "com.example.runnity.action.PAUSE"
-                        }
-                    )
-                    // notify phone
-                    sendSessionControlFromWatch(context, "pause")
-                    isPaused.value = true
-                }) { Text("Pause") }
-            } else {
-                Button(onClick = {
-                    ContextCompat.startForegroundService(
-                        context,
-                        Intent(context, ExerciseFgService::class.java).apply {
-                            action = "com.example.runnity.action.RESUME"
-                        }
-                    )
-                    sendSessionControlFromWatch(context, "resume")
-                    isPaused.value = false
-                }) { Text("Resume") }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("페이스", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                    val p = paceSecPerKm
+                    val paceText = if (p != null && p > 0) String.format("%d'%02d\"/km", p/60, p%60) else "--:--/km"
+                    Text(paceText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("거리", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                    Text(String.format("%.2f km", distanceKm), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                }
             }
 
-            Spacer(Modifier.width(12.dp))
-            Button(onClick = {
-                context.startService(
-                    Intent(context, ExerciseFgService::class.java).apply {
-                        action = "com.example.runnity.action.STOP"
-                    }
-                )
-                sendSessionControlFromWatch(context, "stop")
-            }) { Text("Stop") }
+            Spacer(Modifier.height(10.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("심박", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                Text(hrBpm?.let { "$it bpm" } ?: "-- bpm", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = {
+                    ContextCompat.startForegroundService(
+                        context,
+                        android.content.Intent(context, ExerciseFgService::class.java).apply {
+                            action = if (!isPaused) "com.example.runnity.action.PAUSE" else "com.example.runnity.action.RESUME"
+                        }
+                    )
+                    sendSessionControlFromWatch(context, if (!isPaused) "pause" else "resume")
+                    isPaused = !isPaused
+                }) { Text(if (!isPaused) "일시정지" else "재개") }
+
+                Spacer(Modifier.width(12.dp))
+                Button(onClick = {
+                    context.startService(
+                        android.content.Intent(context, ExerciseFgService::class.java).apply {
+                            action = "com.example.runnity.action.STOP"
+                        }
+                    )
+                    sendSessionControlFromWatch(context, "stop")
+                }) { Text("종료") }
+            }
         }
     }
 }

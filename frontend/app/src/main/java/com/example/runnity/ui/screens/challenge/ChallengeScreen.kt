@@ -6,13 +6,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -40,8 +43,8 @@ fun ChallengeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
-    // 정렬 상태 (기본값: 최신순)
-    var selectedSort by remember { mutableStateOf("최신순") }
+    // 정렬 상태 (기본값: 임박순)
+    var selectedSort by remember { mutableStateOf("임박순") }
 
     // API 응답을 UI 모델로 변환
     val challenges = when (val state = uiState) {
@@ -109,10 +112,10 @@ fun ChallengeScreen(
                     selectedSort = selectedSort,
                     onSortSelected = {
                         selectedSort = it
-                        // "인기순" -> "POPULAR", "최신순" -> "LATEST" 변환
+                        // "인기순" -> "POPULAR", "임박순" -> "LATEST" 변환
                         val sortType = when (it) {
                             "인기순" -> "POPULAR"
-                            "최신순" -> "LATEST"
+                            "임박순" -> "LATEST"
                             else -> "LATEST"
                         }
                         viewModel.updateSortType(sortType)
@@ -122,35 +125,114 @@ fun ChallengeScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 4. 챌린지 리스트 (LazyColumn)
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)  // FAB 공간 확보
-            ) {
-                items(challenges.size) { index ->
-                    val challenge = challenges[index]
-                    ChallengeCard(
-                        distance = challenge.distance,
-                        title = challenge.title,
-                        startDateTime = challenge.startDateTime,
-                        participants = challenge.participants,
-                        buttonState = challenge.buttonState,
-                        onCardClick = {
-                            // 세부 화면으로 이동
-                            navController?.navigate("challenge_detail/${challenge.id}")
-                        },
-                        onButtonClick = {
-                            // 참가하기 버튼 (시작 5분 전, 웹소켓 참가용)
-                            val challengeId = challenge.id.toLongOrNull()
-                            if (challengeId != null && challenge.buttonState == ChallengeButtonState.Join) {
-                                // TODO: 웹소켓 참가 로직 추가
-                                viewModel.joinChallenge(challengeId)
+            // 4. 챌린지 리스트 또는 상태 메시지
+            when (val state = uiState) {
+                is ChallengeUiState.Loading -> {
+                    // 로딩 중
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = ColorPalette.Common.accent
+                        )
+                    }
+                }
+                is ChallengeUiState.Success -> {
+                    if (challenges.isEmpty()) {
+                        // 챌린지가 없음
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = 80.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "챌린지가 없습니다",
+                                    style = com.example.runnity.theme.Typography.Subheading,
+                                    color = ColorPalette.Light.secondary,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "새로운 챌린지를 생성해보세요!",
+                                    style = com.example.runnity.theme.Typography.Caption,
+                                    color = ColorPalette.Light.component,
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
-                    )
+                    } else {
+                        // 챌린지 리스트 표시
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
+                        ) {
+                            items(challenges.size) { index ->
+                                val challenge = challenges[index]
+                                ChallengeCard(
+                                    distance = challenge.distance,
+                                    title = challenge.title,
+                                    startDateTime = challenge.startDateTime,
+                                    participants = challenge.participants,
+                                    buttonState = challenge.buttonState,
+                                    onCardClick = {
+                                        navController?.navigate("challenge_detail/${challenge.id}")
+                                    },
+                                    onButtonClick = {
+                                        val challengeId = challenge.id.toLongOrNull()
+                                        if (challengeId != null && challenge.buttonState == ChallengeButtonState.Join) {
+                                            viewModel.joinChallenge(challengeId)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                is ChallengeUiState.Error -> {
+                    // 에러 메시지 표시
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (state.message.contains("네트워크")) {
+                                    "네트워크 연결을 확인해주세요"
+                                } else {
+                                    state.message
+                                },
+                                style = com.example.runnity.theme.Typography.Subheading,
+                                color = ColorPalette.Light.secondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            IconButton(
+                                onClick = { viewModel.refreshChallenges() }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "다시 시도",
+                                    tint = ColorPalette.Common.accent
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

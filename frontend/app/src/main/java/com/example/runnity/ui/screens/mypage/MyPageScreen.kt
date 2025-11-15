@@ -33,6 +33,7 @@ import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.BarChartData
+import com.example.runnity.ui.components.BarChartDetailedData
 import com.example.runnity.ui.components.MonthPeriodPicker
 import com.example.runnity.ui.components.PageHeader
 import com.example.runnity.ui.components.PrimaryButton
@@ -147,7 +148,15 @@ fun MyPageScreen(
                             personalRecords = state.personalRecords,
                             challengeRecords = state.challengeRecords,
                             onViewAllClick = {
-                                // TODO: 모든 운동 기록 페이지로 이동
+                                // 모든 운동 기록 페이지로 이동
+                                navController?.navigate("all_run_history")
+                            },
+                            onRecordClick = { record ->
+                                // 운동 기록 상세 페이지로 이동 (개인/챌린지 구분)
+                                when (record.type) {
+                                    "personal" -> navController?.navigate("personal_run_detail/${record.id}")
+                                    "challenge" -> navController?.navigate("challenge_run_detail/${record.id}")
+                                }
                             }
                         )
                     }
@@ -261,19 +270,35 @@ private fun GraphSection(
             .padding(16.dp)
     ) {
         // 막대 그래프 (재사용 가능한 컴포넌트 사용)
+        // 월 그래프: X축 레이블을 1, 15, 마지막 날만 표시하도록 변경
+        val displayData = remember(periodType, graphData) {
+            if (periodType == PeriodType.MONTH) {
+                val maxDay = graphData.mapNotNull { it.label.toIntOrNull() }.maxOrNull() ?: 0
+                android.util.Log.d("MyPageScreen", "월 그래프: maxDay=$maxDay, total=${graphData.size}")
+                graphData.map {
+                    val day = it.label.toIntOrNull() ?: 0
+                    val displayLabel = if (day == 1 || day == 15 || day == maxDay) it.label else ""
+                    android.util.Log.d("MyPageScreen", "day=$day, label=${it.label}, displayLabel=$displayLabel")
+                    BarChartData(displayLabel, it.distance)
+                }
+            } else {
+                graphData.map { BarChartData(it.label, it.distance) }
+            }
+        }
+
         SimpleBarChart(
-            data = graphData.map { BarChartData(it.label, it.distance) },
+            data = displayData,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp),
-            xAxisLabelFilter = { index, label ->
-                // 월일 경우: 1일, 15일, 마지막 일만 표시
-                if (periodType == PeriodType.MONTH) {
-                    val day = label.toIntOrNull() ?: 0
-                    day == 1 || day == 15 || index == graphData.size - 1
-                } else {
-                    true
-                }
+            detailedData = graphData.map {
+                BarChartDetailedData(
+                    label = it.label,
+                    distance = it.distance,
+                    time = it.timeSeconds,
+                    pace = it.paceSeconds,
+                    count = it.count
+                )
             }
         )
     }

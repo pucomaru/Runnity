@@ -62,4 +62,5 @@ dependencies {
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
 
     implementation("com.google.guava:guava:31.1-android")
+
 }

@@ -4,8 +4,13 @@ import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
 import com.example.runnity.data.remote.api.BroadcastApiService
 import com.example.runnity.data.remote.api.ChallengeApiService
+import com.example.runnity.data.remote.api.NotificationApiService
+import com.example.runnity.data.remote.api.RunApiService
+import com.example.runnity.data.remote.api.RunHistoryApiService
+import com.example.runnity.data.remote.api.StatsApiService
 import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
+import com.example.runnity.data.remote.interceptor.TokenRefreshInterceptor
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -54,6 +59,7 @@ object RetrofitInstance {
     /**
      * OkHttpClient 설정
      * - AuthInterceptor: 모든 요청에 Access Token 자동 추가
+     * - TokenRefreshInterceptor: 403 에러 시 자동 토큰 갱신 및 재시도
      * - TokenAuthenticator: 401 에러 시 자동 토큰 갱신 및 재시도
      */
     private val okHttpClient = OkHttpClient.Builder()
@@ -61,6 +67,7 @@ object RetrofitInstance {
         .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
         .addInterceptor(AuthInterceptor())           // 토큰 자동 추가
+        .addInterceptor(TokenRefreshInterceptor())   // 403 에러 시 자동 토큰 갱신
         .addInterceptor(loggingInterceptor)          // HTTP 로깅
         .authenticator(TokenAuthenticator())         // 401 에러 시 자동 토큰 갱신
         .build()
@@ -109,11 +116,35 @@ object RetrofitInstance {
     }
 
     /**
-     * RunApiService 인스턴스 (기존 유지)
-     * TODO: 추후 실제 API에 맞춰 수정 필요
+     * RunApiService 인스턴스
+     * 개인 운동 러닝 결과 저장
      */
     val runApi: RunApiService by lazy {
         createService(RunApiService::class.java)
+    }
+
+    /**
+     * NotificationApiService 인스턴스
+     * FCM 토큰 저장/삭제
+     */
+    val notificationApi: NotificationApiService by lazy {
+        createService(NotificationApiService::class.java)
+    }
+
+    /**
+     * RunHistoryApiService 인스턴스
+     * 러닝 기록 조회, 저장, 참가한 챌린지 조회
+     */
+    val runHistoryApi: RunHistoryApiService by lazy {
+        createService(RunHistoryApiService::class.java)
+    }
+
+    /**
+     * StatsApiService 인스턴스
+     * 개인의 러닝 기록 통계 조회
+     */
+    val statsApi: StatsApiService by lazy {
+        createService(StatsApiService::class.java)
     }
 
     /**
