@@ -33,6 +33,7 @@ import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
 import com.example.runnity.ui.screens.challenge.ChallengeWaitingScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCountdownScreen
+import com.example.runnity.ui.screens.challenge.ChallengeResultScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import com.example.runnity.ui.screens.mypage.PersonalRunDetailScreen
@@ -194,6 +195,13 @@ fun MainTabScreen(
                     ChallengeWorkoutScreen(
                         challengeId = challengeId,
                         navController = navController
+                    )
+                }
+
+                // 챌린지 결과 화면
+                composable("challenge_result") {
+                    ChallengeResultScreen(
+                        onClose = { navController.navigate("home") }
                     )
                 }
             }

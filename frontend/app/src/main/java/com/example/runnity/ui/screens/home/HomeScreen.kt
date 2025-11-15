@@ -185,7 +185,6 @@ fun HomeScreen(
                 }
             }
 
-            // 하단 여백
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

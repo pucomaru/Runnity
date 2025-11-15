@@ -671,7 +671,8 @@ data class Participant(
     val distanceKm: Double = 0.0,       // 실시간 누적 거리 (km)
     val paceSecPerKm: Double? = null,   // 실시간 페이스 (sec/km)
     val rank: Int = 0,                  // 프론트에서 계산한 순위 (1,2,3,...)
-    val isMe: Boolean = false           // 현재 사용자 여부
+    val isMe: Boolean = false,          // 현재 사용자 여부
+    val isRetired: Boolean = false      // 챌린지 중도 이탈 여부 (USER_LEFT 처리용)
 )
 
 /**

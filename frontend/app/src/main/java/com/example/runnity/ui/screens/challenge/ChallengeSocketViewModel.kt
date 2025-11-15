@@ -6,6 +6,7 @@ import com.example.runnity.socket.WebSocketManager
 import com.example.runnity.data.util.UserProfileManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,18 @@ class ChallengeSocketViewModel : ViewModel() {
     fun observeSession(challengeId: Long) {
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
+            // 주기적인 클라이언트 PING 전송 (연결 유지용)
+            launch {
+                while (true) {
+                    delay(30_000L)
+                    val pingJson = "{" +
+                        "\"type\":\"PING\"," +
+                        "\"timestamp\":" + System.currentTimeMillis() +
+                        "}"
+                    WebSocketManager.send(pingJson)
+                }
+            }
+
             WebSocketManager.incoming.collect { text ->
                 try {
                     // 먼저 type만 확인
@@ -38,7 +51,8 @@ class ChallengeSocketViewModel : ViewModel() {
                         "CONNECTED" -> {
                             val message = gson.fromJson(text, ConnectedMessage::class.java)
                             if (message.challengeId == challengeId) {
-                                val mapped = message.participants.map { p ->
+                                // 서버 participants에는 "나"가 포함되지 않을 수 있으므로, 클라이언트에서 보정
+                                val baseList = message.participants.map { p ->
                                     Participant(
                                         id = p.userId.toString(),
                                         nickname = p.nickname,
@@ -49,7 +63,25 @@ class ChallengeSocketViewModel : ViewModel() {
                                         isMe = (currentUserId != null && currentUserId == p.userId.toString())
                                     )
                                 }
-                                _participants.value = applyRanking(mapped)
+
+                                val withMe = if (currentUserId != null && baseList.none { it.id == currentUserId }) {
+                                    val profile = UserProfileManager.getProfile()
+                                    val meNickname = profile?.nickname ?: "나"
+                                    val meAvatar = profile?.profileImageUrl
+                                    baseList + Participant(
+                                        id = currentUserId,
+                                        nickname = meNickname,
+                                        avatarUrl = meAvatar,
+                                        averagePace = "",
+                                        distanceKm = 0.0,
+                                        paceSecPerKm = null,
+                                        isMe = true
+                                    )
+                                } else {
+                                    baseList
+                                }
+
+                                _participants.value = applyRanking(withMe)
                             }
                         }
                         "USER_ENTERED" -> {
@@ -75,7 +107,13 @@ class ChallengeSocketViewModel : ViewModel() {
                             val left = gson.fromJson(text, UserLeftMessage::class.java)
                             if (left.userId != null) {
                                 val current = _participants.value
-                                _participants.value = applyRanking(current.filterNot { it.id == left.userId.toString() })
+                                val updated = current.map { p ->
+                                    if (p.id == left.userId.toString()) {
+                                        // 챌린지 도중 퇴장한 참가자는 리스트에서 제거하지 않고 리타이어 상태로 표시
+                                        p.copy(isRetired = true)
+                                    } else p
+                                }
+                                _participants.value = applyRanking(updated)
                             }
                         }
                         "PARTICIPANT_UPDATE" -> {
@@ -90,6 +128,14 @@ class ChallengeSocketViewModel : ViewModel() {
                                 } else p
                             }
                             _participants.value = applyRanking(updated)
+                        }
+                        "PING" -> {
+                            // 서버에서 보낸 PING에 대한 PONG 응답
+                            val pongJson = "{" +
+                                "\"type\":\"PONG\"," +
+                                "\"timestamp\":" + System.currentTimeMillis() +
+                                "}"
+                            WebSocketManager.send(pongJson)
                         }
                         else -> Unit
                     }
@@ -113,10 +159,29 @@ data class ParticipantUpdateMessage(
 // 거리/페이스 기준으로 정렬하고 rank/isMe를 일관되게 적용
 private fun applyRanking(list: List<Participant>): List<Participant> {
     if (list.isEmpty()) return list
-    // 우선 distanceKm 내림차순, 동률일 때는 pace가 빠른 순
-    val sorted = list.sortedWith(compareByDescending<Participant> { it.distanceKm }.thenBy { it.paceSecPerKm ?: Double.MAX_VALUE })
-    return sorted.mapIndexed { index, p ->
-        p.copy(rank = index + 1)
+
+    // 모든 참가자의 거리가 0이면 순위를 매기지 않는다 (rank=0 유지)
+    if (list.all { it.distanceKm <= 0.0 }) {
+        return list.map { it.copy(rank = 0) }
+    }
+
+    // 우선 distanceKm 내림차순, 동률일 때는 pace가 빠른 순으로 정렬
+    val sorted = list.sortedWith(
+        compareByDescending<Participant> { it.distanceKm }
+            .thenBy { it.paceSecPerKm ?: Double.MAX_VALUE }
+    )
+
+    var currentRank = 1
+    return sorted.map { p ->
+        if (p.distanceKm > 0.0) {
+            // 기록이 있는 참가자만 1,2,3... 순위를 부여
+            val ranked = p.copy(rank = currentRank)
+            currentRank += 1
+            ranked
+        } else {
+            // 기록 없는 참가자는 rank=0으로 두고 UI에서 "--위" 처리
+            p.copy(rank = 0)
+        }
     }
 }
 
