@@ -1,6 +1,7 @@
 package com.runnity.history.service;
 
 import com.runnity.challenge.domain.Challenge;
+import com.runnity.challenge.domain.ChallengeParticipation;
 import com.runnity.challenge.domain.ParticipationStatus;
 import com.runnity.global.exception.GlobalException;
 import com.runnity.global.status.ErrorStatus;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -175,5 +177,39 @@ public class HistoryService {
                 .toList();
 
         runLapRepository.saveAll(laps);
+
+        if (request.runType() == RunRecordType.CHALLENGE) {
+            if (request.challengeId() == null) {
+                throw new GlobalException(ErrorStatus.CHALLENGE_ID_REQUIRED);
+            }
+
+            handleChallengeFinish(member, savedRecord, request.challengeId());
+        }
     }
+
+    public void handleChallengeFinish(Member member, RunRecord runRecord, Long challengeId) {
+
+        var cp = repository.findCompletedByMemberIdAndChallengeId(member.getMemberId(), challengeId)
+                .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_PARTICIPATION_NOT_FOUND));
+
+        cp.updateRunRecord(runRecord);
+
+        List<ChallengeParticipation> finishers =
+                repository.findFinishersForRanking(challengeId);
+
+        finishers.sort((a, b) ->
+                a.getRunRecord().getDurationSec().compareTo(
+                        b.getRunRecord().getDurationSec()
+                )
+        );
+
+        int newRank = 1;
+        for (ChallengeParticipation p : finishers) {
+            if (!Objects.equals(p.getRanking(), newRank)) {
+                p.updateRanking(newRank);
+            }
+            newRank++;
+        }
+    }
+
 }

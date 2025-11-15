@@ -199,4 +199,18 @@ public class ChallengeParticipation extends BaseEntity {
         }
         this.status = ParticipationStatus.NOT_STARTED;
     }
+
+    /**
+     * 완주 후 RunRecord 연결
+     */
+    public void updateRunRecord(RunRecord runRecord) {
+        this.runRecord = runRecord;
+    }
+
+    /**
+     * 랭킹 업데이트
+     */
+    public void updateRanking(Integer ranking) {
+        this.ranking = ranking;
+    }
 }

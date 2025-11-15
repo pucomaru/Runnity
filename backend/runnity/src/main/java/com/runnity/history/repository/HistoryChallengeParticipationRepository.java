@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface HistoryChallengeParticipationRepository extends JpaRepository<ChallengeParticipation, Long> {
 
@@ -28,6 +29,38 @@ public interface HistoryChallengeParticipationRepository extends JpaRepository<C
             "GROUP BY cp.challenge.challengeId")
     List<Object[]> countByChallengeIds(@Param("challengeIds") List<Long> challengeIds);
 
+    /**
+     * 챌린지 ID + memberId로 특정 멤버의 챌린지 참여 조회
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.member.memberId = :memberId
+          AND cp.challenge.challengeId = :challengeId
+          AND cp.isDeleted = false
+          AND cp.status = com.runnity.challenge.domain.ParticipationStatus.COMPLETED
+    """)
+    Optional<ChallengeParticipation> findCompletedByMemberIdAndChallengeId(
+            @Param("memberId") Long memberId,
+            @Param("challengeId") Long challengeId
+    );
 
+    /**
+     * 특정 챌린지의 완주자 전체 조회
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        JOIN FETCH cp.runRecord rr
+        WHERE cp.challenge.challengeId = :challengeId
+          AND cp.isDeleted = false
+          AND cp.status = com.runnity.challenge.domain.ParticipationStatus.COMPLETED
+          AND cp.runRecord IS NOT NULL
+          AND rr.isDeleted = false
+        ORDER BY rr.durationSec ASC
+    """)
+    List<ChallengeParticipation> findFinishersForRanking(
+            @Param("challengeId") Long challengeId
+    );
 
 }
