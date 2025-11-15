@@ -12,6 +12,8 @@ import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,11 +42,16 @@ fun TabBar(
     ) {
         items.forEachIndexed { index, icon ->
             val isSelected = index == selectedIndex
+            val currentIconTint = if (isSelected) iconTint else ColorPalette.Light.component
+            val currentStrokeColor = if (isSelected) strokeColor else ColorPalette.Light.component.copy(alpha = 0.5f)
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .height(height)
-                    .clickable { onSelected(index) },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onSelected(index) },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
@@ -54,14 +61,14 @@ fun TabBar(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = iconTint
+                        tint = currentIconTint
                     )
                 }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(if (isSelected) selectedStroke else unselectedStroke)
-                        .background(strokeColor)
+                        .background(currentStrokeColor)
                 )
             }
         }

@@ -26,6 +26,7 @@ import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.ActionHeader
 import com.example.runnity.ui.components.PrimaryButton
 import com.example.runnity.ui.components.SectionHeader
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -66,6 +67,27 @@ fun ChallengeWaitingScreen(
         LocalDateTime.parse(detail.startAt, DateTimeFormatter.ISO_DATE_TIME)
     } catch (e: Exception) {
         LocalDateTime.now().plusMinutes(10)
+    }
+
+    // 시작까지 5초 남았을 때 카운트다운 화면으로 자동 이동
+    LaunchedEffect(challengeStartTime, challengeId) {
+        try {
+            val now = LocalDateTime.now()
+            val secondsUntilStart = Duration.between(now, challengeStartTime).seconds
+            when {
+                secondsUntilStart > 5 -> {
+                    kotlinx.coroutines.delay((secondsUntilStart - 5) * 1000)
+                    navController.navigate("challenge_countdown/$challengeId")
+                }
+                secondsUntilStart in 1..5 -> {
+                    // 이미 5초 이내라면 바로 카운트다운으로 이동
+                    navController.navigate("challenge_countdown/$challengeId")
+                }
+                // 0 이하인 경우는 이미 시작 시간이 지난 상태이므로 아무 것도 하지 않음
+            }
+        } catch (_: Exception) {
+            // 시간 계산 실패 시에는 자동 이동 생략
+        }
     }
 
     // 현재 사용자 정보 (대기방 참여자 목록에서 "나"를 구분하기 위함)

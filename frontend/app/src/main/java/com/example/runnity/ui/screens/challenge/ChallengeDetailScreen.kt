@@ -667,7 +667,11 @@ data class Participant(
     val id: String,
     val nickname: String,
     val avatarUrl: String?,
-    val averagePace: String  // 평균 페이스 (예: "5'30\"")
+    val averagePace: String,  // 평균 페이스 (예: "5'30\"")
+    val distanceKm: Double = 0.0,       // 실시간 누적 거리 (km)
+    val paceSecPerKm: Double? = null,   // 실시간 페이스 (sec/km)
+    val rank: Int = 0,                  // 프론트에서 계산한 순위 (1,2,3,...)
+    val isMe: Boolean = false           // 현재 사용자 여부
 )
 
 /**
