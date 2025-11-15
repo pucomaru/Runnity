@@ -11,11 +11,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -41,6 +43,15 @@ fun HomeScreen(
     parentNavController: NavController? = null,  // 앱 전체 이동용
     viewModel: HomeViewModel = viewModel()       // viewModel(): ViewModel 자동 생성
 ) {
+    val context = LocalContext.current
+
+    // 홈 입장/소켓 연결 관련 에러 메시지 토스트 표시
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // TODO: ViewModel에서 실제 데이터 가져오기
     // 현재는 임시 데이터 사용
 
@@ -166,7 +177,9 @@ fun HomeScreen(
                             navController?.navigate("challenge_detail/${challenge.id}")
                         },
                         onButtonClick = {
-                            viewModel.joinChallengeAndConnect(challenge.id)
+                            viewModel.joinChallengeAndConnect(challenge.id) {
+                                navController?.navigate("challenge_waiting/${challenge.id}")
+                            }
                         }
                     )
                 }

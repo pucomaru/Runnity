@@ -2,9 +2,12 @@ package com.example.runnity.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.example.runnity.data.repository.RunHistoryRepository
 import com.example.runnity.data.model.common.ApiResponse
@@ -33,6 +36,10 @@ class HomeViewModel : ViewModel() {
     private val _reservedChallenges = MutableStateFlow<List<ChallengeListItem>>(emptyList())
     val reservedChallenges: StateFlow<List<ChallengeListItem>> = _reservedChallenges.asStateFlow()
 
+    // 일회성 에러 메시지 이벤트 (토스트 등)
+    private val _errorEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val errorEvents: SharedFlow<String> = _errorEvents
+
     private val runHistoryRepository = RunHistoryRepository()
     private val challengeRepository = ChallengeRepository()
     private val joinInFlight = mutableSetOf<String>()
@@ -56,7 +63,8 @@ class HomeViewModel : ViewModel() {
     }
 
     // 참여하기 버튼 처리: enter API 호출 후 티켓으로 WebSocket 연결
-    fun joinChallengeAndConnect(challengeId: String) {
+    // onJoined는 API + 소켓 연결까지 성공했을 때만 호출됨
+    fun joinChallengeAndConnect(challengeId: String, onJoined: () -> Unit) {
         if (challengeId.isBlank() || joinInFlight.contains(challengeId)) return
         joinInFlight.add(challengeId)
         viewModelScope.launch {
@@ -72,8 +80,30 @@ class HomeViewModel : ViewModel() {
                             url = url,
                             tokenProvider = { TokenManager.getAccessToken() }
                         )
+
+                        // WebSocket 연결 완료될 때까지 대기 후 콜백 호출
+                        val state = WebSocketManager.state.first { it is WebSocketManager.WsState.Open || it is WebSocketManager.WsState.Failed }
+                        when (state) {
+                            is WebSocketManager.WsState.Open -> onJoined()
+                            is WebSocketManager.WsState.Failed -> {
+                                _errorEvents.tryEmit("챌린지 대기방 연결에 실패했어요. 네트워크 상태를 확인한 후 다시 시도해 주세요.")
+                            }
+                            else -> Unit
+                        }
                     }
-                    else -> Unit
+                    is ApiResponse.Error -> {
+                        val message = when (resp.code) {
+                            400 -> "아직 입장 가능한 시간이 아니에요. 챌린지 시작 전에는 입장할 수 없어요."
+                            401 -> "인증이 만료되었어요. 다시 로그인한 후 시도해 주세요."
+                            404 -> "해당 챌린지를 찾을 수 없거나 참가 중이 아닌 챌린지예요."
+                            500 -> "서버 오류로 챌린지 입장에 실패했어요. 잠시 후 다시 시도해 주세요."
+                            else -> resp.message.ifBlank { "챌린지 입장 중 오류가 발생했어요." }
+                        }
+                        _errorEvents.tryEmit(message)
+                    }
+                    is ApiResponse.NetworkError -> {
+                        _errorEvents.tryEmit("네트워크 연결 상태를 확인한 후 다시 시도해 주세요.")
+                    }
                 }
             } finally {
                 joinInFlight.remove(challengeId)
