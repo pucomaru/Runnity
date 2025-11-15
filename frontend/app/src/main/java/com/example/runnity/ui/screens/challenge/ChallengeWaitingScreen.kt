@@ -94,11 +94,12 @@ fun ChallengeWaitingScreen(
     val profile = UserProfileManager.getProfile()
     val currentUserId = profile?.memberId?.toString().orEmpty()
 
-    // 나를 상단에 고정한 참가자 리스트 구성
+    // 나를 상단에 고정한 참가자 리스트 구성 (대기방에서는 리타이어 참가자는 숨김)
     val participantsForUi = remember(waitingParticipants, currentUserId) {
-        val me = waitingParticipants.find { it.id == currentUserId }
-        val others = waitingParticipants.filter { it.id != currentUserId }
-        if (me != null) listOf(me) + others else waitingParticipants
+        val visible = waitingParticipants.filterNot { it.isRetired }
+        val me = visible.find { it.id == currentUserId }
+        val others = visible.filter { it.id != currentUserId }
+        if (me != null) listOf(me) + others else visible
     }
 
     var showQuitDialog by remember { mutableStateOf(false) }

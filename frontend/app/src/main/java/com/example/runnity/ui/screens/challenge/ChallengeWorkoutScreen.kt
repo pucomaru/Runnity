@@ -138,13 +138,13 @@ fun ChallengeWorkoutScreen(
         }
     }
 
-    // 세션이 Ended로 전환될 때 최종 RECORD를 한 번만 전송
+    // 세션이 Ended로 전환될 때 최종 RECORD를 한 번만 전송하고 결과 화면으로 이동
     LaunchedEffect(phase, targetKm) {
         val goalKm = targetKm ?: return@LaunchedEffect
-        if (phase == WorkoutPhase.Ended && !finalRecordSent) {
+        if (phase == WorkoutPhase.Ended) {
             val distanceKm = metrics.distanceMeters / 1000.0
             val paceToSend = currentPace ?: metrics.avgPaceSecPerKm ?: 0.0
-            if (distanceKm > 0.0 && paceToSend > 0.0) {
+            if (!finalRecordSent && distanceKm > 0.0 && paceToSend > 0.0) {
                 val recordJson = "{" +
                     "\"type\":\"RECORD\"," +
                     "\"distance\":" + distanceKm + "," +
@@ -152,8 +152,15 @@ fun ChallengeWorkoutScreen(
                     "\"timestamp\":" + System.currentTimeMillis() +
                     "}"
                 WebSocketManager.send(recordJson)
+                finalRecordSent = true
             }
-            finalRecordSent = true
+
+            // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
+            if (distanceKm >= goalKm) {
+                navController.navigate("challenge_result") {
+                    popUpTo("challenge_workout/$challengeId") { inclusive = true }
+                }
+            }
         }
     }
 
@@ -448,11 +455,25 @@ fun ChallengeWorkoutScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
-                Text(
-                    text = "실시간 랭킹",
-                    style = Typography.Subtitle,
-                    color = ColorPalette.Light.secondary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "실시간 랭킹",
+                        style = Typography.Subtitle,
+                        color = ColorPalette.Light.secondary
+                    )
+
+                    val elapsedLabel = formatElapsedCompact(metrics.activeElapsedMs)
+                    Text(
+                        text = elapsedLabel,
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(20.dp))
 
                 val rankingRows = remember(participantsState) {
@@ -480,7 +501,10 @@ fun ChallengeWorkoutScreen(
                     WebSocketManager.send(quitJson)
                     WebSocketManager.close()
                     sessionViewModel.stop()
-                    navController.navigateUp()
+                    navController.navigate("home") {
+                        // 홈 탭의 시작 화면으로 이동하면서, 중간 스택(대기방/카운트다운/운동)은 제거
+                        popUpTo("home") { inclusive = true }
+                    }
                 }
             )
         }
@@ -509,6 +533,15 @@ private fun TextMetric(label: String, value: String) {
 private fun formatDistanceKm(meters: Double): String {
     val km = meters / 1000.0
     return String.format("%.2f", km)
+}
+
+// 누적 시간 포맷팅 (예: 00:41, 12:03, 1:05:20)
+private fun formatElapsedCompact(ms: Long): String {
+    val totalSec = (ms / 1000).toInt()
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
 }
 
 private fun formatPace(secPerKm: Double): String {
@@ -578,8 +611,9 @@ private fun RankingRow(participant: Participant) {
             modifier = Modifier.weight(2.5f)
         )
 
-        // 오른쪽: 랭킹/나 배지 (두 자리 수까지 고려)
+        // 오른쪽: 랭킹/나/리타이어 배지 (두 자리 수까지 고려)
         val badgeText = when {
+            participant.isRetired -> "리타이어"
             participant.isMe -> "나"
             participant.rank == 1 -> "1위"
             participant.rank > 0 -> "${participant.rank}위"
@@ -588,7 +622,11 @@ private fun RankingRow(participant: Participant) {
         Text(
             text = badgeText,
             style = Typography.Caption,
-            color = if (participant.isMe) ColorPalette.Common.accent else ColorPalette.Light.secondary,
+            color = when {
+                participant.isMe -> ColorPalette.Common.accent
+                participant.isRetired -> ColorPalette.Light.secondary
+                else -> ColorPalette.Light.secondary
+            },
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1.2f)
         )
@@ -599,8 +637,12 @@ private fun RankingRow(participant: Participant) {
 private fun selectRankingRows(list: List<Participant>): List<Participant> {
     if (list.isEmpty()) return emptyList()
 
-    val first = list.first()
-    val meIndex = list.indexOfFirst { it.isMe }
+    // 운동 랭킹에서는 "대기방에서만 나갔다가 한 번도 움직이지 않은" 참가자는 제외
+    val visible = list.filterNot { it.isRetired && it.distanceKm <= 0.0 }
+    if (visible.isEmpty()) return emptyList()
+
+    val first = visible.first()
+    val meIndex = visible.indexOfFirst { it.isMe }
 
     val base = mutableListOf<Participant>()
 
@@ -609,11 +651,11 @@ private fun selectRankingRows(list: List<Participant>): List<Participant> {
 
     if (meIndex >= 0) {
         // 내 앞
-        if (meIndex - 1 >= 0) base += list[meIndex - 1]
+        if (meIndex - 1 >= 0) base += visible[meIndex - 1]
         // 나
-        base += list[meIndex]
+        base += visible[meIndex]
         // 내 뒤
-        if (meIndex + 1 < list.size) base += list[meIndex + 1]
+        if (meIndex + 1 < visible.size) base += visible[meIndex + 1]
     }
 
     // 중복 제거 (id 기준) + 순서 유지
@@ -627,7 +669,7 @@ private fun selectRankingRows(list: List<Participant>): List<Participant> {
 
     // 4명 미만이면 위에서부터 채우기
     if (deduped.size < 4) {
-        list.forEach { p ->
+        visible.forEach { p ->
             if (deduped.size >= 4) return@forEach
             if (!seen.contains(p.id)) {
                 seen += p.id
