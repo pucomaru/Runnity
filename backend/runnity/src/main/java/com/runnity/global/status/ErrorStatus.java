@@ -60,11 +60,11 @@ public enum ErrorStatus implements BaseErrorStatus {
     //history
     RUN_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 운동 기록입니다."),
     RUN_RECORD_FORBIDDEN(HttpStatus.FORBIDDEN, 403, "본인의 운동 기록만 조회할 수 있습니다."),
-    CHALLENGE_ID_REQUIRED(HttpStatus.FORBIDDEN, 403, "본인의 운동 기록만 조회할 수 있습니다."),
+    CHALLENGE_ID_REQUIRED(HttpStatus.BAD_REQUEST, 400, "챌린지 id가 입력되지 않았습니다."),
     CHALLENGE_PARTICIPATION_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 챌린지 참여 기록입니다."),
 
     //fcm
-    FCM_TOKEN_NOT_FOUND(HttpStatus.BAD_REQUEST, 400, "챌린지 id가 입력되지 않았습니다.");
+    FCM_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "존재하지 않는 fcm 토큰입니다.");
 
     private final HttpStatus httpStatus;
     private final Integer code;
