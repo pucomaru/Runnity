@@ -296,7 +296,7 @@ public class ChallengeService {
     @Transactional
     public ChallengeEnterResponse enterChallenge(Long challengeId, Long memberId) {
         Challenge challenge = validateAndGetChallenge(challengeId);
-        challenge.validateEnterable();
+        challenge.validateEnterableOrReenterable();
 
         // Member 정보 조회
         Member member = memberRepository.findById(memberId)
@@ -306,30 +306,68 @@ public class ChallengeService {
                 .findByChallengeIdAndMemberId(challengeId, memberId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_JOINED));
 
-        participation.startRunning();
-        participationRepository.save(participation);
-        participationRepository.flush();
+        // 챌린지 상태와 참가 상태에 따라 처음 입장 또는 재입장 처리
+        boolean isFirstEnter = challenge.getStatus() == ChallengeStatus.READY 
+                && participation.getStatus() == ParticipationStatus.WAITING;
+        boolean isReenter = (challenge.getStatus() == ChallengeStatus.READY 
+                || challenge.getStatus() == ChallengeStatus.RUNNING)
+                && ParticipationStatus.REJOINABLE_STATUSES.contains(participation.getStatus());
 
-        // Redis에 저장된 actualParticipantCount 증가
-        incrementActualParticipantCount(challengeId);
+        if (isFirstEnter) {
+            // 처음 입장: WAITING → RUNNING
+            participation.startRunning();
+            participationRepository.save(participation);
+            participationRepository.flush();
 
-        String ticket = wsTicketService.issueTicket(
-                memberId,
-                challengeId,
-                WebSocketTicketService.TicketType.ENTER,
-                member.getNickname(),
-                member.getProfileImage()
-        );
+            // Redis에 저장된 actualParticipantCount 증가
+            incrementActualParticipantCount(challengeId);
 
-        String wsUrl = selectWebSocketServer(memberId, challengeId);
+            String ticket = wsTicketService.issueTicket(
+                    memberId,
+                    challengeId,
+                    WebSocketTicketService.TicketType.ENTER,
+                    member.getNickname(),
+                    member.getProfileImage()
+            );
 
-        return new ChallengeEnterResponse(
-                ticket,
-                memberId,
-                challengeId,
-                wsUrl,
-                wsTicketService.getTicketTtl()
-        );
+            String wsUrl = selectWebSocketServer(memberId, challengeId);
+
+            return new ChallengeEnterResponse(
+                    ticket,
+                    memberId,
+                    challengeId,
+                    wsUrl,
+                    wsTicketService.getTicketTtl()
+            );
+        } else if (isReenter) {
+            // 재입장: TIMEOUT/DISCONNECTED/ERROR → RUNNING
+            participation.reenter();
+            participationRepository.save(participation);
+            participationRepository.flush();
+
+            // 재입장은 actualParticipantCount를 증가시키지 않음 (이미 카운트에 포함됨)
+
+            String ticket = wsTicketService.issueTicket(
+                    memberId,
+                    challengeId,
+                    WebSocketTicketService.TicketType.REENTER,
+                    member.getNickname(),
+                    member.getProfileImage()
+            );
+
+            String wsUrl = selectWebSocketServer(memberId, challengeId);
+
+            return new ChallengeEnterResponse(
+                    ticket,
+                    memberId,
+                    challengeId,
+                    wsUrl,
+                    wsTicketService.getTicketTtl()
+            );
+        } else {
+            // 입장/재입장 불가능한 상태
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
     }
 
     private String selectWebSocketServer(Long memberId, Long challengeId) {

@@ -154,12 +154,14 @@ public class ChallengeController {
 
     @PostMapping("/{challengeId}/enter")
     @Operation(
-            summary = "챌린지 입장",
-            description = "챌린지에 입장하고 WebSocket 연결용 티켓을 발급받습니다. (WAITING → RUNNING)"
+            summary = "챌린지 입장/재입장",
+            description = "챌린지에 입장하거나 재입장하고 WebSocket 연결용 티켓을 발급받습니다.\n\n" +
+                    "- 처음 입장: 챌린지가 READY 상태이고 참가 상태가 WAITING인 경우 (WAITING → RUNNING)\n" +
+                    "- 재입장: 챌린지가 READY 또는 RUNNING 상태이고 참가 상태가 TIMEOUT, DISCONNECTED, ERROR 중 하나인 경우 (해당 상태 → RUNNING)"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "입장 성공"),
-            @ApiResponse(responseCode = "400", description = "챌린지가 READY 상태가 아니거나, 참가 상태가 WAITING이 아닌 경우"),
+            @ApiResponse(responseCode = "200", description = "입장/재입장 성공"),
+            @ApiResponse(responseCode = "400", description = "챌린지가 READY/RUNNING 상태가 아니거나, 참가 상태가 입장/재입장 불가능한 경우"),
             @ApiResponse(responseCode = "401", description = "인증 실패"),
             @ApiResponse(responseCode = "404", description = "챌린지가 존재하지 않거나, 참가하지 않은 챌린지인 경우"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")

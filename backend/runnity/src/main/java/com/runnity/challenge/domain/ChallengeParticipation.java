@@ -213,4 +213,17 @@ public class ChallengeParticipation extends BaseEntity {
     public void updateRanking(Integer ranking) {
         this.ranking = ranking;
     }
+
+    /**
+     * 챌린지 재입장 처리
+     * - TIMEOUT, DISCONNECTED, ERROR → RUNNING
+     * 
+     * @throws GlobalException 재입장 불가능한 상태인 경우
+     */
+    public void reenter() {
+        if (!ParticipationStatus.REJOINABLE_STATUSES.contains(this.status)) {
+            throw new GlobalException(ErrorStatus.INVALID_PARTICIPATION_STATUS);
+        }
+        this.status = ParticipationStatus.RUNNING;
+    }
 }
