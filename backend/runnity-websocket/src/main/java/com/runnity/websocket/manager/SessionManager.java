@@ -73,26 +73,24 @@ public class SessionManager {
         // 1. 메모리에 세션 저장
         sessions.put(sessionKey, session);
         
-        // 2. Redis에 참가자 등록 (ZADD - score는 현재 시간)
+        // 2. Redis에 참가자 등록 (ZADD - score는 distance)
         String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
-        long now = System.currentTimeMillis();
-        redisTemplate.opsForZSet().add(participantsKey, userId.toString(), now);
+        Double distance = previousDistance != null ? previousDistance : 0.0;
+        redisTemplate.opsForZSet().add(participantsKey, userId.toString(), distance);
         
-        // 3. Redis에 참가자 정보 저장
-        // 재접속인 경우 이전 distance, pace 유지, 아니면 0.0 / 0
+        // 3. Redis에 참가자 정보 저장 (distance 제외, ZSet score에서 관리)
         String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
         try {
-            Double distance = previousDistance != null ? previousDistance : 0.0;
             Integer pace = previousPace != null ? previousPace : 0;
-            ParticipantInfo info = new ParticipantInfo(userId, nickname, profileImage, distance, pace);
+            ParticipantInfo info = new ParticipantInfo(userId, nickname, profileImage, pace);
             String infoJson = objectMapper.writeValueAsString(info);
             redisTemplate.opsForValue().set(infoKey, infoJson);
         } catch (JsonProcessingException e) {
             log.error("참가자 정보 저장 실패: challengeId={}, userId={}", challengeId, userId, e);
         }
         
-        log.info("세션 등록 완료: challengeId={}, userId={}, nickname={}, sessionId={}, isReconnect={}", 
-                challengeId, userId, nickname, session.getId(), previousDistance != null);
+        log.info("세션 등록 완료: challengeId={}, userId={}, nickname={}, sessionId={}, distance={}, isReconnect={}", 
+                challengeId, userId, nickname, session.getId(), distance, previousDistance != null);
     }
 
     /**
@@ -102,21 +100,42 @@ public class SessionManager {
      * @param userId 사용자 ID
      */
     public void removeSession(Long challengeId, Long userId) {
+        removeSession(challengeId, userId, null);
+    }
+
+    /**
+     * 세션 제거 (메모리 + Redis) - reason에 따라 다르게 처리
+     * 
+     * @param challengeId 챌린지 ID
+     * @param userId 사용자 ID
+     * @param reason 퇴장 사유 (FINISH는 랭킹 유지, 그 외는 제거)
+     */
+    public void removeSession(Long challengeId, Long userId, String reason) {
         String sessionKey = makeSessionKey(challengeId, userId);
         
         // 1. 메모리에서 세션 제거
         WebSocketSession session = sessions.remove(sessionKey);
         
-        // 2. Redis에서 참가자 제거
+        // 2. Redis ZSet에서 참가자 제거 여부 결정
         String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
-        redisTemplate.opsForZSet().remove(participantsKey, userId.toString());
         
-        // 3. Redis에서 참가자 정보 제거
+        // 완주한 사람만 랭킹에 포함 (ZSet 유지)
+        // QUIT, TIMEOUT, DISCONNECTED, ERROR는 제거
+        if (reason == null || !"FINISH".equals(reason)) {
+            redisTemplate.opsForZSet().remove(participantsKey, userId.toString());
+        }
+        
+        // 3. 참가자 정보 제거 여부 결정
         String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
-        redisTemplate.delete(infoKey);
         
-        log.info("세션 제거 완료: challengeId={}, userId={}, sessionId={}", 
-                challengeId, userId, session != null ? session.getId() : "null");
+        // 완주한 사람만 정보 유지 (랭킹 포함)
+        // QUIT, TIMEOUT, DISCONNECTED, ERROR는 제거
+        if (reason == null || !"FINISH".equals(reason)) {
+            redisTemplate.delete(infoKey);
+        }
+        
+        log.info("세션 제거 완료: challengeId={}, userId={}, reason={}, rankingKept={}, sessionId={}", 
+                challengeId, userId, reason, "FINISH".equals(reason), session != null ? session.getId() : "null");
     }
 
     /**
@@ -143,7 +162,8 @@ public class SessionManager {
         
         try {
             String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
-            Set<String> userIds = redisTemplate.opsForZSet().range(participantsKey, 0, -1);
+            // ZSet에서 distance 기준 내림차순 조회
+            Set<String> userIds = redisTemplate.opsForZSet().reverseRange(participantsKey, 0, -1);
             
             if (userIds == null || userIds.isEmpty()) {
                 return participants;
@@ -157,7 +177,13 @@ public class SessionManager {
                     continue;
                 }
                 
-                // 참가자 정보 조회
+                // ZSet에서 distance 조회 (score)
+                Double distance = redisTemplate.opsForZSet().score(participantsKey, userIdStr);
+                if (distance == null) {
+                    continue;
+                }
+                
+                // 참가자 정보 조회 (nickname, profileImage, pace)
                 String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
                 String infoJson = redisTemplate.opsForValue().get(infoKey);
                 
@@ -167,7 +193,7 @@ public class SessionManager {
                         info.userId,
                         info.nickname,
                         info.profileImage,
-                        info.distance,
+                        distance,  // ZSet score에서 조회
                         info.pace
                     ));
                 }
@@ -206,6 +232,7 @@ public class SessionManager {
      */
     public void updateParticipantInfo(Long challengeId, Long userId, Double distance, Integer pace) {
         try {
+            String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
             String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
             String infoJson = redisTemplate.opsForValue().get(infoKey);
             
@@ -214,12 +241,15 @@ public class SessionManager {
                 return;
             }
             
+            // 1. ZSet score 업데이트 (distance)
+            redisTemplate.opsForZSet().add(participantsKey, userId.toString(), distance);
+            
+            // 2. 참가자 정보 업데이트 (pace만, distance는 ZSet score에서 관리)
             ParticipantInfo info = objectMapper.readValue(infoJson, ParticipantInfo.class);
             ParticipantInfo updatedInfo = new ParticipantInfo(
                 info.userId,
                 info.nickname,
                 info.profileImage,
-                distance,
                 pace
             );
             
@@ -234,14 +264,15 @@ public class SessionManager {
     }
 
     /**
-     * 참가자 정보 조회
+     * 참가자 정보 조회 (distance 포함)
      * 
      * @param challengeId 챌린지 ID
      * @param userId 사용자 ID
-     * @return 참가자 정보 (없으면 null)
+     * @return 참가자 정보 (없으면 null, distance는 ZSet score에서 조회)
      */
-    public ParticipantInfo getParticipantInfo(Long challengeId, Long userId) {
+    public ParticipantInfoWithDistance getParticipantInfo(Long challengeId, Long userId) {
         try {
+            String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
             String infoKey = String.format(PARTICIPANT_INFO_PREFIX, challengeId, userId);
             String infoJson = redisTemplate.opsForValue().get(infoKey);
             
@@ -249,7 +280,23 @@ public class SessionManager {
                 return null;
             }
             
-            return objectMapper.readValue(infoJson, ParticipantInfo.class);
+            // 참가자 정보 조회 (nickname, profileImage, pace)
+            ParticipantInfo info = objectMapper.readValue(infoJson, ParticipantInfo.class);
+            
+            // ZSet에서 distance 조회 (score)
+            Double distance = redisTemplate.opsForZSet().score(participantsKey, userId.toString());
+            if (distance == null) {
+                distance = 0.0;
+            }
+            
+            // distance를 포함한 정보 반환 (하위 호환성을 위해)
+            return new ParticipantInfoWithDistance(
+                info.userId,
+                info.nickname,
+                info.profileImage,
+                distance,
+                info.pace
+            );
         } catch (Exception e) {
             log.error("참가자 정보 조회 실패: challengeId={}, userId={}", challengeId, userId, e);
             return null;
@@ -258,6 +305,7 @@ public class SessionManager {
 
     /**
      * 참가자 순위 계산 (distance 기준 내림차순)
+     * ZSet의 score가 distance이므로 ZREVRANGE로 바로 조회
      * 
      * @param challengeId 챌린지 ID
      * @param userId 사용자 ID
@@ -266,29 +314,18 @@ public class SessionManager {
     public Integer calculateRanking(Long challengeId, Long userId) {
         try {
             String participantsKey = String.format(PARTICIPANT_KEY_PREFIX, challengeId);
-            Set<String> userIds = redisTemplate.opsForZSet().range(participantsKey, 0, -1);
+            
+            // ZSet에서 distance 기준 내림차순 조회 (score가 distance)
+            Set<String> userIds = redisTemplate.opsForZSet().reverseRange(participantsKey, 0, -1);
             
             if (userIds == null || userIds.isEmpty()) {
                 return null;
             }
             
-            // 모든 참가자의 distance 조회
-            List<ParticipantDistance> distances = new ArrayList<>();
-            for (String userIdStr : userIds) {
-                Long uid = Long.parseLong(userIdStr);
-                ParticipantInfo info = getParticipantInfo(challengeId, uid);
-                if (info != null) {
-                    distances.add(new ParticipantDistance(uid, info.distance()));
-                }
-            }
-            
-            // distance 기준 내림차순 정렬
-            distances.sort((a, b) -> Double.compare(b.distance(), a.distance()));
-            
-            // 순위 계산
+            // 순위는 인덱스 + 1
             int ranking = 1;
-            for (ParticipantDistance pd : distances) {
-                if (pd.userId().equals(userId)) {
+            for (String userIdStr : userIds) {
+                if (userIdStr.equals(userId.toString())) {
                     return ranking;
                 }
                 ranking++;
@@ -309,22 +346,26 @@ public class SessionManager {
     }
 
     /**
-     * 참가자 정보 DTO
+     * 참가자 정보 DTO (distance 제외, ZSet score에서 관리)
+     * Redis String에 저장되는 정보
      */
     public record ParticipantInfo(
         Long userId,
         String nickname,
         String profileImage,
-        Double distance,
         Integer pace
     ) {}
 
     /**
-     * 순위 계산용 DTO
+     * 참가자 정보 DTO (distance 포함)
+     * getParticipantInfo()에서 반환하는 타입
      */
-    private record ParticipantDistance(
+    public record ParticipantInfoWithDistance(
         Long userId,
-        Double distance
+        String nickname,
+        String profileImage,
+        Double distance,
+        Integer pace
     ) {}
 }
 

@@ -255,7 +255,7 @@ public class RedisMessageListener implements MessageListener {
             WebSocketSession session = sessionManager.getSession(challengeId, userId);
             
             // 참가자 정보 조회
-            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
             Double distance = info != null ? info.distance() : 0.0;
             Integer pace = info != null ? info.pace() : 0;
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
@@ -282,8 +282,8 @@ public class RedisMessageListener implements MessageListener {
             kafkaProducer.publishLeaveEvent(challengeId, userId, nickname, profileImage, 
                     distance, pace, ranking, LeaveReason.EXPIRED.getValue());
 
-            // 세션 제거
-            sessionManager.removeSession(challengeId, userId);
+            // 세션 제거 (EXPIRED는 랭킹에서 제거)
+            sessionManager.removeSession(challengeId, userId, LeaveReason.EXPIRED.getValue());
 
             // 세션이 있으면 연결 종료
             if (session != null && session.isOpen()) {

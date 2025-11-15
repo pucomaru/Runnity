@@ -146,7 +146,7 @@ public class TimeoutCheckService {
             WebSocketSession session = sessionManager.getSession(challengeId, userId);
             
             // 참가자 정보 조회
-            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
             Double distance = info != null ? info.distance() : 0.0;
             Integer pace = info != null ? info.pace() : 0;
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
@@ -166,8 +166,8 @@ public class TimeoutCheckService {
             // 2. 마지막 RECORD 시간 제거
             removeLastRecordTime(challengeId, userId);
 
-            // 3. 세션 제거
-            sessionManager.removeSession(challengeId, userId);
+            // 3. 세션 제거 (TIMEOUT은 랭킹에서 제거)
+            sessionManager.removeSession(challengeId, userId, LeaveReason.TIMEOUT.getValue());
 
             // 4. Redis Pub/Sub으로 퇴장 이벤트 발행
             redisPubSubService.publishUserLeft(challengeId, userId, LeaveReason.TIMEOUT.getValue());

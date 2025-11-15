@@ -99,16 +99,40 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             session.getAttributes().put("nickname", nickname);
             session.getAttributes().put("profileImage", profileImage);
 
-            // 4. 재접속 여부 확인 (이전 참가자 정보가 있는지)
-            SessionManager.ParticipantInfo previousInfo = sessionManager.getParticipantInfo(challengeId, userId);
-            boolean isReconnect = previousInfo != null;
-            Double previousDistance = previousInfo != null ? previousInfo.distance() : null;
-            Integer previousPace = previousInfo != null ? previousInfo.pace() : null;
+            // 4. 티켓 타입 확인 및 재입장 처리
+            String ticketType = ticketData.ticketType(); // "ENTER" or "REENTER"
+            
+            // REENTER인 경우 이전 세션 종료
+            if ("REENTER".equals(ticketType)) {
+                WebSocketSession previousSession = sessionManager.getSession(challengeId, userId);
+                if (previousSession != null && previousSession.isOpen()) {
+                    try {
+                        previousSession.close(CloseStatus.NORMAL);
+                        log.info("재입장: 이전 세션 종료: challengeId={}, userId={}", challengeId, userId);
+                    } catch (Exception e) {
+                        log.warn("이전 세션 종료 실패: challengeId={}, userId={}", challengeId, userId, e);
+                    }
+                }
+            }
+            
+            // 재접속 여부 확인 (이전 참가자 정보가 있는지)
+            // 재입장 시에는 프론트에서 최신 데이터를 전송하므로 이전 정보 복구 불필요
+            SessionManager.ParticipantInfoWithDistance previousInfo = sessionManager.getParticipantInfo(challengeId, userId);
+            
+            // 재입장 시에는 항상 0.0/0으로 시작 (프론트에서 최신 데이터 전송)
+            // ENTER이고 이전 정보가 있는 경우에만 이전 정보 사용
+            Double previousDistance = null;
+            Integer previousPace = null;
+            if (!"REENTER".equals(ticketType) && previousInfo != null) {
+                previousDistance = previousInfo.distance();
+                previousPace = previousInfo.pace();
+            }
 
             // 5. 다른 참가자 목록 조회 (본인 제외)
             List<ConnectedMessage.Participant> participants = sessionManager.getParticipants(challengeId, userId);
 
-            // 6. 세션 등록 (메모리 + Redis) - 재접속인 경우 이전 정보 유지
+            // 6. 세션 등록 (메모리 + Redis)
+            // 재입장 시에는 0.0/0으로 시작, ENTER이고 이전 정보가 있으면 이전 정보 사용
             sessionManager.registerSession(challengeId, userId, nickname, profileImage, session, 
                     previousDistance, previousPace);
 
@@ -116,12 +140,12 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             timeoutCheckService.updateLastRecordTime(challengeId, userId);
 
             // 7. CONNECTED 메시지 전송 (본인에게)
-            // 재접속인 경우 이전 distance, pace 사용, 아니면 0.0 / 0
-            Double initialDistance = isReconnect && previousInfo != null ? previousInfo.distance() : 0.0;
-            Integer initialPace = isReconnect && previousInfo != null ? previousInfo.pace() : 0;
+            // 재입장 시에는 항상 0.0/0으로 시작 (프론트에서 최신 데이터 전송)
+            Double initialDistance = previousDistance != null ? previousDistance : 0.0;
+            Integer initialPace = previousPace != null ? previousPace : 0;
             
-            log.debug("Participant 생성 전: userId={}, nickname={}, profileImage={}, isReconnect={}", 
-                    userId, nickname, profileImage, isReconnect);
+            log.debug("Participant 생성 전: userId={}, nickname={}, profileImage={}, ticketType={}, initialDistance={}, initialPace={}", 
+                    userId, nickname, profileImage, ticketType, initialDistance, initialPace);
             ConnectedMessage.Participant me = new ConnectedMessage.Participant(
                     userId, nickname, profileImage, initialDistance, initialPace);
             log.debug("Participant 생성 후: me={}", me);
@@ -132,17 +156,18 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             // 8. Redis Pub/Sub으로 입장 이벤트 발행 (다른 WebSocket 서버에 알림)
             redisPubSubService.publishUserEntered(challengeId, userId, nickname, profileImage);
 
-            // 9. Kafka 이벤트 발행
-            if (isReconnect) {
-                // 재접속인 경우: RUNNING 이벤트 발행 (이전 distance, pace 사용)
+            // 9. Kafka 이벤트 발행 (티켓 타입 기반)
+            if ("ENTER".equals(ticketType)) {
+                // 첫 입장: START 이벤트 발행
+                kafkaProducer.publishStartEvent(challengeId, userId, nickname, profileImage);
+                log.info("첫 입장 처리: challengeId={}, userId={}", challengeId, userId);
+            } else if ("REENTER".equals(ticketType)) {
+                // 재입장: RUNNING 이벤트 발행 (distance=0.0, pace=0, 프론트에서 최신 데이터 전송)
                 Integer ranking = sessionManager.calculateRanking(challengeId, userId);
                 kafkaProducer.publishRunningEvent(challengeId, userId, nickname, profileImage, 
-                        initialDistance, initialPace, ranking);
-                log.info("재접속 처리: challengeId={}, userId={}, distance={}, pace={}", 
-                        challengeId, userId, initialDistance, initialPace);
-            } else {
-                // 첫 입장인 경우: START 이벤트 발행
-                kafkaProducer.publishStartEvent(challengeId, userId, nickname, profileImage);
+                        0.0, 0, ranking);
+                log.info("재입장 처리: challengeId={}, userId={}, distance=0.0, pace=0", 
+                        challengeId, userId);
             }
 
             log.info("챌린지 입장 성공: challengeId={}, userId={}, nickname={}, sessionId={}", 
@@ -214,9 +239,10 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             String profileImage = (String) session.getAttributes().get("profileImage");
 
             // 참가자 정보 업데이트 (Redis)
+            // ZSet score (distance)와 참가자 정보 (pace) 모두 업데이트
             sessionManager.updateParticipantInfo(challengeId, userId, distance, pace);
 
-            // 순위 계산
+            // 순위 계산 (ZREVRANGE 사용)
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
 
             // Redis Pub/Sub으로 참가자 업데이트 이벤트 발행 (다른 서버에 알림)
@@ -249,7 +275,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             log.info("자발적 포기: challengeId={}, userId={}", challengeId, userId);
 
             // 참가자 정보 조회 (현재 distance, pace)
-            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
             Double distance = info != null ? info.distance() : 0.0;
             Integer pace = info != null ? info.pace() : 0;
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
@@ -323,7 +349,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             log.info("강제 퇴장 요청 수신: challengeId={}, userId={}", challengeId, userId);
 
             // 참가자 정보 조회
-            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
             Double distance = info != null ? info.distance() : 0.0;
             Integer pace = info != null ? info.pace() : 0;
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
@@ -375,8 +401,8 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
                 // Redis Pub/Sub으로 퇴장 이벤트 발행 (reason: FINISH)
                 redisPubSubService.publishUserLeft(challengeId, userId, LeaveReason.FINISH.getValue());
 
-                // 세션 제거
-                sessionManager.removeSession(challengeId, userId);
+                // 세션 제거 (FINISH는 랭킹 유지)
+                sessionManager.removeSession(challengeId, userId, LeaveReason.FINISH.getValue());
             }
         } catch (Exception e) {
             log.error("완주 체크 실패: challengeId={}, userId={}", challengeId, userId, e);
@@ -429,7 +455,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             }
 
             // 참가자 정보 조회 (현재 distance, pace)
-            SessionManager.ParticipantInfo info = sessionManager.getParticipantInfo(challengeId, userId);
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
             Double distance = info != null ? info.distance() : 0.0;
             Integer pace = info != null ? info.pace() : 0;
             Integer ranking = sessionManager.calculateRanking(challengeId, userId);
@@ -463,8 +489,8 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             // 2. 타임아웃 체크 서비스에서 마지막 RECORD 시간 제거
             timeoutCheckService.removeLastRecordTime(challengeId, userId);
 
-            // 3. 세션 제거 (메모리 + Redis)
-            sessionManager.removeSession(challengeId, userId);
+            // 3. 세션 제거 (메모리 + Redis, reason에 따라 다르게 처리)
+            sessionManager.removeSession(challengeId, userId, reason);
 
             // 4. Redis Pub/Sub으로 퇴장 이벤트 발행 (다른 서버에 알림)
             redisPubSubService.publishUserLeft(challengeId, userId, reason);
