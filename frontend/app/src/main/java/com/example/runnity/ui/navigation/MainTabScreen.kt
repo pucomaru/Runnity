@@ -27,10 +27,12 @@ import com.example.runnity.theme.Typography
 import com.example.runnity.ui.screens.home.HomeScreen
 import com.example.runnity.ui.screens.startrun.StartRunScreen
 import com.example.runnity.ui.screens.challenge.ChallengeScreen
+import com.example.runnity.ui.screens.challenge.ChallengeWorkoutScreen
 import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
 import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
 import com.example.runnity.ui.screens.challenge.ChallengeWaitingScreen
+import com.example.runnity.ui.screens.challenge.ChallengeCountdownScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import com.example.runnity.ui.screens.mypage.PersonalRunDetailScreen
@@ -172,6 +174,24 @@ fun MainTabScreen(
                 composable("challenge_waiting/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id") ?: ""
                     ChallengeWaitingScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
+
+                // 챌린지 카운트다운 화면 (홈 탭에서 접근하는 경우)
+                composable("challenge_countdown/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeCountdownScreen(
+                        navController = navController,
+                        challengeId = challengeId
+                    )
+                }
+
+                // 챌린지 운동 화면 (홈 탭에서 접근하는 경우)
+                composable("challenge_workout/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWorkoutScreen(
                         challengeId = challengeId,
                         navController = navController
                     )
