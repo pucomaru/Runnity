@@ -30,6 +30,7 @@ import com.example.runnity.ui.screens.challenge.ChallengeScreen
 import com.example.runnity.ui.screens.challenge.ChallengeDetailScreen
 import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
+import com.example.runnity.ui.screens.challenge.ChallengeWaitingScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import com.example.runnity.ui.screens.mypage.PersonalRunDetailScreen
@@ -166,6 +167,15 @@ fun MainTabScreen(
                         navController = navController  // 뒤로가기용
                     )
                 }
+
+                // 챌린지 대기방 화면 (소켓 입장 후)
+                composable("challenge_waiting/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWaitingScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
             }
 
             // ========== 개인 러닝 그래프 ==========
@@ -288,6 +298,15 @@ fun MainTabScreen(
                 composable("challenge_detail/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id") ?: ""
                     ChallengeDetailScreen(
+                        challengeId = challengeId,
+                        navController = navController
+                    )
+                }
+
+                // 챌린지 대기방 화면 (챌린지 탭에서 접근하는 경우)
+                composable("challenge_waiting/{id}") { backStackEntry ->
+                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    ChallengeWaitingScreen(
                         challengeId = challengeId,
                         navController = navController
                     )
