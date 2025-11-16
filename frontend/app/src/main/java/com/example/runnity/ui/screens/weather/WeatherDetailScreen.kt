@@ -13,11 +13,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.R
+import com.example.runnity.data.model.response.DailyForecast
 import com.example.runnity.data.model.response.WeatherUiModel
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
@@ -53,6 +57,7 @@ fun WeatherDetailScreen(
     viewModel: WeatherDetailViewModel = viewModel()
 ) {
     val weatherData by viewModel.weather.collectAsState()
+    val forecast by viewModel.forecast.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val context = LocalContext.current
 
@@ -110,19 +115,52 @@ fun WeatherDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // 1. 현재 날씨 큰 카드
-                CurrentWeatherCard(weather)
+                CurrentWeatherCard(
+                    weather = weather,
+                    todayForecast = forecast.firstOrNull(),
+                    onRefresh = {
+                        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                        if (PermissionUtils.hasLocationPermission(context)) {
+                            fusedLocationClient.getCurrentLocation(
+                                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                                null
+                            ).addOnSuccessListener { location ->
+                                if (location != null) {
+                                    viewModel.fetchWeather(location.latitude, location.longitude)
+                                } else {
+                                    viewModel.fetchWeather(37.5665, 126.9780)
+                                }
+                            }.addOnFailureListener {
+                                viewModel.fetchWeather(37.5665, 126.9780)
+                            }
+                        } else {
+                            viewModel.fetchWeather(37.5665, 126.9780)
+                        }
+                    }
+                )
 
                 // 2. 러닝 지수 카드
                 RunningIndexCard(weather)
 
-                // 3. 상세 정보 섹션
+                // 3. 5일 예보 섹션
+                if (forecast.isNotEmpty()) {
+                    Text(
+                        text = "5일 예보",
+                        style = Typography.Subheading,
+                        color = ColorPalette.Light.primary
+                    )
+
+                    ForecastSection(forecast)
+                }
+
+                // 4. 상세 정보 섹션
                 Text(
                     text = "상세 정보",
                     style = Typography.Subheading,
                     color = ColorPalette.Light.primary
                 )
 
-                // 4. 상세 정보 그리드
+                // 5. 상세 정보 그리드
                 WeatherDetailsGrid(weather)
             }
             }
@@ -134,7 +172,25 @@ fun WeatherDetailScreen(
  * 현재 날씨 큰 카드
  */
 @Composable
-fun CurrentWeatherCard(weather: WeatherUiModel) {
+fun CurrentWeatherCard(
+    weather: WeatherUiModel,
+    todayForecast: DailyForecast? = null,
+    onRefresh: () -> Unit = {}
+) {
+    // 현재 시간 가져오기
+    val currentTime = remember {
+        val now = java.time.LocalDateTime.now()
+        val hour = now.hour
+        val minute = now.minute
+        val amPm = if (hour < 12) "오전" else "오후"
+        val displayHour = if (hour > 12) hour - 12 else if (hour == 0) 12 else hour
+        "$amPm ${displayHour}:${minute.toString().padStart(2, '0')}"
+    }
+
+    // 실제 일일 최고/최저 온도 (5일 예보에서 오늘 데이터)
+    val tempMax = todayForecast?.tempMax ?: weather.tempMax
+    val tempMin = todayForecast?.tempMin ?: weather.tempMin
+
     // 날씨 상태에 따른 배경 이미지 선택
     val backgroundImage = when (weather.weatherMain) {
         "Clear" -> R.drawable.weather_clear
@@ -182,24 +238,57 @@ fun CurrentWeatherCard(weather: WeatherUiModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp)
+                    .padding(20.dp)
             ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // 상단: 위치
-                Column {
-                    Text(
-                        text = weather.cityName,
-                        style = Typography.Title,
-                        color = Color.White
-                    )
-                    Text(
-                        text = weather.country,
-                        style = Typography.Caption,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                // 상단: 위치 + 시간/새로고침
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // 왼쪽: 위치
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = weather.country,
+                            style = Typography.Caption,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                        Text(
+                            text = weather.cityName,
+                            style = Typography.Title,
+                            color = Color.White
+                        )
+                    }
+
+                    // 오른쪽: 시간 + 새로고침 버튼
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = currentTime,
+                            style = Typography.Caption,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+
+                        IconButton(
+                            onClick = onRefresh,
+                            modifier = Modifier.size(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "날씨 새로고침",
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
 
                 // 중앙: 온도 + 날씨
@@ -226,13 +315,113 @@ fun CurrentWeatherCard(weather: WeatherUiModel) {
                             color = Color.White
                         )
                         Text(
-                            text = "최고 ${weather.tempMax}° · 최저 ${weather.tempMin}°",
+                            text = "최고 ${tempMax}° · 최저 ${tempMin}°",
                             style = Typography.Caption,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                     }
                 }
             }
+            }
+        }
+    }
+}
+
+/**
+ * 5일 예보 섹션
+ */
+@Composable
+fun ForecastSection(forecast: List<DailyForecast>) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        forecast.forEach { day ->
+            key(day.date) {
+                ForecastDayItem(day)
+            }
+        }
+    }
+}
+
+/**
+ * 일별 예보 아이템
+ */
+@Composable
+fun ForecastDayItem(day: DailyForecast) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 날짜
+            Text(
+                text = day.date,
+                style = Typography.Body,
+                color = ColorPalette.Light.primary,
+                modifier = Modifier.weight(1f)
+            )
+
+            // 날씨 아이콘 + 상태
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                // 날씨 아이콘
+                val weatherIcon = when (day.weatherMain) {
+                    "Clear" -> Icons.Filled.WbSunny
+                    "Clouds" -> Icons.Filled.Cloud
+                    "Rain" -> Icons.Filled.WaterDrop
+                    "Snow" -> Icons.Filled.AcUnit
+                    "Thunderstorm" -> Icons.Filled.Thunderstorm
+                    else -> Icons.Filled.Cloud
+                }
+
+                Icon(
+                    imageVector = weatherIcon,
+                    contentDescription = day.weatherMain,
+                    tint = ColorPalette.Light.component,
+                    modifier = Modifier.size(20.dp)
+                )
+
+                Text(
+                    text = getWeatherKorean(day.weatherMain),
+                    style = Typography.Caption,
+                    color = ColorPalette.Light.secondary
+                )
+            }
+
+            // 최고/최저 온도
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${day.tempMax}°",
+                    style = Typography.Body,
+                    color = ColorPalette.Common.accent,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "/",
+                    style = Typography.Caption,
+                    color = ColorPalette.Light.component
+                )
+                Text(
+                    text = "${day.tempMin}°",
+                    style = Typography.Body,
+                    color = ColorPalette.Light.component
+                )
             }
         }
     }

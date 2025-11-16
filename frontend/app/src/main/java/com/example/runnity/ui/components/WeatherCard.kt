@@ -6,8 +6,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,6 +58,7 @@ fun WeatherCard(
     @DrawableRes backgroundImageRes: Int? = null,  // 배경 이미지 리소스
     backgroundImageUrl: String? = null,  // 배경 이미지 URL (deprecated)
     onClick: (() -> Unit)? = null, // 클릭 이벤트
+    onRefresh: (() -> Unit)? = null, // 새로고침 클릭 이벤트
     modifier: Modifier = Modifier  // 추가 Modifier
 ) {
     // Card: 날씨 정보 카드
@@ -160,12 +165,33 @@ fun WeatherCard(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // 시간
-                    Text(
-                        text = time,
-                        style = Typography.Caption,
-                        color = Color.White
-                    )
+                    // 시간 + 새로고침 아이콘
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // 시간
+                        Text(
+                            text = time,
+                            style = Typography.Caption,
+                            color = Color.White
+                        )
+
+                        // 새로고침 아이콘 (시간 텍스트 크기와 동일)
+                        if (onRefresh != null) {
+                            IconButton(
+                                onClick = onRefresh,
+                                modifier = Modifier.size(16.dp)  // Caption 크기와 비슷하게
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "날씨 새로고침",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
 
                     // 온도
                     Text(

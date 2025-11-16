@@ -54,26 +54,32 @@ class MyPageViewModel(
     private fun loadUserProfile() {
         viewModelScope.launch {
             try {
-                // UserProfileManager에서 프로필 정보 가져오기
-                Timber.d("MyPage: 프로필 로드 시작")
-                val profile = UserProfileManager.getProfile()
+                // UserProfileManager의 StateFlow 구독
+                Timber.d("MyPage: 프로필 StateFlow 구독 시작")
 
-                if (profile == null) {
-                    Timber.w("MyPage: UserProfileManager에 프로필 없음")
-                } else {
-                    Timber.d("MyPage: 프로필 로드 성공 - nickname=${profile.nickname}, email=${profile.email}")
+                UserProfileManager.profile.collect { profile ->
+                    Timber.d("MyPage: 프로필 갱신 - nickname=${profile?.nickname}, email=${profile?.email}")
+
+                    val currentState = _uiState.value
+                    _uiState.value = when (currentState) {
+                        is MyPageUiState.Success -> currentState.copy(
+                            userProfile = UserProfile(
+                                nickname = profile?.nickname ?: "닉네임 없음",
+                                profileImageUrl = profile?.profileImageUrl
+                            )
+                        )
+                        else -> MyPageUiState.Success(
+                            userProfile = UserProfile(
+                                nickname = profile?.nickname ?: "닉네임 없음",
+                                profileImageUrl = profile?.profileImageUrl
+                            ),
+                            stats = RunningStats(0.0, 0, "0'00\"", "0:00"),
+                            graphData = emptyList(),
+                            personalRecords = emptyList(),
+                            challengeRecords = emptyList()
+                        )
+                    }
                 }
-
-                _uiState.value = MyPageUiState.Success(
-                    userProfile = UserProfile(
-                        nickname = profile?.nickname ?: "닉네임 없음",
-                        profileImageUrl = profile?.profileImageUrl
-                    ),
-                    stats = RunningStats(0.0, 0, "0'00\"", "0:00"),
-                    graphData = emptyList(),
-                    personalRecords = emptyList(),
-                    challengeRecords = emptyList()
-                )
             } catch (e: Exception) {
                 Timber.e(e, "MyPage: 프로필 로드 실패")
                 _uiState.value = MyPageUiState.Error(e.message ?: "프로필 로드 실패")
