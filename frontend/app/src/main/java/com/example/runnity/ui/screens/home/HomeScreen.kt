@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -245,11 +246,28 @@ fun HomeScreen(
                 }
             )
 
-            // 2-3. 예약한 챌린지 섹션
-            SectionHeader(
-                subtitle = "예약한 챌린지",
-                caption = "내가 예약한 챌린지를 확인하세요"
-            )
+            // 2-3. 예약한 챌린지 섹션 + 새로고침 버튼
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SectionHeader(
+                    subtitle = "예약한 챌린지",
+                    caption = "내가 예약한 챌린지를 확인하세요",
+                )
+
+                IconButton(
+                    onClick = { viewModel.fetchReservedChallenges() },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "예약한 챌린지 새로고침",
+                        tint = ColorPalette.Light.component
+                    )
+                }
+            }
 
             // 예약한 챌린지 리스트
             Column(
