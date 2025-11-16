@@ -3,7 +3,9 @@ package com.example.runnity.ui.screens.weather
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.model.response.DailyForecast
 import com.example.runnity.data.model.response.WeatherUiModel
+import com.example.runnity.data.model.response.toDailyForecasts
 import com.example.runnity.data.model.response.toUiModel
 import com.example.runnity.data.repository.WeatherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,16 +24,20 @@ class WeatherDetailViewModel : ViewModel() {
     private val _weather = MutableStateFlow<WeatherUiModel?>(null)
     val weather: StateFlow<WeatherUiModel?> = _weather.asStateFlow()
 
+    private val _forecast = MutableStateFlow<List<DailyForecast>>(emptyList())
+    val forecast: StateFlow<List<DailyForecast>> = _forecast.asStateFlow()
+
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
     /**
-     * 위치 기반 날씨 정보 조회
+     * 위치 기반 날씨 정보 및 5일 예보 조회
      */
     fun fetchWeather(lat: Double, lon: Double) {
         viewModelScope.launch {
             _loading.value = true
 
+            // 현재 날씨 조회
             when (val response = weatherRepository.getCurrentWeather(lat, lon)) {
                 is ApiResponse.Success -> {
                     _weather.value = response.data.toUiModel()
@@ -44,6 +50,22 @@ class WeatherDetailViewModel : ViewModel() {
                 is ApiResponse.NetworkError -> {
                     Timber.e("날씨 네트워크 오류")
                     _weather.value = null
+                }
+            }
+
+            // 5일 예보 조회
+            when (val forecastResponse = weatherRepository.getForecast(lat, lon)) {
+                is ApiResponse.Success -> {
+                    _forecast.value = forecastResponse.data.toDailyForecasts()
+                    Timber.d("5일 예보 로드 성공: ${_forecast.value.size}일")
+                }
+                is ApiResponse.Error -> {
+                    Timber.e("5일 예보 조회 실패: ${forecastResponse.message}")
+                    _forecast.value = emptyList()
+                }
+                is ApiResponse.NetworkError -> {
+                    Timber.e("5일 예보 네트워크 오류")
+                    _forecast.value = emptyList()
                 }
             }
 

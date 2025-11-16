@@ -22,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.screens.home.HomeScreen
@@ -146,7 +148,12 @@ fun MainTabScreen(
         NavHost(
             navController = navController,
             startDestination = BottomNavItem.Home.graphRoute,  // 시작 화면: home_graph
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            // 애니메이션 제거 - 즉시 전환 (사용자 피로도 감소)
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             // ========== 홈 그래프 ==========
             // navigation(): 여러 화면을 하나의 그룹으로 묶음

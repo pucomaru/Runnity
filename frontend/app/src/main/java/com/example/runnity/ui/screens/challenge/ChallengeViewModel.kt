@@ -6,6 +6,7 @@ import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.repository.ChallengeRepository
 import com.example.runnity.data.model.response.ChallengeListItem
 import com.example.runnity.data.model.response.ChallengeDetailResponse
+import com.example.runnity.data.util.ReservedChallengeManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -214,7 +215,9 @@ class ChallengeViewModel(
             when (val response = repository.joinChallenge(challengeId, password)) {
                 is ApiResponse.Success -> {
                     Timber.d("챌린지 참가 성공: $challengeId")
-                    // 목록 새로고침
+                    // 예약한 챌린지 목록 갱신 (전역)
+                    ReservedChallengeManager.refresh()
+                    // 챌린지 목록 새로고침
                     refreshChallenges()
                     // 상세 정보 새로고침
                     loadChallengeDetail(challengeId)
@@ -237,7 +240,9 @@ class ChallengeViewModel(
             when (val response = repository.cancelChallenge(challengeId)) {
                 is ApiResponse.Success -> {
                     Timber.d("챌린지 참가 취소 성공: $challengeId")
-                    // 목록 새로고침
+                    // 예약한 챌린지 목록 갱신 (전역)
+                    ReservedChallengeManager.refresh()
+                    // 챌린지 목록 새로고침
                     refreshChallenges()
                     // 상세 정보 새로고침
                     loadChallengeDetail(challengeId)

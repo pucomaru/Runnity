@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.challenge
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -81,17 +82,19 @@ fun ChallengeScreen(
 
     // 전체 레이아웃 (Box로 FAB 배치)
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorPalette.Light.background)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ColorPalette.Light.background)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
             // 1. 상단 헤더 (챌린지 타이틀)
             PageHeader(title = "챌린지")
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // 2. 검색바 + 필터 버튼
             SearchBarWithFilter(
@@ -200,7 +203,10 @@ fun ChallengeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
                         ) {
-                            items(challenges.size) { index ->
+                            items(
+                                count = challenges.size,
+                                key = { index -> challenges[index].id }
+                            ) { index ->
                                 val challenge = challenges[index]
                                 ChallengeCard(
                                     distance = challenge.distance,

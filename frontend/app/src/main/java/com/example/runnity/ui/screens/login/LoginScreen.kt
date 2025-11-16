@@ -183,7 +183,8 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorPalette.Light.background)
-            .padding(horizontal = 16.dp),
+            .statusBarsPadding()
+            .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -203,7 +204,9 @@ fun LoginScreen(
             style = Typography.Title,
             color = ColorPalette.Light.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp)
         )
 
         Text(
@@ -211,7 +214,9 @@ fun LoginScreen(
             style = Typography.Body,
             color = ColorPalette.Light.component,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 48.dp)
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 48.dp)
         )
 
         // Google 로그인 버튼
@@ -228,7 +233,8 @@ fun LoginScreen(
             ),
             border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.3f)),
             modifier = Modifier.offset(y = 4.dp),
-            enabled = uiState != LoginUiState.Loading
+            enabled = uiState != LoginUiState.Loading,
+            leadingIcon = painterResource(id = R.drawable.google)
         )
 
         // Kakao 로그인 버튼
@@ -263,7 +269,8 @@ fun LoginScreen(
                 contentColor = Color.Black
             ),
             modifier = Modifier.offset(y = (-4).dp),
-            enabled = uiState != LoginUiState.Loading
+            enabled = uiState != LoginUiState.Loading,
+            leadingIcon = painterResource(id = R.drawable.kakao)
         )
     }
 }

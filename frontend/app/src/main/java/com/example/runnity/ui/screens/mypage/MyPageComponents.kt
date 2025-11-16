@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.key
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -119,23 +120,25 @@ fun ScopeBar(
         )
 
         items.forEach { (type, label) ->
-            val isSelected = selectedPeriodType == type
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(
-                        color = if (isSelected) ColorPalette.Common.accent else Color.Transparent,
-                        shape = RoundedCornerShape(16.dp)
+            key(type) {
+                val isSelected = selectedPeriodType == type
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(
+                            color = if (isSelected) ColorPalette.Common.accent else Color.Transparent,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable { onPeriodTypeSelected(type) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = Typography.Body,
+                        color = if (isSelected) Color.White else ColorPalette.Light.secondary
                     )
-                    .clickable { onPeriodTypeSelected(type) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    style = Typography.Body,
-                    color = if (isSelected) Color.White else ColorPalette.Light.secondary
-                )
+                }
             }
         }
     }
@@ -297,10 +300,12 @@ fun RunningRecordTabSection(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     records.take(5).forEach { record ->
-                        RunningRecordItem(
-                            record = record,
-                            onClick = { onRecordClick(record) }
-                        )
+                        key(record.id) {
+                            RunningRecordItem(
+                                record = record,
+                                onClick = { onRecordClick(record) }
+                            )
+                        }
                     }
                 }
             }

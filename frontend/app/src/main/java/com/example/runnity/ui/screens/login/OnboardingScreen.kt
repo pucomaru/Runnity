@@ -61,6 +61,7 @@ fun OnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorPalette.Common.accent)
+            .statusBarsPadding()
     ) {
         // 스와이프 가능한 페이지들
         HorizontalPager(
@@ -96,7 +97,8 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 32.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
             ) {
                 PrimaryButton(
                     text = "시작하기",
