@@ -113,7 +113,8 @@ fun WorkoutResultScreen(
             bpm = avgBpm,
             calories = metrics.caloriesKcal,
             route = routeJson,
-            laps = lapRequests
+            laps = lapRequests,
+            challengeId = null
         )
         val repository = RunRepository()
         val result = runCatching { repository.createRun(req) }.getOrNull()

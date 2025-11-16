@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import okhttp3.*
 import java.util.concurrent.TimeUnit
+import timber.log.Timber
 
 
 object WebSocketManager : WebSocketListener() {
@@ -38,6 +39,7 @@ object WebSocketManager : WebSocketListener() {
         socket = null
 
         if (url.isBlank()) {
+            Timber.e("웹소켓 URL이 비어 있습니다.")
             _state.value = WsState.Failed(IllegalArgumentException("WebSocket URL is blank"), null)
             return
         }
@@ -55,6 +57,7 @@ object WebSocketManager : WebSocketListener() {
             .headers(headersBuilder.build())
             .build()
 
+        Timber.d("웹소켓 연결 시도: url=%s", url)
         _state.value = WsState.Connecting
         socket = client.newWebSocket(request, this)
     }
@@ -72,26 +75,31 @@ object WebSocketManager : WebSocketListener() {
 
     override fun onOpen(webSocket: WebSocket, response: Response) {
         // 연결 완료
+        Timber.d("웹소켓 연결 성공: code=%d", response.code)
         _state.value = WsState.Open
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
         // 서버에서 도착한 텍스트 메시지를 스트림으로 방출
+        Timber.d("웹소켓 메시지 수신: %s", text)
         _incoming.tryEmit(text)
     }
 
     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
         // 서버/클라이언트가 종료를 예고한 상태 → 실제 종료 호출
+        Timber.d("웹소켓 종료 진행 중: code=%d, reason=%s", code, reason)
         webSocket.close(code, reason)
     }
 
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
         // 종료 완료
+        Timber.d("웹소켓 종료 완료: code=%d, reason=%s", code, reason)
         _state.value = WsState.Closed
     }
 
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
         // 네트워크 오류 또는 서버 응답 오류 등으로 실패
+        Timber.e(t, "웹소켓 연결 실패: httpCode=%s, message=%s", response?.code, t.message)
         _state.value = WsState.Failed(t, response?.code)
     }
 }

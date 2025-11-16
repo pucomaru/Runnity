@@ -33,6 +33,7 @@ import com.example.runnity.ui.screens.challenge.ChallengeFilterScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCreateScreen
 import com.example.runnity.ui.screens.challenge.ChallengeWaitingScreen
 import com.example.runnity.ui.screens.challenge.ChallengeCountdownScreen
+import com.example.runnity.ui.screens.challenge.ChallengeResultScreen
 import com.example.runnity.ui.screens.mypage.MyPageScreen
 import com.example.runnity.ui.screens.mypage.ProfileSettingScreen
 import com.example.runnity.ui.screens.mypage.PersonalRunDetailScreen
@@ -200,6 +201,13 @@ fun MainTabScreen(
                         navController = navController
                     )
                 }
+
+                // 챌린지 결과 화면
+                composable("challenge_result") {
+                    ChallengeResultScreen(
+                        onClose = { navController.navigate("home") }
+                    )
+                }
             }
 
             // ========== 개인 러닝 그래프 ==========
@@ -346,6 +354,20 @@ fun MainTabScreen(
 
                 // 중계 필터 화면 (네비바 있음)
                 composable("broadcast_filter") {
+                    BroadcastFilterScreen(
+                        navController = navController  // 뒤로가기용
+                    )
+                }
+
+                // 중계 필터 화면 (네비바 있음)
+                composable("broadcast_filter") { backStackEntry ->
+                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
+                    val broadcastViewModel: com.example.runnity.ui.screens.broadcast.BroadcastViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     BroadcastFilterScreen(
                         navController = navController  // 뒤로가기용
                     )
