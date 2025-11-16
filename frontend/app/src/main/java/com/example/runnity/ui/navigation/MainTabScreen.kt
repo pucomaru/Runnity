@@ -43,6 +43,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 import com.example.runnity.ui.screens.workout.CountdownScreen
+import com.example.runnity.ui.screens.weather.WeatherDetailScreen
 
 /**
  * 메인 탭 화면
@@ -158,6 +159,13 @@ fun MainTabScreen(
                     HomeScreen(
                         navController = navController,           // 탭 내부 이동용 (세부 화면으로)
                         parentNavController = parentNavController // 앱 전체 이동용 (로그인 등)
+                    )
+                }
+
+                // 날씨 상세 화면 (네비바 없음)
+                composable("weather_detail") {
+                    WeatherDetailScreen(
+                        navController = navController
                     )
                 }
 

@@ -6,13 +6,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,6 +31,12 @@ import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
+import com.example.runnity.utils.PermissionUtils
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import java.time.format.DateTimeFormatter
+import timber.log.Timber
 
 /**
  * 홈 화면
@@ -45,15 +56,50 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
 
+    // 날씨 정보 구독
+    val weatherData by viewModel.weather.collectAsState()
+    val weatherLoading by viewModel.weatherLoading.collectAsState()
+
+    // 위치 가져오기 및 날씨 조회
+    LaunchedEffect(Unit) {
+        if (PermissionUtils.hasLocationPermission(context)) {
+            try {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource().token
+
+                fusedLocationClient.getCurrentLocation(
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    cancellationToken
+                ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.fetchWeather(location.latitude, location.longitude)
+                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                    } else {
+                        // 위치를 가져오지 못한 경우 서울 기본값
+                        viewModel.fetchWeather(37.5665, 126.9780)
+                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                    }
+                }.addOnFailureListener { exception ->
+                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
+                    viewModel.fetchWeather(37.5665, 126.9780)
+                }
+            } catch (e: SecurityException) {
+                Timber.e(e, "위치 권한 없음")
+                viewModel.fetchWeather(37.5665, 126.9780)
+            }
+        } else {
+            // 권한 없으면 서울 기본값
+            viewModel.fetchWeather(37.5665, 126.9780)
+            Timber.w("위치 권한 없음 → 서울 기본값 사용")
+        }
+    }
+
     // 홈 입장/소켓 연결 관련 에러 메시지 토스트 표시
     LaunchedEffect(Unit) {
         viewModel.errorEvents.collect { message ->
             android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-
-    // TODO: ViewModel에서 실제 데이터 가져오기
-    // 현재는 임시 데이터 사용
 
     // 추천 챌린지 샘플 데이터
     val recommendedChallenges = listOf(
@@ -80,10 +126,13 @@ fun HomeScreen(
     // 예약한 챌린지: ViewModel의 실제 데이터 사용
     val reservedChallenges = viewModel.reservedChallenges.collectAsState().value
 
-    // 전체 레이아웃
-    Column(
+    // 전체 레이아웃 (Box로 FAB 배치)
+    Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 1. 상단 앱바 (로고 + 알람)
         Row(
             modifier = Modifier
@@ -130,14 +179,57 @@ fun HomeScreen(
                     .background(ColorPalette.Common.accent)  // 액센트 색상 배경
                     .padding(16.dp)
             ) {
-                WeatherCard(
-                    country = "Korea",
-                    city = "Seoul",
-                    weather = "Cloudy",
-                    temperature = "10°",
-                    time = "9:41 AM",
-                    backgroundImageUrl = null  // TODO: 실제 날씨 배경 이미지 URL
-                )
+                if (weatherLoading) {
+                    // 로딩 중
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                } else {
+                    // 실제 날씨 데이터 표시
+                    val weather = weatherData
+                    val currentTime = remember {
+                        java.time.LocalTime.now()
+                            .format(DateTimeFormatter.ofPattern("h:mm a"))
+                    }
+
+                    val weatherMain = weather?.weatherMain ?: "Clouds"
+                    val weatherKorean = when (weatherMain) {
+                        "Clear" -> "맑음"
+                        "Clouds" -> "흐림"
+                        "Rain" -> "비"
+                        "Snow" -> "눈"
+                        "Thunderstorm" -> "천둥번개"
+                        "Drizzle" -> "이슬비"
+                        "Mist", "Fog" -> "안개"
+                        else -> weather?.weatherDescription ?: "흐림"
+                    }
+                    val backgroundImage = when (weatherMain) {
+                        "Clear" -> R.drawable.weather_clear
+                        "Clouds" -> R.drawable.weather_clouds
+                        "Rain" -> R.drawable.weather_rain
+                        "Snow" -> R.drawable.weather_snow
+                        "Thunderstorm" -> R.drawable.weather_thunderstorm
+                        "Drizzle", "Mist", "Fog" -> R.drawable.weather_drizzle
+                        else -> R.drawable.weather_clouds
+                    }
+
+                    WeatherCard(
+                        country = weather?.country ?: "Korea",
+                        city = weather?.cityName ?: "Seoul",
+                        weather = weatherKorean,
+                        temperature = "${weather?.temperature ?: 10}°",
+                        time = currentTime,
+                        backgroundImageRes = backgroundImage,
+                        onClick = {
+                            navController?.navigate("weather_detail")
+                        }
+                    )
+                }
             }
 
             // 2-2. 운영진 추천 챌린지 섹션
@@ -186,6 +278,26 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+        }
+
+        // FloatingActionButton (중계방 보기)
+        FloatingActionButton(
+            onClick = {
+                // TODO: 중계방 페이지로 이동 (동료가 연결 예정)
+                // navController?.navigate("broadcast_view")
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = ColorPalette.Common.accent,
+            contentColor = Color.White
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LiveTv,
+                contentDescription = "중계방 보기",
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }

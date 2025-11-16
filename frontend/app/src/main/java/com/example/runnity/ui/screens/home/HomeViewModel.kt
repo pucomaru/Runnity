@@ -19,6 +19,10 @@ import java.time.format.DateTimeFormatter
 import com.example.runnity.data.repository.ChallengeRepository
 import com.example.runnity.socket.WebSocketManager
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.repository.WeatherRepository
+import com.example.runnity.data.model.response.WeatherUiModel
+import com.example.runnity.data.model.response.toUiModel
+import timber.log.Timber
 
 /**
  * 홈 화면 ViewModel
@@ -42,7 +46,15 @@ class HomeViewModel : ViewModel() {
 
     private val runHistoryRepository = RunHistoryRepository()
     private val challengeRepository = ChallengeRepository()
+    private val weatherRepository = WeatherRepository()
     private val joinInFlight = mutableSetOf<String>()
+
+    // 날씨 상태
+    private val _weather = MutableStateFlow<WeatherUiModel?>(null)
+    val weather: StateFlow<WeatherUiModel?> = _weather.asStateFlow()
+
+    private val _weatherLoading = MutableStateFlow(false)
+    val weatherLoading: StateFlow<Boolean> = _weatherLoading.asStateFlow()
 
     init {
         loadHomeData()
@@ -169,6 +181,32 @@ class HomeViewModel : ViewModel() {
             localDt.format(formatter)
         } catch (e: Exception) {
             iso
+        }
+    }
+
+    /**
+     * 위치 기반 날씨 정보 조회
+     */
+    fun fetchWeather(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            _weatherLoading.value = true
+
+            when (val response = weatherRepository.getCurrentWeather(lat, lon)) {
+                is ApiResponse.Success -> {
+                    _weather.value = response.data.toUiModel()
+                    Timber.d("날씨 정보 업데이트: ${_weather.value?.cityName}")
+                }
+                is ApiResponse.Error -> {
+                    Timber.e("날씨 조회 실패: ${response.message}")
+                    _weather.value = null
+                }
+                is ApiResponse.NetworkError -> {
+                    Timber.e("날씨 네트워크 오류")
+                    _weather.value = null
+                }
+            }
+
+            _weatherLoading.value = false
         }
     }
 
