@@ -11,6 +11,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import com.example.runnity.data.util.TokenManager
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.screens.login.LoginScreen
@@ -66,7 +68,12 @@ fun AppNavigation() {
 
     NavHost(
         navController = navController,
-        startDestination = startDestination!!
+        startDestination = startDestination!!,
+        // 애니메이션 제거 - 즉시 전환 (사용자 피로도 감소)
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
     ) {
         // 웰컴 화면
         composable("welcome") {

@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.runnity.data.model.response.ProfileResponse
 import com.google.gson.Gson
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 
 /**
@@ -22,6 +25,10 @@ object UserProfileManager {
     // 메모리 캐시 (빠른 접근)
     private var cachedProfile: ProfileResponse? = null
 
+    // StateFlow로 프로필 상태 관리 (UI에서 구독 가능)
+    private val _profile = MutableStateFlow<ProfileResponse?>(null)
+    val profile: StateFlow<ProfileResponse?> = _profile.asStateFlow()
+
     /**
      * UserProfileManager 초기화
      * GlobalApplication onCreate에서 호출 필요
@@ -35,11 +42,12 @@ object UserProfileManager {
 
     /**
      * 프로필 정보 저장
-     * - 메모리 캐시 + SharedPreferences 모두 저장
+     * - 메모리 캐시 + SharedPreferences + StateFlow 모두 저장
      * - commit() 사용으로 동기적 저장 보장
      */
     fun saveProfile(profile: ProfileResponse) {
         cachedProfile = profile
+        _profile.value = profile  // StateFlow 갱신
         val json = gson.toJson(profile)
         val success = prefs?.edit()?.putString(KEY_PROFILE, json)?.commit() ?: false
         if (success) {
@@ -80,6 +88,7 @@ object UserProfileManager {
      */
     fun clearProfile() {
         cachedProfile = null
+        _profile.value = null  // StateFlow 갱신
         prefs?.edit()?.clear()?.commit()
         Timber.d("프로필 삭제 완료")
     }
@@ -99,10 +108,12 @@ object UserProfileManager {
         if (json != null) {
             try {
                 cachedProfile = gson.fromJson(json, ProfileResponse::class.java)
+                _profile.value = cachedProfile  // StateFlow 갱신
                 Timber.d("로컬 캐시에서 프로필 로드 완료: memberId=${cachedProfile?.memberId}")
             } catch (e: Exception) {
                 Timber.e(e, "프로필 JSON 파싱 실패")
                 cachedProfile = null
+                _profile.value = null
             }
         } else {
             Timber.d("로컬 캐시에 프로필 없음")

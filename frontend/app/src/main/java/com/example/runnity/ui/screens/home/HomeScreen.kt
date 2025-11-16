@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
@@ -96,7 +97,7 @@ fun HomeScreen(
 
     val notificationLauncher = rememberNotificationPermissionLauncher { }
 
-    // 위치 가져오기 및 날씨 조회 + 권한 요청
+    // 위치 가져오기 및 날씨 조회 + 권한 요청 (캐시 사용)
     LaunchedEffect(Unit) {
         if (!PermissionUtils.hasLocationPermission(context)) {
             requestLocationPermissions(locationLauncher)
@@ -109,15 +110,15 @@ fun HomeScreen(
                 cancellationToken
             ).addOnSuccessListener { location ->
                 if (location != null) {
-                    viewModel.fetchWeather(location.latitude, location.longitude)
+                    viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
                     Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
                 } else {
-                    viewModel.fetchWeather(37.5665, 126.9780)
+                    viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
                     Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
             }.addOnFailureListener { exception ->
                 Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
-                viewModel.fetchWeather(37.5665, 126.9780)
+                viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
             }
         }
 
@@ -259,6 +260,23 @@ fun HomeScreen(
                         backgroundImageRes = backgroundImage,
                         onClick = {
                             navController?.navigate("weather_detail")
+                        },
+                        onRefresh = {
+                            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                            val cancellationToken = CancellationTokenSource().token
+
+                            fusedLocationClient.getCurrentLocation(
+                                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                                cancellationToken
+                            ).addOnSuccessListener { location ->
+                                if (location != null) {
+                                    viewModel.fetchWeather(location.latitude, location.longitude)
+                                } else {
+                                    viewModel.fetchWeather(37.5665, 126.9780)
+                                }
+                            }.addOnFailureListener {
+                                viewModel.fetchWeather(37.5665, 126.9780)
+                            }
                         }
                     )
                 }
@@ -308,31 +326,33 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 reservedChallenges.forEach { challenge ->
-                    ChallengeCard(
-                        distance = challenge.distance,
-                        title = challenge.title,
-                        startDateTime = challenge.startDateTime,
-                        participants = challenge.participants,
-                        buttonState = challenge.buttonState,
-                        onCardClick = {
-                            navController?.navigate("challenge_detail/${challenge.id}")
-                        },
-                        onButtonClick = {
-                            val needsLocation = !PermissionUtils.hasLocationPermission(context)
-                            val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
-                            if (needsLocation || needsNotification) {
-                                if (needsLocation) {
-                                    requestLocationPermissions(locationLauncher)
-                                } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
-                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            } else {
-                                viewModel.joinChallengeAndConnect(challenge.id) {
-                                    navController?.navigate("challenge_waiting/${challenge.id}")
+                    key(challenge.id) {
+                        ChallengeCard(
+                            distance = challenge.distance,
+                            title = challenge.title,
+                            startDateTime = challenge.startDateTime,
+                            participants = challenge.participants,
+                            buttonState = challenge.buttonState,
+                            onCardClick = {
+                                navController?.navigate("challenge_detail/${challenge.id}")
+                            },
+                            onButtonClick = {
+                                val needsLocation = !PermissionUtils.hasLocationPermission(context)
+                                val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+                                if (needsLocation || needsNotification) {
+                                    if (needsLocation) {
+                                        requestLocationPermissions(locationLauncher)
+                                    } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
+                                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                } else {
+                                    viewModel.joinChallengeAndConnect(challenge.id) {
+                                        navController?.navigate("challenge_waiting/${challenge.id}")
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
 

@@ -32,6 +32,7 @@ fun WelcomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorPalette.Common.accent)
+            .statusBarsPadding()
     ) {
         // 중앙 로고
         Image(
@@ -48,7 +49,8 @@ fun WelcomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             // 시작하기 버튼 (흰색 배경)

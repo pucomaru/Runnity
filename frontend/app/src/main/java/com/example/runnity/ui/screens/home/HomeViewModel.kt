@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter
 import com.example.runnity.data.repository.ChallengeRepository
 import com.example.runnity.socket.WebSocketManager
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.util.ReservedChallengeManager
 import com.example.runnity.data.repository.WeatherRepository
 import com.example.runnity.data.model.response.WeatherUiModel
 import com.example.runnity.data.model.response.toUiModel
@@ -36,15 +37,13 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // 예약한 챌린지 리스트 State (enterableChallenge가 최상단)
-    private val _reservedChallenges = MutableStateFlow<List<ChallengeListItem>>(emptyList())
-    val reservedChallenges: StateFlow<List<ChallengeListItem>> = _reservedChallenges.asStateFlow()
+    // 예약한 챌린지 리스트 (전역 Manager에서 구독)
+    val reservedChallenges: StateFlow<List<ChallengeListItem>> = ReservedChallengeManager.reservedChallenges
 
     // 일회성 에러 메시지 이벤트 (토스트 등)
     private val _errorEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val errorEvents: SharedFlow<String> = _errorEvents
 
-    private val runHistoryRepository = RunHistoryRepository()
     private val challengeRepository = ChallengeRepository()
     private val weatherRepository = WeatherRepository()
     private val joinInFlight = mutableSetOf<String>()
@@ -56,17 +55,19 @@ class HomeViewModel : ViewModel() {
     private val _weatherLoading = MutableStateFlow(false)
     val weatherLoading: StateFlow<Boolean> = _weatherLoading.asStateFlow()
 
+    // 마지막 날씨 조회 시간 (밀리초)
+    private var lastWeatherFetchTime: Long = 0
+    private val WEATHER_CACHE_DURATION = 30 * 60 * 1000L // 30분
+
     init {
         loadHomeData()
-        // TODO: 주기적으로 시간 체크하는 타이머 시작
-        // startChallengeTimeChecker()
     }
 
     private fun loadHomeData() {
         viewModelScope.launch {
             try {
-                // 예약한 챌린지 불러오기 (enterable → joined 순)
-                fetchReservedChallenges()
+                // ReservedChallengeManager가 자동으로 주기적 갱신 (1분마다)
+                // 여기서는 UI 상태만 Success로 변경
                 _uiState.value = HomeUiState.Success
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "알 수 없는 오류")
@@ -96,7 +97,11 @@ class HomeViewModel : ViewModel() {
                         // WebSocket 연결 완료될 때까지 대기 후 콜백 호출
                         val state = WebSocketManager.state.first { it is WebSocketManager.WsState.Open || it is WebSocketManager.WsState.Failed }
                         when (state) {
-                            is WebSocketManager.WsState.Open -> onJoined()
+                            is WebSocketManager.WsState.Open -> {
+                                // 소켓 연결 성공 시 예약한 챌린지 목록 갱신
+                                ReservedChallengeManager.refresh()
+                                onJoined()
+                            }
                             is WebSocketManager.WsState.Failed -> {
                                 _errorEvents.tryEmit("챌린지 대기방 연결에 실패했어요. 네트워크 상태를 확인한 후 다시 시도해 주세요.")
                             }
@@ -123,77 +128,42 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    // 예약한 챌린지 조회: enterableChallenge를 최상단에 배치
+    /**
+     * 예약한 챌린지 수동 갱신
+     * 새로고침 버튼 클릭 시 호출
+     */
     fun fetchReservedChallenges() {
         viewModelScope.launch {
-            when (val resp = runHistoryRepository.getMyChallenges()) {
-                is ApiResponse.Success -> {
-                    val data = resp.data
-                    val list = buildList {
-                        data.enterableChallenge?.let {
-                            val item = mapToListItem(it).copy(
-                                buttonState = com.example.runnity.ui.components.ChallengeButtonState.Join
-                            )
-                            add(item)
-                        }
-                        data.joinedChallenges.forEach { add(mapToListItem(it)) }
-                    }
-                    _reservedChallenges.value = list
-                }
-                is ApiResponse.Error -> {
-                    // 에러 시 비워두고 상태만 갱신 (UI는 변경하지 않음)
-                    _reservedChallenges.value = emptyList()
-                }
-                ApiResponse.NetworkError -> {
-                    _reservedChallenges.value = emptyList()
-                }
-            }
+            ReservedChallengeManager.refresh()
         }
     }
 
-    // 서버의 간단 챌린지 정보를 홈 리스트 아이템으로 매핑
-    private fun mapToListItem(info: ChallengeSimpleInfo): ChallengeListItem {
-        val distanceText = formatDistance(info.distance)
-        val participants = "${info.currentParticipants}/${info.maxParticipants}명"
-        val startText = formatIsoToLocal(info.startAt)
-        return ChallengeListItem(
-            id = info.challengeId.toString(),
-            distance = distanceText,
-            title = info.title,
-            startDateTime = startText,
-            participants = participants
-        )
-    }
+    /**
+     * 캐시 시간을 확인하여 필요한 경우만 날씨 조회
+     */
+    fun fetchWeatherIfNeeded(lat: Double, lon: Double) {
+        val currentTime = System.currentTimeMillis()
+        val cacheExpired = (currentTime - lastWeatherFetchTime) > WEATHER_CACHE_DURATION
 
-    private fun formatDistance(raw: String): String {
-        val v = raw.toDoubleOrNull() ?: return raw
-        val iv = v.toInt() // 소수점 버림
-        return "${iv}km"
-    }
-
-    private fun formatIsoToLocal(iso: String): String {
-        return try {
-            // 서버 시간이 이미 한국 시간 기준인데 Z(UTC)로 표시되는 상황을 고려하여
-            // Z를 제거하고 로컬 DateTime으로 그대로 해석
-            val trimmed = iso.removeSuffix("Z")
-            val localDt = java.time.LocalDateTime.parse(trimmed)
-            val formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
-            localDt.format(formatter)
-        } catch (e: Exception) {
-            iso
+        if (_weather.value == null || cacheExpired) {
+            fetchWeather(lat, lon, forceRefresh = false)
+        } else {
+            Timber.d("날씨 캐시 사용 (마지막 조회: ${(currentTime - lastWeatherFetchTime) / 1000}초 전)")
         }
     }
 
     /**
      * 위치 기반 날씨 정보 조회
+     * @param forceRefresh true면 캐시 무시하고 강제 조회 (새로고침 버튼용)
      */
-    fun fetchWeather(lat: Double, lon: Double) {
+    fun fetchWeather(lat: Double, lon: Double, forceRefresh: Boolean = true) {
         viewModelScope.launch {
             _weatherLoading.value = true
 
             when (val response = weatherRepository.getCurrentWeather(lat, lon)) {
                 is ApiResponse.Success -> {
                     _weather.value = response.data.toUiModel()
+                    lastWeatherFetchTime = System.currentTimeMillis()
                     Timber.d("날씨 정보 업데이트: ${_weather.value?.cityName}")
                 }
                 is ApiResponse.Error -> {
