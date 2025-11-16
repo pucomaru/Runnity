@@ -33,9 +33,16 @@ import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
 import com.example.runnity.utils.PermissionUtils
+import com.example.runnity.utils.rememberLocationPermissionLauncher
+import com.example.runnity.utils.rememberNotificationPermissionLauncher
+import com.example.runnity.utils.requestLocationPermissions
+import com.example.runnity.utils.hasNotificationPermission
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import android.os.Build
+import android.Manifest
+import android.widget.Toast
 import java.time.format.DateTimeFormatter
 import timber.log.Timber
 
@@ -61,37 +68,61 @@ fun HomeScreen(
     val weatherData by viewModel.weather.collectAsState()
     val weatherLoading by viewModel.weatherLoading.collectAsState()
 
-    // 위치 가져오기 및 날씨 조회
-    LaunchedEffect(Unit) {
-        if (PermissionUtils.hasLocationPermission(context)) {
-            try {
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                val cancellationToken = CancellationTokenSource().token
+    val locationLauncher = rememberLocationPermissionLauncher { granted ->
+        if (granted) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            val cancellationToken = CancellationTokenSource().token
 
-                fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                    cancellationToken
-                ).addOnSuccessListener { location ->
-                    if (location != null) {
-                        viewModel.fetchWeather(location.latitude, location.longitude)
-                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
-                    } else {
-                        // 위치를 가져오지 못한 경우 서울 기본값
-                        viewModel.fetchWeather(37.5665, 126.9780)
-                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
-                    }
-                }.addOnFailureListener { exception ->
-                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                cancellationToken
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    viewModel.fetchWeather(location.latitude, location.longitude)
+                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                } else {
                     viewModel.fetchWeather(37.5665, 126.9780)
+                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
-            } catch (e: SecurityException) {
-                Timber.e(e, "위치 권한 없음")
+            }.addOnFailureListener { exception ->
+                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
                 viewModel.fetchWeather(37.5665, 126.9780)
             }
         } else {
-            // 권한 없으면 서울 기본값
             viewModel.fetchWeather(37.5665, 126.9780)
-            Timber.w("위치 권한 없음 → 서울 기본값 사용")
+            Timber.w("위치 권한 거부 → 서울 기본값 사용")
+        }
+    }
+
+    val notificationLauncher = rememberNotificationPermissionLauncher { }
+
+    // 위치 가져오기 및 날씨 조회 + 권한 요청
+    LaunchedEffect(Unit) {
+        if (!PermissionUtils.hasLocationPermission(context)) {
+            requestLocationPermissions(locationLauncher)
+        } else {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            val cancellationToken = CancellationTokenSource().token
+
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                cancellationToken
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    viewModel.fetchWeather(location.latitude, location.longitude)
+                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                } else {
+                    viewModel.fetchWeather(37.5665, 126.9780)
+                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                }
+            }.addOnFailureListener { exception ->
+                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
+                viewModel.fetchWeather(37.5665, 126.9780)
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -287,8 +318,18 @@ fun HomeScreen(
                             navController?.navigate("challenge_detail/${challenge.id}")
                         },
                         onButtonClick = {
-                            viewModel.joinChallengeAndConnect(challenge.id) {
-                                navController?.navigate("challenge_waiting/${challenge.id}")
+                            val needsLocation = !PermissionUtils.hasLocationPermission(context)
+                            val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+                            if (needsLocation || needsNotification) {
+                                if (needsLocation) {
+                                    requestLocationPermissions(locationLauncher)
+                                } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
+                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            } else {
+                                viewModel.joinChallengeAndConnect(challenge.id) {
+                                    navController?.navigate("challenge_waiting/${challenge.id}")
+                                }
                             }
                         }
                     )
