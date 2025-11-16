@@ -24,7 +24,7 @@ fun BroadcastCard(
     title: String,                          // 제목
     viewerCount: Int,                       // 중계방 입장수
     participantCount: Int,                  // 챌린지 참여자 수
-    distance: Int,                          // 거리
+    distance: String,                          // 거리
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -71,7 +71,7 @@ fun BroadcastCard(
                     // 거리
                     InfoChip(
                         icon = Icons.Default.TrackChanges,
-                        text = "$distance km"
+                        text = distance
                     )
                 }
             }
@@ -107,7 +107,7 @@ private fun BroadcastCardPreview() {
         title = "3km 달릴 사람 구한다",
         viewerCount = 120,
         participantCount = 15,
-        distance = 10,
+        distance = "10",
         onCardClick = {}
     )
 }

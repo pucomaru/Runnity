@@ -14,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -44,6 +45,7 @@ import androidx.navigation.NavType
 import com.example.runnity.ui.screens.broadcast.BroadcastFilterScreen
 import com.example.runnity.ui.screens.broadcast.BroadcastLiveScreen
 import com.example.runnity.ui.screens.broadcast.BroadcastScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastViewModel
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 import com.example.runnity.ui.screens.workout.CountdownScreen
 import com.example.runnity.ui.screens.weather.WeatherDetailScreen
@@ -216,6 +218,50 @@ fun MainTabScreen(
                         onClose = { navController.navigate("home") }
                     )
                 }
+
+                // ========== 중계 그래프 ==========
+                navigation(
+                    startDestination = "broadcast_view",
+                    route = "broadcast_graph" // 이 그래프의 고유 이름
+                ) {
+                    // 중계 목록 화면
+                    composable("broadcast_view") { backStackEntry ->
+                        // 부모 그래프("broadcast_graph")에서 ViewModel을 가져옴
+                        val parentEntry = remember(backStackEntry) {
+                            navController.getBackStackEntry("broadcast_graph")
+                        }
+                        val broadcastViewModel: BroadcastViewModel = viewModel(parentEntry)
+
+                        BroadcastScreen(
+                            navController = navController,
+                            parentNavController = parentNavController,
+                            viewModel = broadcastViewModel
+                        )
+                    }
+
+                    // 중계 필터 화면
+                    composable("broadcast_filter") { backStackEntry ->
+                        // 부모 그래프("broadcast_graph")에서 동일한 ViewModel을 가져옴
+                        val parentEntry = remember(backStackEntry) {
+                            navController.getBackStackEntry("broadcast_graph")
+                        }
+                        val broadcastViewModel: BroadcastViewModel = viewModel(parentEntry)
+
+                        BroadcastFilterScreen(
+                            navController = navController,
+                            viewModel = broadcastViewModel
+                        )
+                    }
+
+                    // 중계 라이브 화면
+                    composable("broadcast_live/{id}") { backStackEntry ->
+                        val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                        BroadcastLiveScreen(
+                            challengeId = challengeId,
+                            navController = navController
+                        )
+                    }
+                }
             }
 
             // ========== 개인 러닝 그래프 ==========
@@ -352,43 +398,6 @@ fun MainTabScreen(
                     )
                 }
 
-                // 중계 화면 (네비바 있음)
-                composable("broadcast_view") {
-                    BroadcastScreen(
-                        navController = navController,
-                        parentNavController = parentNavController
-                    )
-                }
-
-                // 중계 필터 화면 (네비바 있음)
-                composable("broadcast_filter") {
-                    BroadcastFilterScreen(
-                        navController = navController  // 뒤로가기용
-                    )
-                }
-
-                // 중계 필터 화면 (네비바 있음)
-                composable("broadcast_filter") { backStackEntry ->
-                    // 부모(challenge_graph) 화면과 동일한 ViewModel 사용
-                    val broadcastViewModel: com.example.runnity.ui.screens.broadcast.BroadcastViewModel =
-                        androidx.lifecycle.viewmodel.compose.viewModel(
-                            viewModelStoreOwner = remember(backStackEntry) {
-                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
-                            }
-                        )
-                    BroadcastFilterScreen(
-                        navController = navController  // 뒤로가기용
-                    )
-                }
-
-                // 중계 라이브 참여 (네비바 있음)
-                composable("broadcast_live/{id}") { backStackEntry ->
-                    val challengeId = backStackEntry.arguments?.getString("id") ?: ""
-                    BroadcastLiveScreen(
-                        challengeId = challengeId,
-                        navController = navController
-                    )
-                }
             }
 
             // ========== 마이페이지 그래프 ==========

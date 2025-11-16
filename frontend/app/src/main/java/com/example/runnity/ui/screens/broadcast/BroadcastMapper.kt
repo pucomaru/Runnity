@@ -7,6 +7,7 @@ import com.example.runnity.data.model.response.ChallengeListItem as ApiChallenge
 import com.example.runnity.ui.components.ChallengeListItem as UiChallengeListItem
 import com.example.runnity.ui.components.ChallengeButtonState
 import com.example.runnity.ui.screens.challenge.ChallengeMapper
+import com.example.runnity.ui.screens.challenge.ChallengeMapper.formatDistance
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -15,20 +16,6 @@ import java.time.temporal.ChronoUnit
  * API 응답을 UI 모델로 변환하는 Mapper
  */
 object BroadcastMapper {
-
-//    /**
-//     * API ChallengeListItem을 UI ChallengeListItem으로 변환
-//     */
-//    fun toUiModel(apiItem: ApiItem): UiChallengeListItem {
-//        return UiChallengeListItem(
-//            id = apiItem.challengeId.toString(),
-//            distance = ChallengeMapper.formatDistance(apiItem.distance),
-//            title = apiItem.title,
-//            startDateTime = ChallengeMapper.formatStartDateTime(apiItem.startAt),
-//            participants = "${apiItem.currentParticipants}/${apiItem.maxParticipants}명",
-//            buttonState = ChallengeMapper.determineButtonState(apiItem.startAt, apiItem.isJoined)
-//        )
-//    }
 
     /**
      * 네트워크 DTO → 화면 리스트 아이템
@@ -95,5 +82,27 @@ object BroadcastMapper {
         } catch (e: Exception) {
             ChallengeButtonState.None
         }
+    }
+}
+
+/**
+ * API 거리 코드를 UI 텍스트로 변환
+ * ONE -> "1km", FIVE -> "5km", HALF -> "하프" 등
+ */
+fun formatDistance(distance: String): String {
+    return when (distance) {
+        "ONE" -> "1"
+        "TWO" -> "2"
+        "THREE" -> "3"
+        "FOUR" -> "4"
+        "FIVE" -> "5"
+        "SIX" -> "6"
+        "SEVEN" -> "7"
+        "EIGHT" -> "8"
+        "NINE" -> "9"
+        "TEN" -> "10"
+        "FIFTEEN" -> "15"
+        "HALF" -> "하프"
+        else -> "${distance}km"
     }
 }

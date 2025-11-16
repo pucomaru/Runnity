@@ -40,12 +40,15 @@ class BroadcastViewModel (
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     // 정렬 기준 (LATEST, POPULAR 등)
-    private val _sortType = MutableStateFlow("LATEST")
+    private val _sortTypeUi = MutableStateFlow("인기순")
+    val sortTypeUi: StateFlow<String> = _sortTypeUi.asStateFlow()
+
+    private val _sortType = MutableStateFlow("POPULAR")
     val sortType: StateFlow<String> = _sortType.asStateFlow()
 
     // 필터 옵션
-    private val _distanceFilter = MutableStateFlow<String?>(null)
-    val distanceFilter: StateFlow<String?> = _distanceFilter.asStateFlow()
+    private val _distanceFilter = MutableStateFlow<List<String>?>(null)
+    val distanceFilter: StateFlow<List<String>?> = _distanceFilter.asStateFlow()
 
     init {
         loadActiveBroadcasts()
@@ -56,40 +59,46 @@ class BroadcastViewModel (
      */
     fun loadActiveBroadcasts(
         keyword: String? = _searchQuery.value.takeIf { it.isNotBlank() },
-        distance: String? = _distanceFilter.value,
-        startAt: String? = null,
-        endAt: String? = null,
-        visibility: String? = null,
+        distance: List<String>? = _distanceFilter.value,
         sort: String? = _sortType.value,
         page: Int = 0,
         size: Int = 20
-    ) = viewModelScope.launch {
+    ) {
         viewModelScope.launch {
             _uiState.value = BroadcastUiState.Loading
 
+            // 현재 상태와 파라미터 병합
+            val actualKeyword = (keyword ?: _searchQuery.value).takeIf { !it.isNullOrBlank() }
+            val actualDistance = distance ?: _distanceFilter.value
+            val actualSort = sort ?: _sortType.value
+
+            Timber.d("로드 파라미터 q=%s, dist=%s, sort=%s, page=%d, size=%d",
+                actualKeyword, actualDistance, actualSort, page, size)
+
             when (val response = repository.getActiveBroadcasts(
-                keyword = keyword,
-                distance = distance,
-                startAt = startAt,
-                endAt = endAt,
-                visibility = visibility,
-                sort = sort,
+                keyword = actualKeyword,
+                distance = actualDistance,
+                sort = actualSort,
                 page = page,
                 size = size
             )) {
                 is ApiResponse.Success -> {
-                    val list = response.data
-                    val sorted = list.sortedByDescending { it.viewerCount }
-                    val items = sorted.map(BroadcastMapper::toItem)
-                    _uiState.value = BroadcastUiState.Success(items)
-                    Timber.d("중계방 목록 로드 성공: ${response.data.size}개")
+                    val server = response.data
+                    val mapped = server.map(BroadcastMapper::toItem)
+                    _broadcastsList.value = mapped
+                    _uiState.value = BroadcastUiState.Success(mapped)
+                    Timber.d("중계방 목록 로드 성공: %d개", mapped.size)
                 }
                 is ApiResponse.Error -> {
-                    _uiState.value = BroadcastUiState.Error(response.message)
+                    val cached = _broadcastsList.value
+                    if (cached.isNotEmpty()) _uiState.value = BroadcastUiState.Success(cached)
+                    else _uiState.value = BroadcastUiState.Error(response.message)
                     Timber.e("중계방 목록 로드 실패: ${response.message}")
                 }
                 is ApiResponse.NetworkError -> {
-                    _uiState.value = BroadcastUiState.Error("네트워크 연결을 확인해주세요")
+                    val cached = _broadcastsList.value
+                    if (cached.isNotEmpty()) _uiState.value = BroadcastUiState.Success(cached)
+                    else _uiState.value = BroadcastUiState.Error("네트워크 연결을 확인해주세요")
                     Timber.e("중계방 목록 로드 실패: 네트워크 오류")
                 }
             }
@@ -101,11 +110,9 @@ class BroadcastViewModel (
      */
     fun joinBroadcast(challengeId: String) {
         viewModelScope.launch {
-            try {
-                // TODO: 중계 참여 API 호출
-            } catch (e: Exception) {
-                // TODO: 에러 처리
-            }
+            runCatching {
+                // TODO : 중계 참여 구현하기
+            }.onFailure { Timber.e(it, "중계 참여 실패: %s", challengeId) }
         }
     }
 
@@ -134,16 +141,27 @@ class BroadcastViewModel (
      * 정렬 기준 변경
      */
     fun updateSortType(sort: String) {
-        _sortType.value = sort
-        loadActiveBroadcasts(sort = sort)
+        _sortTypeUi.value = sort
+        val sortCode = when (sort) {
+            "인기순" -> "POPULAR"
+            "임박순" -> "LATEST" // "최신순" -> "임박순"으로 텍스트 변경
+            else -> "POPULAR"
+        }
+        _sortType.value = sortCode
+        loadActiveBroadcasts(sort = sortCode)
     }
 
     /**
-     * 거리 필터 변경
+     * 모든 필터 한 번에 적용 (필터 화면에서 사용)
      */
-    fun updateDistanceFilter(distance: String?) {
+    fun applyFilters(
+        distance: List<String>? = null
+    ) {
+        Timber.d("applyFilters 호출: distance=$distance")
         _distanceFilter.value = distance
-        loadActiveBroadcasts(distance = distance)
+        loadActiveBroadcasts(
+            distance = distance
+        )
     }
 }
 
@@ -154,4 +172,22 @@ sealed class BroadcastUiState {
     object Loading : BroadcastUiState()
     data class Success(val broadcasts: List<BroadcastListItem>) : BroadcastUiState()
     data class Error(val message: String) : BroadcastUiState()
+}
+
+private fun convertDistanceToCode(distance: String): String {
+    return when (distance) {
+        "1km" -> "ONE"
+        "2km" -> "TWO"
+        "3km" -> "THREE"
+        "4km" -> "FOUR"
+        "5km" -> "FIVE"
+        "6km" -> "SIX"
+        "7km" -> "SEVEN"
+        "8km" -> "EIGHT"
+        "9km" -> "NINE"
+        "10km" -> "TEN"
+        "15km" -> "FIFTEEN"
+        "하프" -> "HALF"
+        else -> ""
+    }
 }

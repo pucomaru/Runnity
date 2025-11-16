@@ -18,8 +18,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.components.*
-import com.example.runnity.ui.screens.challenge.ChallengeMapper
-import com.example.runnity.ui.screens.challenge.ChallengeUiState
+import androidx.compose.foundation.lazy.items
+import timber.log.Timber
 
 /**
  * 중계 화면
@@ -36,29 +36,17 @@ import com.example.runnity.ui.screens.challenge.ChallengeUiState
 fun BroadcastScreen(
     navController: NavController? = null,        // 세부 화면 이동용
     parentNavController: NavController? = null,  // 앱 전체 이동용
-    viewModel: BroadcastViewModel = viewModel(),
-    innerPadding: PaddingValues = PaddingValues()
+    viewModel: BroadcastViewModel
 ) {
     // ViewModel 상태 관찰
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
-    // 정렬 상태 (기본값: 최신순)
-    var selectedSort by remember { mutableStateOf("최신순") }
-
-    // API 응답을 UI 모델로 변환
-    val challenges = when (val state = uiState) {
-        is ChallengeUiState.Success -> {
-            state.challenges.map { apiItem ->
-                ChallengeMapper.toUiModel(apiItem)
-            }
-        }
-        else -> emptyList()
-    }
+    // 정렬 상태 (기본값: 인기순)
+    val selectedSort by viewModel.sortTypeUi.collectAsState()
 
     var showJoinDialog by remember { mutableStateOf(false) }
     var selectedChallengeId by remember { mutableStateOf<Long?>(null) }
-
 
     Column(Modifier.fillMaxSize()) {
         Spacer(Modifier.height(12.dp))
@@ -112,20 +100,15 @@ fun BroadcastScreen(
             // 정렬 드롭다운 (오른쪽 정렬)
             SortDropdown(
                 selectedSort = selectedSort,
-                onSortSelected = {
-                    selectedSort = it
-                    // "인기순" -> "POPULAR", "최신순" -> "LATEST" 변환
-                    val sortType = when (it) {
-                        "인기순" -> "POPULAR"
-                        "최신순" -> "LATEST"
-                        else -> "POPULAR"
-                    }
-                    viewModel.updateSortType(sortType)
+                onSortSelected = { newSort ->
+                    viewModel.updateSortType(newSort)
                 }
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
+
+
 
         // 4. 중계목록
         when (val state = uiState) {
@@ -142,6 +125,12 @@ fun BroadcastScreen(
             }
 
             is BroadcastUiState.Success -> {
+                LaunchedEffect(state.broadcasts) {
+                    Timber.d("UI 렌더 직전: count=%d, ids=%s",
+                        state.broadcasts.size,
+                        state.broadcasts.joinToString(",") { it.challengeId.toString() })
+                }
+
                 val items = state.broadcasts
                 if (items.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -155,19 +144,17 @@ fun BroadcastScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
                     ) {
-                        items(items.size) { index ->
-                            val item = items[index]
+                        items(items, key = { it.challengeId }) { broadcast ->
                             BroadcastCard(
-                                title = item.title,
-                                viewerCount = item.viewerCount,
-                                participantCount = item.participantCount,
+                                title = broadcast.title,
+                                viewerCount = broadcast.viewerCount,
+                                participantCount = broadcast.participantCount,
+                                distance = codeToLabel(broadcast.distance),
                                 onCardClick = {
-                                    selectedChallengeId = item.challengeId
+                                    selectedChallengeId = broadcast.challengeId
                                     showJoinDialog = true
-//                                    // 중계방 입장
-//                                    navController?.navigate("broadcast_live/${item.challengeId}")
-                                },
-                                distance = item.distance
+                                    navController?.navigate("broadcast_live/${broadcast.challengeId}")
+                                }
                             )
                         }
                     }
@@ -198,4 +185,20 @@ fun BroadcastScreen(
             )
         }
     }
+}
+
+fun codeToLabel(code: String?): String = when (code) {
+    "ONE" -> "1 km"
+    "TWO" -> "2 km"
+    "THREE" -> "3 km"
+    "FOUR" -> "4 km"
+    "FIVE" -> "5 km"
+    "SIX" -> "6 km"
+    "SEVEN" -> "7 km"
+    "EIGHT" -> "8 km"
+    "NINE" -> "9 km"
+    "TEN" -> "10 km"
+    "FIFTEEN" -> "15 km"
+    "HALF" -> "하프"
+    else -> "UNKNOWN km"
 }

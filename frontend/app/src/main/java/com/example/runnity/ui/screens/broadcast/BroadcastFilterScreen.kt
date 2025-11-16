@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.components.*
-import java.time.LocalDate
 
 /**
  * 중계 필터 화면
@@ -26,21 +25,17 @@ import java.time.LocalDate
  */
 @Composable
 fun BroadcastFilterScreen(
-    navController: NavController? = null
+    navController: NavController? = null,
+    viewModel: BroadcastViewModel
 ) {
     // 거리 선택 상태 (여러 개 선택 가능)
-    var selectedDistances by remember { mutableStateOf(setOf<String>()) }
+    val currentDistances by viewModel.distanceFilter.collectAsState()
 
-    // 날짜 선택 상태 (범위)
-    var selectedStartDate by remember { mutableStateOf<LocalDate?>(null) }
-    var selectedEndDate by remember { mutableStateOf<LocalDate?>(null) }
-
-    // 시간 선택 상태
-    var selectedStartTime by remember { mutableStateOf("00:00") }
-    var selectedEndTime by remember { mutableStateOf("24:00") }
-
-    // 공개 여부 선택 상태
-    var selectedVisibility by remember { mutableStateOf("공개만") }
+    var selectedDistances by remember {
+        mutableStateOf(
+            currentDistances?.mapNotNull { code -> convertCodeToDistance(code) }?.toSet() ?: setOf()
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -62,11 +57,6 @@ fun BroadcastFilterScreen(
                         .clickable {
                             // 초기화
                             selectedDistances = setOf()
-                            selectedStartDate = null
-                            selectedEndDate = null
-                            selectedStartTime = "00:00"
-                            selectedEndTime = "24:00"
-                            selectedVisibility = "공개만"
                         }
                 )
             }
@@ -168,58 +158,6 @@ fun BroadcastFilterScreen(
                     modifier = Modifier.width(80.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ===== 날짜 · 시간 섹션 =====
-            SectionHeader(subtitle = "날짜 · 시간")
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 날짜·시간 선택 컴포넌트
-            DateTimeSelector(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                selectedStartDate = selectedStartDate,
-                selectedEndDate = selectedEndDate,
-                onDateRangeSelected = { startDate, endDate ->
-                    selectedStartDate = startDate
-                    selectedEndDate = endDate
-                },
-                selectedStartTime = selectedStartTime,
-                selectedEndTime = selectedEndTime,
-                onTimeSelected = { startTime, endTime ->
-                    selectedStartTime = startTime
-                    selectedEndTime = endTime
-                }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ===== 공개 여부 섹션 =====
-            SectionHeader(subtitle = "공개 여부")
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SmallPillButton(
-                    text = "공개만",
-                    selected = selectedVisibility == "공개만",
-                    onClick = { selectedVisibility = "공개만" },
-                    modifier = Modifier.weight(1f)
-                )
-                SmallPillButton(
-                    text = "전체",
-                    selected = selectedVisibility == "전체",
-                    onClick = { selectedVisibility = "전체" },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -227,11 +165,50 @@ fun BroadcastFilterScreen(
         PrimaryButton(
             text = "적용하기",
             onClick = {
-                // TODO: 필터 적용 로직
-                // - selectedDistances, selectedDate, selectedStartTime, selectedEndTime, selectedVisibility
-                // - 이 값들을 ViewModel에 전달하거나 Navigation arguments로 전달
+                val distanceCodes = if (selectedDistances.isNotEmpty()) {
+                    selectedDistances.map { convertDistanceToCode(it) }
+                } else {
+                    null
+                }
+                viewModel.applyFilters(distance = distanceCodes)
                 navController?.navigateUp()
             }
         )
+    }
+}
+
+private fun convertDistanceToCode(distance: String): String {
+    return when (distance) {
+        "1km" -> "ONE"
+        "2km" -> "TWO"
+        "3km" -> "THREE"
+        "4km" -> "FOUR"
+        "5km" -> "FIVE"
+        "6km" -> "SIX"
+        "7km" -> "SEVEN"
+        "8km" -> "EIGHT"
+        "9km" -> "NINE"
+        "10km" -> "TEN"
+        "15km" -> "FIFTEEN"
+        "하프" -> "HALF"
+        else -> "FIVE" // 기본값
+    }
+}
+
+private fun convertCodeToDistance(code: String): String? {
+    return when (code) {
+        "ONE" -> "1km"
+        "TWO" -> "2km"
+        "THREE" -> "3km"
+        "FOUR" -> "4km"
+        "FIVE" -> "5km"
+        "SIX" -> "6km"
+        "SEVEN" -> "7km"
+        "EIGHT" -> "8km"
+        "NINE" -> "9km"
+        "TEN" -> "10km"
+        "FIFTEEN" -> "15km"
+        "HALF" -> "하프"
+        else -> null
     }
 }

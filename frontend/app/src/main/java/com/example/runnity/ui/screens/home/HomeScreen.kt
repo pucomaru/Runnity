@@ -2,7 +2,16 @@ package com.example.runnity.ui.screens.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,7 +21,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,14 +37,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
-import com.example.runnity.theme.Typography
-import com.example.runnity.ui.components.*
+import com.example.runnity.ui.components.ChallengeCard
+import com.example.runnity.ui.components.RecommendedChallengeCarousel
+import com.example.runnity.ui.components.RecommendedChallengeItem
+import com.example.runnity.ui.components.SectionHeader
+import com.example.runnity.ui.components.WeatherCard
 import com.example.runnity.utils.PermissionUtils
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import java.time.format.DateTimeFormatter
 import timber.log.Timber
+import java.time.format.DateTimeFormatter
 
 /**
  * 홈 화면
@@ -284,8 +295,7 @@ fun HomeScreen(
         // FloatingActionButton (중계방 보기)
         FloatingActionButton(
             onClick = {
-                // TODO: 중계방 페이지로 이동 (동료가 연결 예정)
-                // navController?.navigate("broadcast_view")
+                 navController?.navigate("broadcast_graph")
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)

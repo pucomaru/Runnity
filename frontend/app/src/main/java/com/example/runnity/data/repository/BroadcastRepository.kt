@@ -20,7 +20,7 @@ class BroadcastRepository(
      */
     suspend fun getActiveBroadcasts(
         keyword: String? = null,
-        distance: String? = null,
+        distance: List<String>? = null,
         startAt: String? = null,
         endAt: String? = null,
         visibility: String? = null,

@@ -19,7 +19,7 @@ interface BroadcastApiService {
     @GET("api/v1/broadcast/active")
     suspend fun getActiveBroadcasts(
         @Query("keyword") keyword: String? = null,
-        @Query("distance") distance: String? = null,
+        @Query("distance") distance: List<String>? = null,
         @Query("startAt") startAt: String? = null,
         @Query("endAt") endAt: String? = null,
         @Query("visibility") visibility: String? = null,

@@ -15,7 +15,7 @@ data class BroadcastResponse(
     val viewerCount: Int,
     val participantCount: Int,
     val createdAt: String,
-    val distance: Int
+    val distance: String
 )
 
 /**
@@ -33,7 +33,7 @@ data class BroadcastListItem(
     val viewerCount: Int, // 현재 시청자 수
     val participantCount: Int, // 챌린지 참가자 수
     val createdAt: String, // 세션 생성 시작 날짜
-    val distance: Int // 거리
+    val distance: String // 거리
 )
 
 data class BroadcastPage(
