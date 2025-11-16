@@ -337,8 +337,8 @@ class WorkoutSessionViewModel : ViewModel() {
         if ((accuracyMeters ?: 0f) > 40f) return
 
         val d = haversineMeters(prev.latitude, prev.longitude, point.latitude, point.longitude)
-        // 최소 이동 임계 (약간 엄격: 2m)
-        if (d < 3.5) return
+        // 최소 이동 임계 (1m 미만 이동은 노이즈로 간주)
+        if (d < 1.0) return
         // 측정 정확도 대비 이동이 작으면 무시 (정확도 20m 이상일 때 노이즈 억제)
         if (accuracyMeters != null && accuracyMeters > 20f && d < accuracyMeters * 0.75f) return
 
