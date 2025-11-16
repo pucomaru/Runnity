@@ -1,6 +1,9 @@
 package com.example.runnity.ui.components
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -12,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -47,14 +51,23 @@ fun WeatherCard(
     weather: String,               // 날씨 상태
     temperature: String,           // 온도
     time: String,                  // 시간
-    backgroundImageUrl: String? = null,  // 배경 이미지 URL
+    @DrawableRes backgroundImageRes: Int? = null,  // 배경 이미지 리소스
+    backgroundImageUrl: String? = null,  // 배경 이미지 URL (deprecated)
+    onClick: (() -> Unit)? = null, // 클릭 이벤트
     modifier: Modifier = Modifier  // 추가 Modifier
 ) {
     // Card: 날씨 정보 카드
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp),       // 카드 높이
+            .height(120.dp)       // 카드 높이
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
@@ -65,20 +78,33 @@ fun WeatherCard(
             modifier = Modifier.fillMaxSize()
         ) {
             // 1. 배경 이미지
-            if (backgroundImageUrl != null) {
-                AsyncImage(
-                    model = backgroundImageUrl,
-                    contentDescription = "날씨 배경",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // 이미지 없을 때 회색 배경
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(ColorPalette.Light.component)
-                )
+            when {
+                backgroundImageRes != null -> {
+                    // 리소스 이미지 사용
+                    Image(
+                        painter = painterResource(id = backgroundImageRes),
+                        contentDescription = "날씨 배경",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                backgroundImageUrl != null -> {
+                    // URL 이미지 사용 (이전 버전 호환)
+                    AsyncImage(
+                        model = backgroundImageUrl,
+                        contentDescription = "날씨 배경",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    // 이미지 없을 때 회색 배경
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ColorPalette.Light.component)
+                    )
+                }
             }
 
             // 2. 그라데이션 오버레이 (텍스트 가독성 향상)
