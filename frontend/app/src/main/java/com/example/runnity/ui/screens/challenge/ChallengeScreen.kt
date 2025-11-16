@@ -17,10 +17,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.components.*
+import com.example.runnity.utils.PermissionUtils
+import com.example.runnity.utils.hasNotificationPermission
+import com.example.runnity.utils.rememberLocationPermissionLauncher
+import com.example.runnity.utils.rememberNotificationPermissionLauncher
+import com.example.runnity.utils.requestLocationPermissions
+import android.os.Build
+import android.widget.Toast
 
 /**
  * 챌린지 화면
@@ -39,6 +47,21 @@ fun ChallengeScreen(
     parentNavController: NavController? = null,  // 앱 전체 이동용
     viewModel: ChallengeViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val locationLauncher = rememberLocationPermissionLauncher { }
+    val notificationLauncher = rememberNotificationPermissionLauncher { }
+
+    LaunchedEffect(Unit) {
+        val needsLocation = !PermissionUtils.hasLocationPermission(context)
+        val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+        if (needsLocation || needsNotification) {
+            Toast.makeText(
+                context,
+                "운동을 위해 위치 및 알림 권한을 허용해 주세요. 설정에서 권한을 켜고 다시 시도해 주세요.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
     // ViewModel 상태 관찰
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -191,7 +214,17 @@ fun ChallengeScreen(
                                     onButtonClick = {
                                         val challengeId = challenge.id.toLongOrNull()
                                         if (challengeId != null && challenge.buttonState == ChallengeButtonState.Join) {
-                                            viewModel.joinChallenge(challengeId)
+                                            val needsLocation = !PermissionUtils.hasLocationPermission(context)
+                                            val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+                                            if (needsLocation || needsNotification) {
+                                                if (needsLocation) {
+                                                    requestLocationPermissions(locationLauncher)
+                                                } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
+                                                    notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                                }
+                                            } else {
+                                                viewModel.joinChallenge(challengeId)
+                                            }
                                         }
                                     }
                                 )

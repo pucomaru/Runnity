@@ -380,17 +380,31 @@ fun StartRunScreen(
                 PrimaryButton(
                     text = "운동하기",
                     onClick = {
-                        val goal = viewModel.resolveGoal()
-                        val route = when (goal) {
-                            is Goal.Distance -> "countdown/personal?type=distance&km=${String.format("%.1f", goal.km)}"
-                            is Goal.Time -> "countdown/personal?type=time&min=${goal.minutes}"
-                            is Goal.FreeRun -> "countdown/personal"
+                        when {
+                            !PermissionUtils.hasLocationPermission(context) -> {
+                                if (PermissionUtils.shouldShowLocationRationale(activity)) {
+                                    showLocationRationale = true
+                                } else {
+                                    requestLocationPermissions(locationLauncher)
+                                }
+                            }
+                            Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context) -> {
+                                showNotificationDialog = true
+                            }
+                            else -> {
+                                val goal = viewModel.resolveGoal()
+                                val route = when (goal) {
+                                    is Goal.Distance -> "countdown/personal?type=distance&km=${String.format("%.1f", goal.km)}"
+                                    is Goal.Time -> "countdown/personal?type=time&min=${goal.minutes}"
+                                    is Goal.FreeRun -> "countdown/personal"
+                                }
+                                showGoalSheet = false
+                                // 워치 준비 -> 카운트다운(3초)
+                                sendSessionControl(context, "prepare")
+                                sendSessionControl(context, "countdown", seconds = 3)
+                                navController?.navigate(route)
+                            }
                         }
-                        showGoalSheet = false
-                        // 워치 준비 -> 카운트다운(3초)
-                        sendSessionControl(context, "prepare")
-                        sendSessionControl(context, "countdown", seconds = 3)
-                        navController?.navigate(route)
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
