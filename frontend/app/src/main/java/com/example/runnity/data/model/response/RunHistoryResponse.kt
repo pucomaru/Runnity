@@ -73,24 +73,28 @@ data class ChallengeRunRecordResponse(
  * 러닝 기록 상세 조회 응답
  *
  * @param runRecordId 러닝 기록 ID
- * @param type 러닝 타입 (PERSONAL, CHALLENGE)
- * @param startDateTime 시작 일시 (ISO 8601)
- * @param endDateTime 종료 일시 (ISO 8601)
- * @param totalDistance 총 거리 (km)
+ * @param runType 러닝 타입 (PERSONAL, CHALLENGE)
+ * @param startAt 시작 일시 (ISO 8601)
+ * @param endAt 종료 일시 (ISO 8601)
+ * @param distance 총 거리 (km)
  * @param durationSec 총 소요 시간 (초)
- * @param avgPaceSec 평균 페이스 (초/km)
- * @param avgBpm 평균 심박수
+ * @param pace 평균 페이스 (초/km)
+ * @param bpm 평균 심박수
+ * @param calories 칼로리 (kcal)
+ * @param route 경로 정보 (JSON 문자열)
  * @param laps 랩 타임 목록
  */
 data class RunRecordDetailResponse(
     val runRecordId: Long,
-    val type: String,
-    val startDateTime: String,
-    val endDateTime: String,
-    val totalDistance: Double,
+    val runType: String,
+    val startAt: String,
+    val endAt: String,
+    val distance: Double,
     val durationSec: Int,
-    val avgPaceSec: Int,
-    val avgBpm: Int,
+    val pace: Int,
+    val bpm: Int,
+    val calories: Int,
+    val route: String?,
     val laps: List<LapResponse>
 )
 
