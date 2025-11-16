@@ -122,7 +122,9 @@ class WorkoutSessionViewModel : ViewModel() {
         val cur = _metrics.value
         val newDistance = distanceM ?: cur.distanceMeters
         val newCalories = caloriesKcal ?: cur.caloriesKcal
-        val newAvgPace = paceSpKm ?: cur.avgPaceSecPerKm
+        val safePace = paceSpKm
+            ?.takeIf { it.isFinite() && it in 60.0..1200.0 }
+        val newAvgPace = safePace ?: cur.avgPaceSecPerKm
         val newHr = hrBpm ?: cur.avgHeartRate
         _metrics.value = cur.copy(
             distanceMeters = newDistance,
@@ -130,7 +132,7 @@ class WorkoutSessionViewModel : ViewModel() {
             avgPaceSecPerKm = newAvgPace,
             avgHeartRate = newHr
         )
-        if (paceSpKm != null) _currentPaceSecPerKm.value = paceSpKm
+        if (safePace != null) _currentPaceSecPerKm.value = safePace
         if (hrBpm != null) lastInstantHr = hrBpm
     }
 
