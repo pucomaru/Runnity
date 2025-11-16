@@ -326,33 +326,35 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 reservedChallenges.forEach { challenge ->
-                    key(challenge.id) {
-                        ChallengeCard(
-                            distance = challenge.distance,
-                            title = challenge.title,
-                            startDateTime = challenge.startDateTime,
-                            participants = challenge.participants,
-                            buttonState = challenge.buttonState,
-                            onCardClick = {
+                    ChallengeCard(
+                        title = challenge.title,
+                        distance = challenge.distance,
+                        startDateTime = challenge.startDateTime,
+                        participants = challenge.participants,
+                        buttonState = challenge.buttonState,
+                        onCardClick = {
+                            // 소켓 방이 활성화되어 "참여하기" 버튼이 뜬 챌린지는
+                            // 카드 전체를 눌러도 상세 조회로 이동하지 않도록 막는다.
+                            if (challenge.buttonState != ChallengeButtonState.Join) {
                                 navController?.navigate("challenge_detail/${challenge.id}")
-                            },
-                            onButtonClick = {
-                                val needsLocation = !PermissionUtils.hasLocationPermission(context)
-                                val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
-                                if (needsLocation || needsNotification) {
-                                    if (needsLocation) {
-                                        requestLocationPermissions(locationLauncher)
-                                    } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
-                                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                } else {
-                                    viewModel.joinChallengeAndConnect(challenge.id) {
-                                        navController?.navigate("challenge_waiting/${challenge.id}")
-                                    }
+                            }
+                        },
+                        onButtonClick = {
+                            val needsLocation = !PermissionUtils.hasLocationPermission(context)
+                            val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+                            if (needsLocation || needsNotification) {
+                                if (needsLocation) {
+                                    requestLocationPermissions(locationLauncher)
+                                } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
+                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            } else {
+                                viewModel.joinChallengeAndConnect(challenge.id) {
+                                    navController?.navigate("challenge_waiting/${challenge.id}")
                                 }
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
 
