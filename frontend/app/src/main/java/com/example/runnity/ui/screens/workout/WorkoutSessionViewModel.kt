@@ -122,7 +122,9 @@ class WorkoutSessionViewModel : ViewModel() {
         val cur = _metrics.value
         val newDistance = distanceM ?: cur.distanceMeters
         val newCalories = caloriesKcal ?: cur.caloriesKcal
-        val newAvgPace = paceSpKm ?: cur.avgPaceSecPerKm
+        val safePace = paceSpKm
+            ?.takeIf { it.isFinite() && it in 60.0..1200.0 }
+        val newAvgPace = safePace ?: cur.avgPaceSecPerKm
         val newHr = hrBpm ?: cur.avgHeartRate
         _metrics.value = cur.copy(
             distanceMeters = newDistance,
@@ -130,7 +132,7 @@ class WorkoutSessionViewModel : ViewModel() {
             avgPaceSecPerKm = newAvgPace,
             avgHeartRate = newHr
         )
-        if (paceSpKm != null) _currentPaceSecPerKm.value = paceSpKm
+        if (safePace != null) _currentPaceSecPerKm.value = safePace
         if (hrBpm != null) lastInstantHr = hrBpm
     }
 
@@ -333,19 +335,18 @@ class WorkoutSessionViewModel : ViewModel() {
         lastPointTimeMs = elapsedRealtimeMs
         if (prev == null) return
 
-        // 정확도 필터 (약간 엄격)
-        if ((accuracyMeters ?: 0f) > 40f) return
+        // 정확도 필터 (조금 완화: 70m 초과만 노이즈로 간주)
+        if ((accuracyMeters ?: 0f) > 70f) return
 
         val d = haversineMeters(prev.latitude, prev.longitude, point.latitude, point.longitude)
         // 최소 이동 임계 (1m 미만 이동은 노이즈로 간주)
         if (d < 1.0) return
-        // 측정 정확도 대비 이동이 작으면 무시 (정확도 20m 이상일 때 노이즈 억제)
-        if (accuracyMeters != null && accuracyMeters > 20f && d < accuracyMeters * 0.75f) return
 
-        // 속도 필터 (약간 엄격: ~25.2 km/h 초과 제외)
+        // 속도 필터
+        // - 너무 빠른 이상치(스파이크)는 여전히 제거
         if (speedMps != null && speedMps > 7.0f) return
-        // 저속 노이즈 억제: 거의 정지 상태에서의 미세 이동은 무시
-        if (speedMps != null && speedMps < 0.5f && d < 5.0) return
+        // - 저속 노이즈: 거의 정지 상태에서의 아주 미세한 흔들림만 제거 (2m 미만)
+        if (speedMps != null && speedMps < 0.5f && d < 2.0) return
 
         totalDistanceMetersInternal += d
 

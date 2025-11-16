@@ -37,12 +37,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.PrimaryButton
 import com.example.runnity.ui.components.TabBar
 import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.datalayer.SessionMetricsBus
 import com.example.runnity.ui.screens.workout.WorkoutLocationTracker
 import com.example.runnity.ui.screens.workout.WorkoutPhase
 import com.example.runnity.ui.screens.workout.WorkoutSessionViewModel
@@ -99,6 +101,19 @@ fun ChallengeWorkoutScreen(
         hasStarted = true
         tracker.start { lat, lon, elapsedMs, acc, speed ->
             sessionViewModel.ingestLocation(lat, lon, elapsedMs, acc, speed)
+        }
+    }
+
+    // 워치에서 올라오는 메트릭을 챌린지 세션에도 동일하게 적용
+    LaunchedEffect(Unit) {
+        SessionMetricsBus.events.collectLatest { m ->
+            sessionViewModel.ingestWatchMetrics(
+                hrBpm = m.hrBpm,
+                distanceM = m.distanceM,
+                elapsedMs = m.elapsedMs,
+                paceSpKm = m.paceSpKm,
+                caloriesKcal = m.caloriesKcal
+            )
         }
     }
 
