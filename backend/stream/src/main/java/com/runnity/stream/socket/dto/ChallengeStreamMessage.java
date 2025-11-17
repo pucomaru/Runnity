@@ -21,4 +21,6 @@ public class ChallengeStreamMessage {
     private Integer ranking;       // 순위
     private Boolean isBroadcast;   // 중계방 여부
     private String reason;         // leave 시 사유 (QUIT, TIMEOUT, DISCONNECTED, KICKED, ERROR, EXPIRED)
+
+
 }

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runnity.stream.socket.dto.ChallengeStreamMessage;
 import com.runnity.stream.socket.dto.HighlightEventDto;
+import com.runnity.stream.socket.dto.LLMCommentaryMessage;
+import com.runnity.stream.socket.dto.WebSocketPayloadWrapper;
 import com.runnity.stream.socket.util.BroadcastRunnerRedisUtil;
 import com.runnity.stream.socket.util.ChallengeMetaRedisUtil;
 import com.runnity.stream.socket.util.HighlightDetector;
@@ -22,6 +24,17 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class BroadcastStreamService {
+
+    private WebSocketPayloadWrapper wrapStreamMessage(ChallengeStreamMessage msg) {
+        return WebSocketPayloadWrapper.builder()
+                .type("STREAM")
+                .subtype(msg.getEventType().toUpperCase())
+                .challengeId(msg.getChallengeId())
+                .timestamp(System.currentTimeMillis())
+                .payload(msg)
+                .build();
+    }
+
 
     private static final String WS_DEST_PREFIX = "/topic/broadcast/";
     private static final String HIGHLIGHT_TOPIC = "highlight-event";
@@ -108,12 +121,27 @@ public class BroadcastStreamService {
 
     private void sendToWebSocket(ChallengeStreamMessage msg) {
         try {
-            messagingTemplate.convertAndSend(
-                    WS_DEST_PREFIX + msg.getChallengeId(),
-                    msg
-            );
+            var wrapper = wrapStreamMessage(msg);
+            messagingTemplate.convertAndSend(WS_DEST_PREFIX + msg.getChallengeId(), wrapper);
         } catch (Exception e) {
             log.error("WS broadcast error: {}", e.getMessage());
         }
     }
+
+    private WebSocketPayloadWrapper wrapLLMMessage(LLMCommentaryMessage llm) {
+        return WebSocketPayloadWrapper.builder()
+                .type("LLM")
+                .subtype(llm.getHighlightType())
+                .challengeId(llm.getChallengeId())
+                .timestamp(System.currentTimeMillis())
+                .payload(llm)
+                .build();
+    }
+
+    public void sendLLMCommentary(LLMCommentaryMessage llm) {
+        var wrapper = wrapLLMMessage(llm);
+        messagingTemplate.convertAndSend(WS_DEST_PREFIX + llm.getChallengeId(), wrapper);
+    }
+
+
 }
