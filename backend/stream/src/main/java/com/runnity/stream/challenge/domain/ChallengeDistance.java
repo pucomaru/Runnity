@@ -5,6 +5,8 @@ import java.util.Optional;
 
 public enum ChallengeDistance {
 
+    M100("M100", 0.1f, 5),
+    M500("M500", 0.5f, 10),
     ONE("ONE", 1.0f, 20),
     TWO("TWO", 2.0f, 30),
     THREE("THREE", 3.0f, 45),
