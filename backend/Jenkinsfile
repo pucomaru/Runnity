@@ -69,7 +69,7 @@ pipeline {
     // 🔥 여기부터가 핵심: Deploy 단계 수정
     stage('Deploy to AI server') {
       steps {
-        sshagent (credentials: ['ubuntu']) {
+        sshagent (credentials: ['ssh_deploy_key']): {
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             // 싱글쿼트 트리플('''...''') → Groovy가 $변수 안 건드림
             sh '''
