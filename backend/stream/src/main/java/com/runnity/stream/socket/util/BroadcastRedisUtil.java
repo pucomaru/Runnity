@@ -34,7 +34,7 @@ public class BroadcastRedisUtil {
     challengeId 를 기반으로 Redis Hash에 방송 정보 저장,
     broadcast:active Set에 challengeId추가
      */
-    public void createSession(Long challengeId, String title, int participantCount){
+    public void createSession(Long challengeId, String title, int participantCount, String distanceCode){
 
         String key = PREFIX + challengeId;
         HashOperations<String, Object, Object> hashOps = redisTemplate.opsForHash();
@@ -44,6 +44,7 @@ public class BroadcastRedisUtil {
         hashOps.put(key, "viewerCount", 0);
         hashOps.put(key, "participantCount", participantCount);
         hashOps.put(key, "createdAt", LocalDateTime.now().toString());
+        hashOps.put(key, "distance", distanceCode);
 
         // 활성 방송 목록에 추가
         redisTemplate.opsForSet().add(ACTIVE_SET, challengeId.toString());
