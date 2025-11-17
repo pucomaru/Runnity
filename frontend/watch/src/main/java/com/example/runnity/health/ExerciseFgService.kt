@@ -144,9 +144,11 @@ class ExerciseFgService : Service() {
         val now = System.currentTimeMillis()
         val activeElapsed = if (isRunning) activeElapsedAccumMs + (now - activeStartMs) else activeElapsedAccumMs
         val dist = latestDistanceM
-        val paceSpKm = if (dist != null && dist > 0.0 && activeElapsed > 0L) {
+        val rawPaceSpKm = if (dist != null && dist > 0.0 && activeElapsed > 0L) {
             (activeElapsed / 1000.0) / (dist / 1000.0)
         } else null
+        // 워치 페이스도 2'30"/km ~ 20'00"/km 범위만 정상값으로 사용
+        val paceSpKm = rawPaceSpKm?.takeIf { it.isFinite() && it in 150.0..1200.0 }
         val json = JSONObject()
         json.put("type", "metrics")
         if (latestHrBpm != null) json.put("hr_bpm", latestHrBpm)
@@ -193,6 +195,15 @@ class ExerciseFgService : Service() {
                 prepareRunningSession()
             }
             ACTION_START -> {
+                // 새 세션 시작 시 직전 상태 완전 초기화
+                latestHrBpm = null
+                latestDistanceM = null
+                latestCaloriesKcal = null
+                activeElapsedAccumMs = 0L
+                sessionStartMs = 0L
+                activeStartMs = 0L
+                isRunning = false
+
                 // 준비/진행 중 센서(HR, 위치 등) 가용성 변경 알림
                 ensureExerciseClient()
                 startRunningSession()
@@ -258,6 +269,9 @@ class ExerciseFgService : Service() {
                 isRunning = false
                 activeStartMs = 0L
                 activeElapsedAccumMs = 0L
+                latestHrBpm = null
+                latestDistanceM = null
+                latestCaloriesKcal = null
                 stopSelf()
             }
         }
