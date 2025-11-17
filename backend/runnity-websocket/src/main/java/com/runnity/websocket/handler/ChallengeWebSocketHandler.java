@@ -95,6 +95,11 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
                 nickname = "User_" + userId;
                 log.warn("티켓에 nickname 없음. 기본값 사용: userId={}, nickname={}", userId, nickname);
             }
+            // profileImage는 null 허용 (ConcurrentHashMap은 null value를 허용하지 않으므로 빈 문자열 사용)
+            // 나중에 사용할 때 빈 문자열을 null로 변환
+            if (profileImage == null) {
+                profileImage = ""; // null 대신 빈 문자열 사용 (ConcurrentHashMap null value 제약)
+            }
 
             session.getAttributes().put("nickname", nickname);
             session.getAttributes().put("profileImage", profileImage);
@@ -133,7 +138,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
 
             // 6. 세션 등록 (메모리 + Redis)
             // 재입장 시에는 0.0/0으로 시작, ENTER이고 이전 정보가 있으면 이전 정보 사용
-            sessionManager.registerSession(challengeId, userId, nickname, profileImage, session, 
+            sessionManager.registerSession(challengeId, userId, nickname, normalizeProfileImage(profileImage), session, 
                     previousDistance, previousPace);
 
             // 6-1. 타임아웃 체크를 위한 초기 RECORD 시간 설정
@@ -147,24 +152,24 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             log.debug("Participant 생성 전: userId={}, nickname={}, profileImage={}, ticketType={}, initialDistance={}, initialPace={}", 
                     userId, nickname, profileImage, ticketType, initialDistance, initialPace);
             ConnectedMessage.Participant me = new ConnectedMessage.Participant(
-                    userId, nickname, profileImage, initialDistance, initialPace);
+                    userId, nickname, normalizeProfileImage(profileImage), initialDistance, initialPace);
             log.debug("Participant 생성 후: me={}", me);
             ConnectedMessage connectedMessage = new ConnectedMessage(challengeId, userId, me, participants);
             String connectedJson = objectMapper.writeValueAsString(connectedMessage);
             session.sendMessage(new TextMessage(connectedJson));
 
             // 8. Redis Pub/Sub으로 입장 이벤트 발행 (다른 WebSocket 서버에 알림)
-            redisPubSubService.publishUserEntered(challengeId, userId, nickname, profileImage);
+            redisPubSubService.publishUserEntered(challengeId, userId, nickname, normalizeProfileImage(profileImage));
 
             // 9. Kafka 이벤트 발행 (티켓 타입 기반)
             if ("ENTER".equals(ticketType)) {
                 // 첫 입장: START 이벤트 발행
-                kafkaProducer.publishStartEvent(challengeId, userId, nickname, profileImage);
+                kafkaProducer.publishStartEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage));
                 log.info("첫 입장 처리: challengeId={}, userId={}", challengeId, userId);
             } else if ("REENTER".equals(ticketType)) {
                 // 재입장: RUNNING 이벤트 발행 (distance=0.0, pace=0, 프론트에서 최신 데이터 전송)
                 Integer ranking = sessionManager.calculateRanking(challengeId, userId);
-                kafkaProducer.publishRunningEvent(challengeId, userId, nickname, profileImage, 
+                kafkaProducer.publishRunningEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage), 
                         0.0, 0, ranking);
                 log.info("재입장 처리: challengeId={}, userId={}, distance=0.0, pace=0", 
                         challengeId, userId);
@@ -249,7 +254,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             redisPubSubService.publishParticipantUpdate(challengeId, userId, distance, pace);
 
             // Kafka로 RUNNING 이벤트 발행
-            kafkaProducer.publishRunningEvent(challengeId, userId, nickname, profileImage, 
+            kafkaProducer.publishRunningEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage), 
                     distance, pace, ranking);
 
             // 마지막 RECORD 시간 업데이트 (타임아웃 체크용)
@@ -259,7 +264,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
                     challengeId, userId, distance, pace, ranking);
 
             // 완주 체크 (목표 거리 달성 시)
-            checkAndHandleFinish(challengeId, userId, nickname, profileImage, distance, pace, ranking);
+            checkAndHandleFinish(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking);
 
         } catch (Exception e) {
             log.error("RECORD 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
@@ -284,7 +289,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             String profileImage = (String) session.getAttributes().get("profileImage");
 
             // 퇴장 처리
-            handleLeave(challengeId, userId, nickname, profileImage, distance, pace, ranking, 
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
                     LeaveReason.QUIT.getValue());
 
             // 연결 종료
@@ -357,7 +362,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             String profileImage = (String) session.getAttributes().get("profileImage");
 
             // 퇴장 처리 (Redis 정리, Pub/Sub 발행, Kafka 이벤트)
-            handleLeave(challengeId, userId, nickname, profileImage, distance, pace, ranking, 
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
                     LeaveReason.KICKED.getValue());
 
             // 연결 종료
@@ -467,7 +472,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             String reason = determineLeaveReason(status);
 
             // 퇴장 처리
-            handleLeave(challengeId, userId, nickname, profileImage, distance, pace, ranking, reason);
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, reason);
 
             log.info("❌ 챌린지 퇴장: challengeId={}, userId={}, sessionId={}, status={}, reason={}", 
                     challengeId, userId, session.getId(), status, reason);
@@ -554,5 +559,12 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
                 log.error("연결 종료 실패: sessionId={}", session.getId(), ex);
             }
         }
+    }
+
+    /**
+     * 빈 문자열을 null로 변환 (ConcurrentHashMap null value 제약으로 인해 빈 문자열로 저장된 경우)
+     */
+    private String normalizeProfileImage(String profileImage) {
+        return (profileImage == null || profileImage.isEmpty()) ? null : profileImage;
     }
 }

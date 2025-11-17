@@ -46,7 +46,7 @@ public class WebSocketHeartbeatService {
         try {
             String timestamp = Instant.now().toString();
             redisTemplate.opsForValue().set(healthKey, timestamp, heartbeatTtlSeconds, TimeUnit.SECONDS);
-            log.debug("WebSocket heartbeat 갱신: key={}, ttl={}s", healthKey, heartbeatTtlSeconds);
+            // log.debug("WebSocket heartbeat 갱신: key={}, ttl={}s", healthKey, heartbeatTtlSeconds);
         } catch (Exception e) {
             log.error("WebSocket heartbeat 갱신 실패: key={}", healthKey, e);
         }
