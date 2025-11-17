@@ -68,6 +68,7 @@ import timber.log.Timber
 @Composable
 fun ChallengeResultScreen(
     challengeId: Int,
+    socketViewModel: ChallengeSocketViewModel,
     onClose: (() -> Unit)? = null
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -139,7 +140,6 @@ fun ChallengeResultScreen(
         }
     }
 
-    val socketViewModel: ChallengeSocketViewModel = viewModel()
     val participants by socketViewModel.participants.collectAsState()
 
     val visibleRanking = remember(participants) {

@@ -152,6 +152,8 @@ fun ChallengeWorkoutScreen(
                 "\"timestamp\":" + System.currentTimeMillis() +
                 "}"
             WebSocketManager.send(recordJson)
+            // 서버는 내 PARTICIPANT_UPDATE 를 보내지 않으므로, 클라이언트에서 내 참가자 정보도 함께 갱신
+            socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
         }
     }
 
@@ -170,6 +172,8 @@ fun ChallengeWorkoutScreen(
                     "}"
                 WebSocketManager.send(recordJson)
                 finalRecordSent = true
+                // 최종 기록도 랭킹에 반영
+                socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
             }
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
@@ -285,8 +289,14 @@ fun ChallengeWorkoutScreen(
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        val myRankText = remember(participantsState) {
+                            val me = participantsState.firstOrNull { it.isMe }
+                            if (me?.rank != null && me.rank > 0) "${me.rank}위" else "--위"
+                        }
+
                         Text(
-                            text = "--위",
+                            text = myRankText,
                             style = Typography.LargeTitle.copy(fontSize = 38.sp),
                             color = ColorPalette.Light.primary,
                             textAlign = TextAlign.Center

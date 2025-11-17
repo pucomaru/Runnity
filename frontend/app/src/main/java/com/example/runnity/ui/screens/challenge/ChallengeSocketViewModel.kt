@@ -26,6 +26,27 @@ class ChallengeSocketViewModel : ViewModel() {
     private val currentUserId: String? = UserProfileManager.getProfile()?.memberId?.toString()
 
     /**
+     * 서버가 나에 대한 PARTICIPANT_UPDATE 를 보내지 않는 경우를 대비해서,
+     * 클라이언트에서 RECORD 전송 시 내 distance/pace 를 직접 참가자 리스트에 반영하기 위한 helper.
+     */
+    fun updateMyStats(distanceKm: Double, paceSecPerKm: Double) {
+        val myId = currentUserId ?: return
+        val current = _participants.value
+        if (current.isEmpty()) return
+
+        val updated = current.map { p ->
+            if (p.id == myId) {
+                p.copy(
+                    distanceKm = distanceKm,
+                    paceSecPerKm = paceSecPerKm
+                )
+            } else p
+        }
+
+        _participants.value = applyRanking(updated)
+    }
+
+    /**
      * 특정 챌린지 세션의 WebSocket 메시지를 관찰하고 참가자 목록을 갱신
      */
     fun observeSession(challengeId: Long) {
