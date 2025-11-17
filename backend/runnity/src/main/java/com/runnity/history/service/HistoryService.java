@@ -121,7 +121,15 @@ public class HistoryService {
                 .map(RunLapResponse::from)
                 .toList();
 
-        return RunRecordDetailResponse.from(record, laps);
+        // challengeId 조회 (챌린지 달리기인 경우에만 존재)
+        Long challengeId = null;
+        if (record.getRunType() == RunRecordType.CHALLENGE) {
+            challengeId = repository.findByRunRecordId(runRecordId)
+                    .map(cp -> cp.getChallenge().getChallengeId())
+                    .orElse(null);
+        }
+
+        return RunRecordDetailResponse.from(record, laps, challengeId);
     }
 
     public RunRecordMonthlyResponse getRunRecordsByMonth(Long memberId, int year, int month) {
