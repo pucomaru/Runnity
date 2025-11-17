@@ -30,7 +30,8 @@ object WebSocketManager : WebSocketListener() {
     val state: StateFlow<WsState> = _state
 
     // 서버에서 수신되는 텍스트 메시지 스트림
-    private val _incoming = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    // replay=1 로 설정하여 새 구독자도 직전 메시지(CONNECTED 등)를 한 번은 받을 수 있도록 함
+    private val _incoming = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 64)
     val incoming: SharedFlow<String> = _incoming
 
     fun connect(url: String, tokenProvider: () -> String?, extraHeaders: Map<String, String> = emptyMap()) {

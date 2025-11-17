@@ -29,6 +29,7 @@ class ChallengeSocketViewModel : ViewModel() {
      * 특정 챌린지 세션의 WebSocket 메시지를 관찰하고 참가자 목록을 갱신
      */
     fun observeSession(challengeId: Long) {
+        Timber.d("[ChallengeSocket] observeSession start, challengeId=%d", challengeId)
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             // 주기적인 클라이언트 PING 전송 (연결 유지용)
@@ -47,12 +48,21 @@ class ChallengeSocketViewModel : ViewModel() {
                 try {
                     // 먼저 type만 확인
                     val base = gson.fromJson(text, BaseSocketMessage::class.java)
+                    Timber.d("[ChallengeSocket] incoming type=%s raw=%s", base.type, text)
                     when (base.type) {
                         "CONNECTED" -> {
                             val message = gson.fromJson(text, ConnectedMessage::class.java)
+                            Timber.d(
+                                "[ChallengeSocket] CONNECTED received: msg.challengeId=%d, sessionId=%d, meUserId=%d",
+                                message.challengeId,
+                                challengeId,
+                                message.userId
+                            )
                             if (message.challengeId == challengeId) {
-                                // 서버 participants에는 "나"가 포함되지 않을 수 있으므로, 클라이언트에서 보정
-                                val baseList = message.participants.map { p ->
+                                // 서버 participants 리스트와 me 필드를 모두 반영해 참가자 목록 구성
+                                val myId = currentUserId ?: message.userId.toString()
+
+                                val fromParticipants = message.participants.map { p ->
                                     Participant(
                                         id = p.userId.toString(),
                                         nickname = p.nickname,
@@ -60,28 +70,39 @@ class ChallengeSocketViewModel : ViewModel() {
                                         averagePace = "",
                                         distanceKm = p.distance,
                                         paceSecPerKm = p.pace,
-                                        isMe = (currentUserId != null && currentUserId == p.userId.toString())
+                                        isMe = (myId == p.userId.toString())
                                     )
                                 }
 
-                                val withMe = if (currentUserId != null && baseList.none { it.id == currentUserId }) {
-                                    val profile = UserProfileManager.getProfile()
-                                    val meNickname = profile?.nickname ?: "나"
-                                    val meAvatar = profile?.profileImageUrl
-                                    baseList + Participant(
-                                        id = currentUserId,
-                                        nickname = meNickname,
-                                        avatarUrl = meAvatar,
+                                // 서버가 me를 별도 필드로 내려주는 경우도 참가자로 포함
+                                val meParticipant = message.me?.let { m ->
+                                    Participant(
+                                        id = m.userId.toString(),
+                                        nickname = m.nickname,
+                                        avatarUrl = m.profileImage,
                                         averagePace = "",
-                                        distanceKm = 0.0,
-                                        paceSecPerKm = null,
+                                        distanceKm = m.distance,
+                                        paceSecPerKm = m.pace,
                                         isMe = true
                                     )
-                                } else {
-                                    baseList
                                 }
 
-                                _participants.value = applyRanking(withMe)
+                                val merged = buildList {
+                                    addAll(fromParticipants)
+                                    if (meParticipant != null && none { it.id == meParticipant.id }) {
+                                        add(meParticipant)
+                                    }
+                                }
+                                Timber.d(
+                                    "[ChallengeSocket] CONNECTED applied, mergedSize=%d, fromParticipants=%d, hasMe=%b",
+                                    merged.size,
+                                    fromParticipants.size,
+                                    meParticipant != null
+                                )
+
+                                _participants.value = applyRanking(merged).also {
+                                    Timber.d("[ChallengeSocket] participants after CONNECTED, size=%d", it.size)
+                                }
                             }
                         }
                         "USER_ENTERED" -> {
@@ -204,6 +225,7 @@ data class ConnectedMessage(
     val challengeId: Long,
     val userId: Long,
     val participants: List<ConnectedParticipant>,
+    val me: ConnectedParticipant?,
     val timestamp: Long
 )
 
