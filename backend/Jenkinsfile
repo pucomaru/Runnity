@@ -83,8 +83,8 @@ pipeline {
                 # .env.ai / google-tts-key.json 은 서버에 미리 있어야 함
                 ls -al .env.ai google-tts-key.json || echo '⚠️  .env.ai 또는 google-tts-key.json 이 없습니다.'; \
                 echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; \
-                TAG=${env.TAG} docker compose pull; \
-                TAG=${env.TAG} docker compose up -d; \
+                TAG=${env.TAG} docker-compose pull; \
+                TAG=${env.TAG} docker-compose up -d; \
                 docker logout || true; \
                 docker image prune -f || true; \
                 docker compose ps"
