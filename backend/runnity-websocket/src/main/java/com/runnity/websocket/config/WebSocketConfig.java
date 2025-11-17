@@ -31,6 +31,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         String[] origins = allowedOriginsRaw.split(",");
 
+        registry.addHandler(challengeWebSocketHandler, "/ws")
+                .setAllowedOrigins(origins)
+                .setAllowedOriginPatterns(origins)
+                .addInterceptors(new TicketHandshakeInterceptor());
+        
         registry.addHandler(challengeWebSocketHandler, "/ws/**")
                 .setAllowedOrigins(origins)
                 .setAllowedOriginPatterns(origins)
