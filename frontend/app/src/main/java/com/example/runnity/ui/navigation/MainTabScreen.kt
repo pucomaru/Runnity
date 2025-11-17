@@ -14,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -43,6 +44,10 @@ import com.example.runnity.ui.screens.mypage.ChallengeRunDetailScreen
 import com.example.runnity.ui.screens.mypage.AllRunHistoryScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.example.runnity.ui.screens.broadcast.BroadcastFilterScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastLiveScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastViewModel
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
 import com.example.runnity.ui.screens.workout.CountdownScreen
 import com.example.runnity.ui.screens.weather.WeatherDetailScreen
@@ -82,7 +87,8 @@ fun MainTabScreen(
         "challenge_filter",  // 챌린지 필터 화면
         "challenge_create",  // 챌린지 생성 화면
         "mypage",            // 마이페이지 화면
-        "all_run_history"    // 운동 기록 화면 (달력)
+        "all_run_history",    // 운동 기록 화면 (달력)
+        "broadcast_view"      // 중계목록 화면
     ) || currentRoute?.startsWith("personal_run_detail/") == true  // 개인 운동 기록 상세
        || currentRoute?.startsWith("challenge_run_detail/") == true // 챌린지 운동 기록 상세
 
@@ -228,7 +234,7 @@ fun MainTabScreen(
                         socketViewModel = socketViewModel
                     )
                 }
-
+                
                 // 챌린지 결과 화면
                 composable("challenge_result/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id")?.toIntOrNull() ?: 0
@@ -236,6 +242,51 @@ fun MainTabScreen(
                         challengeId = challengeId,
                         onClose = { navController.navigate("home") }
                     )
+                }
+
+
+                // ========== 중계 그래프 ==========
+                navigation(
+                    startDestination = "broadcast_view",
+                    route = "broadcast_graph" // 이 그래프의 고유 이름
+                ) {
+                    // 중계 목록 화면
+                    composable("broadcast_view") { backStackEntry ->
+                        // 부모 그래프("broadcast_graph")에서 ViewModel을 가져옴
+                        val parentEntry = remember(backStackEntry) {
+                            navController.getBackStackEntry("broadcast_graph")
+                        }
+                        val broadcastViewModel: BroadcastViewModel = viewModel(parentEntry)
+
+                        BroadcastScreen(
+                            navController = navController,
+                            parentNavController = parentNavController,
+                            viewModel = broadcastViewModel
+                        )
+                    }
+
+                    // 중계 필터 화면
+                    composable("broadcast_filter") { backStackEntry ->
+                        // 부모 그래프("broadcast_graph")에서 동일한 ViewModel을 가져옴
+                        val parentEntry = remember(backStackEntry) {
+                            navController.getBackStackEntry("broadcast_graph")
+                        }
+                        val broadcastViewModel: BroadcastViewModel = viewModel(parentEntry)
+
+                        BroadcastFilterScreen(
+                            navController = navController,
+                            viewModel = broadcastViewModel
+                        )
+                    }
+
+                    // 중계 라이브 화면
+                    composable("broadcast_live/{id}") { backStackEntry ->
+                        val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                        BroadcastLiveScreen(
+                            challengeId = challengeId,
+                            navController = navController
+                        )
+                    }
                 }
             }
 
@@ -380,6 +431,7 @@ fun MainTabScreen(
                         socketViewModel = socketViewModel
                     )
                 }
+
             }
 
             // ========== 마이페이지 그래프 ==========

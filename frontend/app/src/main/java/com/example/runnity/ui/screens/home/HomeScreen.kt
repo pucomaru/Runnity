@@ -31,19 +31,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
-import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.*
 import com.example.runnity.utils.PermissionUtils
+import com.example.runnity.utils.hasNotificationPermission
 import com.example.runnity.utils.rememberLocationPermissionLauncher
 import com.example.runnity.utils.rememberNotificationPermissionLauncher
 import com.example.runnity.utils.requestLocationPermissions
-import com.example.runnity.utils.hasNotificationPermission
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import android.os.Build
 import android.Manifest
-import android.widget.Toast
 import java.time.format.DateTimeFormatter
 import timber.log.Timber
 
@@ -365,8 +363,7 @@ fun HomeScreen(
         // FloatingActionButton (중계방 보기)
         FloatingActionButton(
             onClick = {
-                // TODO: 중계방 페이지로 이동 (동료가 연결 예정)
-                // navController?.navigate("broadcast_view")
+                 navController?.navigate("broadcast_graph")
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)

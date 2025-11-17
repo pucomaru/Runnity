@@ -2,6 +2,7 @@ package com.example.runnity.data.api
 
 import com.example.runnity.BuildConfig
 import com.example.runnity.data.remote.api.AuthApiService
+import com.example.runnity.data.remote.api.BroadcastApiService
 import com.example.runnity.data.remote.api.ChallengeApiService
 import com.example.runnity.data.remote.api.NotificationApiService
 import com.example.runnity.data.remote.api.RunApiService
@@ -166,4 +167,11 @@ object RetrofitInstance {
         createService(StatsApiService::class.java)
     }
 
+    /**
+     * BroadcastApiService 인스턴스
+     * 현재 활성화된 중계방 처리
+     */
+    val broadcastApi: BroadcastApiService by lazy {
+        createService(BroadcastApiService::class.java)
+    }
 }

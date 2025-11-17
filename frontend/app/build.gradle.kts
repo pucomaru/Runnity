@@ -130,6 +130,10 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.foundation.layout)
     implementation("androidx.compose.foundation:foundation")
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.animation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -194,6 +198,15 @@ dependencies {
     // 웹소켓
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+
+    // Media3 (통일)
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
+
+    // STOMP + RxJava2
+    implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
+    implementation("io.reactivex.rxjava2:rxjava:2.2.21")
+    implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
 
     //  테스트 라이브러리
     testImplementation(libs.junit)
