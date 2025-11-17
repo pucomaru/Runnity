@@ -44,6 +44,8 @@ object ChallengeMapper {
             "TEN" -> "10km"
             "FIFTEEN" -> "15km"
             "HALF" -> "하프"
+            "HUNDRED_METERS" -> "100m"
+            "FIVE_HUNDRED_METERS" -> "500m"
             else -> "${distance}km"
         }
     }
