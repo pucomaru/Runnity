@@ -33,7 +33,6 @@ class BroadcastLiveViewModel(
 
     // 내부에서 직접 정의
     private val tokenProvider: () -> String = { TokenManager.getAccessToken().toString() }
-    private val mock: Boolean = true  // 테스트용 true, 실제는 BuildConfig.DEBUG
 
     data class LiveUi(
         val title: String = "",
