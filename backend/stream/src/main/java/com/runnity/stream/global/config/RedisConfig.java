@@ -7,6 +7,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -39,6 +40,12 @@ public class RedisConfig {
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(new StringRedisSerializer());
         return template;
+    }
+
+    // BroadcastRedisUtil 등 StringRedisTemplate 타입 의존성 대응용 추가 빈
+    @Bean
+    public StringRedisTemplate stringRedisTemplateBean(RedisConnectionFactory redisCacheConnectionFactory) {
+        return new StringRedisTemplate(redisCacheConnectionFactory);
     }
 
     // BroadcastRedisUtil용: Object 직렬화
