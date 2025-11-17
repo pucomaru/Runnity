@@ -223,15 +223,19 @@ fun SimpleBarChart(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         data.forEachIndexed { index, point ->
-                            Text(
-                                text = point.label,
-                                style = Typography.CaptionSmall,
-                                color = ColorPalette.Light.secondary,
-                                modifier = Modifier.weight(1f),
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                softWrap = false
-                            )
+                            // 빈 문자열이 아닌 경우에만 표시
+                            if (point.label.isNotEmpty()) {
+                                Text(
+                                    text = point.label,
+                                    style = Typography.CaptionSmall,
+                                    color = ColorPalette.Light.secondary,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Center
+                                )
+                            } else {
+                                // 빈 문자열인 경우 공간만 차지
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(48.dp)) // Y축 레이블 공간만큼 패딩

@@ -368,7 +368,7 @@ fun RunDetailContent(data: RunRecordDetailResponse) {
                                     color = ColorPalette.Light.secondary
                                 )
                                 Text(
-                                    "${data.calories} kcal",
+                                    "${data.calories.toInt()} kcal",
                                     style = Typography.Title
                                 )
                             }

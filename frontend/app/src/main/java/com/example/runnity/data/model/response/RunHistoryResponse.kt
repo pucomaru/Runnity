@@ -34,7 +34,7 @@ data class RunRecordResponse(
     val pace: Int,
     val bpm: Int,
     val runType: String,
-    val calories: Int,
+    val calories: Double,
     val route: String?
 )
 
@@ -63,7 +63,7 @@ data class ChallengeRunRecordResponse(
     val pace: Int,
     val bpm: Int,
     val runType: String,
-    val calories: Int,
+    val calories: Double,
     val route: String?,
     val challengeId: Long? = null,
     val challengeTitle: String? = null
@@ -83,6 +83,7 @@ data class ChallengeRunRecordResponse(
  * @param calories 칼로리 (kcal)
  * @param route 경로 정보 (JSON 문자열)
  * @param laps 랩 타임 목록
+ * @param challengeId 챌린지 ID (챌린지 러닝인 경우)
  */
 data class RunRecordDetailResponse(
     val runRecordId: Long,
@@ -93,9 +94,10 @@ data class RunRecordDetailResponse(
     val durationSec: Int,
     val pace: Int,
     val bpm: Int,
-    val calories: Int,
+    val calories: Double,
     val route: String?,
-    val laps: List<LapResponse>
+    val laps: List<LapResponse>,
+    val challengeId: Long? = null
 )
 
 /**

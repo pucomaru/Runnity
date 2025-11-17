@@ -2,6 +2,7 @@ package com.example.runnity.ui.screens.mypage
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,11 +13,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,12 +35,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -79,6 +89,7 @@ fun ChallengeRunDetailScreen(
     viewModel: RunDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val challengeDetail by viewModel.challengeDetail.collectAsState()
 
     // 데이터 로드
     LaunchedEffect(runId) {
@@ -110,7 +121,10 @@ fun ChallengeRunDetailScreen(
                 }
             }
             is RunDetailUiState.Success -> {
-                ChallengeRunDetailContent(data = state.data)
+                ChallengeRunDetailContent(
+                    data = state.data,
+                    challengeDetail = challengeDetail
+                )
             }
             is RunDetailUiState.Error -> {
                 Box(
@@ -133,9 +147,16 @@ fun ChallengeRunDetailScreen(
  */
 @SuppressLint("MissingPermission")
 @Composable
-fun ChallengeRunDetailContent(data: RunRecordDetailResponse) {
+fun ChallengeRunDetailContent(
+    data: RunRecordDetailResponse,
+    challengeDetail: com.example.runnity.data.model.response.ChallengeDetailResponse?
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+
+    // 현재 사용자 정보
+    val currentProfile = com.example.runnity.data.util.UserProfileManager.getProfile()
+    val currentUserId = currentProfile?.memberId
 
     // 지도 상태
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
@@ -366,7 +387,7 @@ fun ChallengeRunDetailContent(data: RunRecordDetailResponse) {
                             color = ColorPalette.Light.secondary
                         )
                         Text(
-                            "${data.calories} kcal",
+                            "${data.calories.toInt()} kcal",
                             style = Typography.Title
                         )
                     }
@@ -376,34 +397,161 @@ fun ChallengeRunDetailContent(data: RunRecordDetailResponse) {
 
         HorizontalDivider(color = Color(0xFFDDDDDD), modifier = Modifier.padding(horizontal = 16.dp))
 
-        // 4. 랭킹 섹션 (TODO - API 미정)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-        ) {
-            Text(
-                text = "챌린지 랭킹",
-                style = Typography.Subheading,
-                color = ColorPalette.Light.primary
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // TODO: 랭킹 API 연동 후 구현
-            Box(
+        // 4. 랭킹 섹션
+        if (challengeDetail != null) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .background(ColorPalette.Light.background),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
             ) {
                 Text(
-                    text = "랭킹 API 연동 예정",
-                    style = Typography.Body,
-                    color = ColorPalette.Light.component
+                    text = "챌린지 랭킹",
+                    style = Typography.Subheading,
+                    color = ColorPalette.Light.primary
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 랭킹 순으로 정렬
+                val sortedParticipants = challengeDetail.participants.sortedBy { it.rank }
+
+                if (sortedParticipants.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "참가자가 없습니다",
+                            style = Typography.Body,
+                            color = ColorPalette.Light.secondary
+                        )
+                    }
+                } else {
+                    // 랭킹 리스트
+                    sortedParticipants.forEach { participant ->
+                        ChallengeRankingItem(
+                            participant = participant,
+                            currentUserId = currentUserId
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
             }
         }
+    }
+}
+
+/**
+ * 챌린지 랭킹 아이템
+ */
+@Composable
+private fun ChallengeRankingItem(
+    participant: com.example.runnity.data.model.response.ChallengeParticipantInfo,
+    currentUserId: Long?
+) {
+    val isCurrentUser = currentUserId != null && participant.memberId == currentUserId
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ColorPalette.Light.background, RoundedCornerShape(8.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // 왼쪽: 순위 + 프로필 이미지 + 닉네임
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.weight(1f)
+        ) {
+            // 순위
+            Text(
+                text = "${participant.rank}위",
+                style = Typography.Subheading,
+                color = when (participant.rank) {
+                    1 -> Color(0xFFFFD700) // 금색
+                    2 -> Color(0xFFC0C0C0) // 은색
+                    3 -> Color(0xFFCD7F32) // 동색
+                    else -> ColorPalette.Light.primary
+                },
+                modifier = Modifier.width(50.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 프로필 이미지
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(ColorPalette.Light.containerBackground)
+                    .border(
+                        width = if (isCurrentUser) 2.dp else 1.dp,
+                        color = if (isCurrentUser) ColorPalette.Common.accent else ColorPalette.Light.component,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!participant.profileImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = participant.profileImage,
+                        contentDescription = "프로필 이미지",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "프로필",
+                        tint = if (isCurrentUser) ColorPalette.Common.accent else ColorPalette.Light.component,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 닉네임 + 나 배지
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = participant.nickname,
+                    style = Typography.Body,
+                    color = ColorPalette.Light.primary
+                )
+
+                if (isCurrentUser) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = ColorPalette.Common.accent,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "나",
+                            style = Typography.Caption,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+
+        // 오른쪽: 페이스 (해당 챌린지에 대한 페이스)
+        val paceToShow = participant.paceSec ?: participant.averagePaceSec
+        Text(
+            text = formatPace(paceToShow.toDouble()),
+            style = Typography.Caption,
+            color = ColorPalette.Light.secondary
+        )
     }
 }
 

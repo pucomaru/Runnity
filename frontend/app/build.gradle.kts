@@ -167,6 +167,9 @@ dependencies {
     // EncryptedSharedPreferences (보안 토큰 저장)
     implementation(libs.security.crypto)
 
+    // ExifInterface (이미지 회전 정보 처리)
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // Timber (로깅)
     implementation(libs.timber)
 

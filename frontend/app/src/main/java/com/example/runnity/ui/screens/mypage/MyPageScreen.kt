@@ -273,11 +273,11 @@ private fun GraphSection(
         // 월 그래프: X축 레이블을 1, 15, 마지막 날만 표시하도록 변경
         val displayData = remember(periodType, graphData) {
             if (periodType == PeriodType.MONTH) {
-                val maxDay = graphData.mapNotNull { it.label.toIntOrNull() }.maxOrNull() ?: 0
+                val maxDay = graphData.mapNotNull { it.label.removeSuffix("일").toIntOrNull() }.maxOrNull() ?: 0
                 android.util.Log.d("MyPageScreen", "월 그래프: maxDay=$maxDay, total=${graphData.size}")
                 graphData.map {
-                    val day = it.label.toIntOrNull() ?: 0
-                    val displayLabel = if (day == 1 || day == 15 || day == maxDay) it.label else ""
+                    val day = it.label.removeSuffix("일").toIntOrNull() ?: 0
+                    val displayLabel = if (day == 1 || day == 15 || day == maxDay) "${day}일" else ""
                     android.util.Log.d("MyPageScreen", "day=$day, label=${it.label}, displayLabel=$displayLabel")
                     BarChartData(displayLabel, it.distance)
                 }

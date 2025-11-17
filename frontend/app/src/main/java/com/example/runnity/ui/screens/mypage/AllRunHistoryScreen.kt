@@ -48,7 +48,7 @@ fun AllRunHistoryScreen(
     navController: NavController,
     viewModel: AllRunHistoryViewModel = viewModel()
 ) {
-    val today = LocalDate.now()
+    val today = remember { LocalDate.now() }
     val uiState by viewModel.uiState.collectAsState()
 
     // 선택된 날짜
@@ -65,16 +65,18 @@ fun AllRunHistoryScreen(
 
     val coroutineScope = rememberCoroutineScope()
 
-    // 현재 페이지에 해당하는 년/월 계산
+    // 현재 페이지에 해당하는 년/월 계산 (YearMonth 사용)
     val currentYearMonth = remember(pagerState.currentPage) {
-        today.minusMonths((119 - pagerState.currentPage).toLong())
+        val baseYearMonth = YearMonth.from(today)
+        baseYearMonth.minusMonths((119 - pagerState.currentPage).toLong())
     }
 
     val selectedYear = currentYearMonth.year
     val selectedMonth = currentYearMonth.monthValue
 
     // 페이지 변경 시 해당 월의 데이터 로드
-    LaunchedEffect(selectedYear, selectedMonth) {
+    LaunchedEffect(pagerState.currentPage) {
+        Timber.d("페이지 변경: ${pagerState.currentPage} -> $selectedYear-$selectedMonth")
         viewModel.loadMonthlyRuns(selectedYear, selectedMonth)
     }
 
