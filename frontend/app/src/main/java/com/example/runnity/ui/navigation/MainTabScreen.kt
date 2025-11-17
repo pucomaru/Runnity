@@ -232,8 +232,16 @@ fun MainTabScreen(
                 // 챌린지 결과 화면
                 composable("challenge_result/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id")?.toIntOrNull() ?: 0
+                    // home_graph 레벨에서 공유되는 ChallengeSocketViewModel 사용 (대기방/운동 화면과 동일 인스턴스)
+                    val socketViewModel: com.example.runnity.ui.screens.challenge.ChallengeSocketViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Home.graphRoute)
+                            }
+                        )
                     ChallengeResultScreen(
                         challengeId = challengeId,
+                        socketViewModel = socketViewModel,
                         onClose = { navController.navigate("home") }
                     )
                 }
