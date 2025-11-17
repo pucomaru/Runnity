@@ -4,6 +4,7 @@ import com.runnity.broadcast.config.FeignConfig;
 import com.runnity.broadcast.dto.BroadcastDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -18,5 +19,9 @@ import java.util.List;
 )
 public interface BroadcastClient {
     @GetMapping("/api/broadcast/active")
-    List<BroadcastDto> getActiveBroadcasts();
+    List<BroadcastDto> getActiveBroadcasts(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "distance", required = false) List<String> distance,
+            @RequestParam(value = "sort", required = false) String sort
+    );
 }
