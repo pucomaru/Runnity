@@ -10,24 +10,115 @@
 2. **Redis Pub/Sub** (양방향): WebSocket 서버 간 동기화
 3. **Kafka** (단방향): WebSocket 서버 → Stream 서버 (브로드캐스트 스트리밍)
 
-### Redis 저장소
+### Redis Cache
 
 #### `challenge:{challengeId}:meta`
-챌린지 메타 정보를 저장하는 Redis Hash입니다.
+* **Key**: `challenge:{challengeId}:meta`
+* **Value**: Redis Hash
+* **방향**: 비즈니스 서버 → Redis Cache → WebSocket 서버 (조회)
+* **TTL**: 없음
+* **목적**: 브로드캐스트 여부 확인, 목표 거리 조회, 참여자 수 관리
+* **Value 예시**:
+```json
+{
+  "title": "5km 러닝 챌린지",
+  "totalApplicantCount": "10",
+  "actualParticipantCount": "8",
+  "distance": "5.0",
+  "isBroadcast": "true"
+}
+```
+* **필드 설명**:
+  * `title`: 챌린지 제목 (String)
+  * `totalApplicantCount`: 전체 신청자 수 (String, TOTAL_APPLICANT_STATUSES 기준)
+  * `actualParticipantCount`: 실제 참여자 수 (String, 초기값 0, 처음 입장 시 +1)
+  * `distance`: 목표 거리 (String, km 단위)
+  * `isBroadcast`: 브로드캐스트 여부 (String, "true" 또는 "false")
 
-**저장 시점**: 챌린지 시작 5분 전 (비즈니스 서버에서 저장)
+#### `ws_ticket:{ticket}`
+* **Key**: `ws_ticket:{ticket}`
+* **Value**: String (JSON)
+* **방향**: 비즈니스 서버 → Redis Cache → WebSocket 서버 (조회 후 삭제)
+* **TTL**: 30초
+* **목적**: WebSocket 연결 시 티켓 검증 및 소모 (일회성)
+* **Value 예시**:
+```json
+{
+  "userId": 1,
+  "challengeId": 100,
+  "ticketType": "ENTER",
+  "nickname": "러너1",
+  "profileImage": "https://..."
+}
+```
 
-**저장 정보**:
-- `title`: 챌린지 제목
-- `totalApplicantCount`: 전체 신청자 수 (TOTAL_APPLICANT_STATUSES 조회)
-- `actualParticipantCount`: 실제 참여자 수 (초기값 0, 입장 시 +1)
-- `distance`: 목표 거리 (km)
-- `isBroadcast`: 브로드캐스트 여부
+#### `challenge:{challengeId}:participants`
+* **Key**: `challenge:{challengeId}:participants`
+* **Value**: Redis ZSet (Member: `userId`, Score: `distance`)
+* **방향**: WebSocket 서버 ↔ Redis Cache
+* **TTL**: 없음
+* **목적**: 참가자 목록 관리, 거리 기준 순위 계산 (거리가 클수록 순위 높음, 내림차순)
+* **Value 예시**:
+```
+Member: "1" (userId), Score: 3.5 (distance)
+Member: "2" (userId), Score: 2.8 (distance)
+Member: "3" (userId), Score: 4.2 (distance)
+```
 
-**사용 위치**:
-- 목표 거리 조회 (완주 체크)
-- 브로드캐스트 여부 확인 (Kafka 발행 조건)
-- 실제 참여자 수 관리 (입장/퇴장 시 업데이트)
+#### `challenge:{challengeId}:participant:{userId}`
+* **Key**: `challenge:{challengeId}:participant:{userId}`
+* **Value**: String (JSON)
+* **방향**: WebSocket 서버 ↔ Redis Cache
+* **TTL**: 없음
+* **목적**: 참가자 상세 정보 저장 (distance는 ZSet score에서 관리)
+* **Value 예시**:
+```json
+{
+  "userId": 1,
+  "nickname": "러너1",
+  "profileImage": "https://...",
+  "pace": 5
+}
+```
+
+#### `challenge:{challengeId}:user:{userId}:lastRecord`
+* **Key**: `challenge:{challengeId}:user:{userId}:lastRecord`
+* **Value**: String (Unix timestamp in seconds)
+* **방향**: WebSocket 서버 ↔ Redis Cache
+* **TTL**: 없음
+* **목적**: 마지막 RECORD 메시지 시간 저장 (타임아웃 체크용)
+* **Value 예시**:
+```
+"1699999999"
+```
+
+### 세션 관리
+
+#### 메모리 세션 저장소
+* **저장소**: `ConcurrentHashMap<String, WebSocketSession>`
+* **Key 형식**: `{challengeId}:{userId}` (예: "100:1")
+* **Value**: WebSocketSession 객체
+* **목적**: 빠른 세션 조회 및 메시지 전송
+* **생명주기**: WebSocket 연결 수립 시 등록, 연결 종료 시 제거
+
+#### Redis 세션 데이터
+* **참가자 목록**: `challenge:{challengeId}:participants` (ZSet)
+* **참가자 정보**: `challenge:{challengeId}:participant:{userId}` (String/JSON)
+* **목적**: 다중 서버 환경에서 참가자 정보 공유 및 동기화
+
+#### 세션 제거 시 처리
+* **FINISH (완주)**: 
+  * 메모리 세션 제거 (WebSocket 연결 종료)
+  * Redis ZSet과 participant 정보 유지 (랭킹 포함)
+* **그 외 (QUIT, TIMEOUT, DISCONNECTED, ERROR, KICKED, EXPIRED)**: 
+  * 메모리 세션 제거
+  * Redis ZSet과 participant 정보 제거
+
+#### 타임아웃 체크
+* **체크 주기**: 30초마다 실행
+* **타임아웃 기준**: 마지막 RECORD/PING/PONG 메시지로부터 60초 경과
+* **처리**: 타임아웃된 참가자는 자동으로 TIMEOUT 상태로 변경 및 퇴장 처리
+* **업데이트 시점**: RECORD, PING, PONG 메시지 수신 시 마지막 시간 업데이트
 
 ---
 
@@ -68,7 +159,9 @@
 - **현재 참여 중인 다른 참가자 목록**을 함께 전송 (본인 제외)
 - challengeId, userId는 디버깅 및 클라이언트 상태 확인용
 - 프론트는 이 목록으로 초기 참가자 UI 구성
-- 초기 distance, pace는 0
+- **티켓 타입별 처리**:
+  * `ENTER`: 첫 입장, distance/pace는 0 또는 이전 정보 (있는 경우)
+  * `REENTER`: 재입장, 이전 세션 종료 후 0.0/0으로 시작 (프론트에서 최신 데이터 전송)
 
 ---
 
@@ -217,6 +310,7 @@
 - 서버는 PONG으로 응답
 
 **처리**:
+- 마지막 RECORD 시간 업데이트 (타임아웃 체크용)
 - PONG 응답 전송
 
 ---
@@ -235,7 +329,7 @@
 - 서버가 먼저 PING을 보내는 경우 클라이언트가 응답
 
 **처리**:
-- 단순 수신 (서버가 PING을 보낸 경우 클라이언트가 응답)
+- 마지막 RECORD 시간 업데이트 (타임아웃 체크용)
 
 ---
 
@@ -268,10 +362,11 @@
 ### 채널: `challenge:enter`
 
 #### 2.1. USER_ENTERED
-**발행 시점**: 사용자가 챌린지에 입장했을 때  
-**발행자**: 해당 사용자가 연결된 WebSocket 서버  
-**구독자**: 모든 WebSocket 서버  
-**구조**:
+* **Channel**: `challenge:enter`
+* **Payload**: JSON (`challengeId`, `userId`, `nickname`, `profileImage`, `timestamp`)
+* **방향**: WebSocket 서버 → Redis Pub/Sub → 모든 WebSocket 서버
+* **발행 시점**: 사용자가 챌린지에 입장했을 때
+* **구조**:
 ```json
 {
   "challengeId": 100,
@@ -291,10 +386,11 @@
 ### 채널: `challenge:leave`
 
 #### 2.2. USER_LEFT
-**발행 시점**: 사용자가 챌린지에서 퇴장했을 때  
-**발행자**: 해당 사용자가 연결된 WebSocket 서버  
-**구독자**: 모든 WebSocket 서버  
-**구조**:
+* **Channel**: `challenge:leave`
+* **Payload**: JSON (`challengeId`, `userId`, `reason`, `timestamp`)
+* **방향**: WebSocket 서버 → Redis Pub/Sub → 모든 WebSocket 서버
+* **발행 시점**: 사용자가 챌린지에서 퇴장했을 때
+* **구조**:
 ```json
 {
   "challengeId": 100,
@@ -323,10 +419,11 @@
 ### 채널: `challenge:update`
 
 #### 2.3. PARTICIPANT_UPDATE
-**발행 시점**: 참가자의 distance, pace가 업데이트될 때  
-**발행자**: RECORD 메시지를 받은 WebSocket 서버  
-**구독자**: 모든 WebSocket 서버  
-**구조**:
+* **Channel**: `challenge:update`
+* **Payload**: JSON (`challengeId`, `userId`, `distance`, `pace`, `timestamp`)
+* **방향**: WebSocket 서버 → Redis Pub/Sub → 모든 WebSocket 서버
+* **발행 시점**: 참가자의 distance, pace가 업데이트될 때
+* **구조**:
 ```json
 {
   "challengeId": 100,
@@ -348,10 +445,11 @@
 ### 채널: `challenge:done`
 
 #### 2.4. CHALLENGE_DONE
-**발행 시점**: 비즈니스 서버에서 챌린지 종료 처리 후 (handleDone()에서 challenge:*:done 처리 후)  
-**발행자**: 비즈니스 서버  
-**구독자**: 모든 WebSocket 서버  
-**구조**:
+* **Channel**: `challenge:done`
+* **Payload**: JSON (`challengeId`, `timestamp`)
+* **방향**: 비즈니스 서버 → Redis Pub/Sub → 모든 WebSocket 서버
+* **발행 시점**: 비즈니스 서버에서 챌린지 종료 처리 후
+* **구조**:
 ```json
 {
   "challengeId": 100,
@@ -367,17 +465,21 @@
 
 ---
 
-## 3️⃣ Kafka 메시지 (WebSocket 서버 → Stream 서버)
+## 3️⃣ Kafka 메시지
 
 ### 토픽: `challenge-stream`
 
-**발행 조건**: `isBroadcast=true`인 챌린지만 발행  
-**구조**:
+* **Topic**: `challenge-stream`
+* **Key**: `challengeId` (String)
+* **Value**: JSON
+* **방향**: WebSocket 서버 → Kafka → Stream 서버
+* **조건**: `isBroadcast=true`인 챌린지만 발행
+* **Value 예시**:
 ```json
 {
   "eventType": "start|running|finish|leave",
   "challengeId": 100,
-  "userId": 1,
+  "runnerId": 1,
   "nickname": "러너1",
   "profileImage": "https://...",
   "distance": 2.5,
