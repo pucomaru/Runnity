@@ -3,14 +3,7 @@ pipeline {
 
   environment {
     DOCKERHUB_USERNAME = 'daum0604'
-    IMAGE       = "docker.io/${DOCKERHUB_USERNAME}/runnity-llm"
-
-    COMPOSE_DIR  = 'backend/ai'
-    COMPOSE_FILE = 'docker-compose.yml'
-    DEPLOY_DIR   = 'llm-app'
-
-    // 🔹 AI 서버 IP를 환경변수로 정의
-    AI_SERVER_IP = '52.79.235.2'
+    IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-llm"
   }
 
   options {
@@ -32,7 +25,8 @@ pipeline {
 
     stage('Docker Build & Push') {
       steps {
-        dir("${COMPOSE_DIR}") {
+        // 📂 백엔드: dir('backend') / AI: dir('backend/ai')
+        dir('backend/ai') {
           sh "pwd && ls -al"
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
             sh """
@@ -52,61 +46,49 @@ pipeline {
 
     stage('Bundle compose') {
       steps {
-        dir("${COMPOSE_DIR}") {
-          sh '''
+        // 📂 backend/ai 안에서 번들 생성
+        dir('backend/ai') {
+          sh """
             set -euxo pipefail
             mkdir -p deploy_bundle
-            cp -f docker-compose.yml deploy_bundle/docker-compose.yml
+            cp -f docker-compose.yml deploy_bundle/
+            # .env.ai, google-tts-key.json 은 서버에만 있고 번들에는 포함 안 함
             tar czf deploy_bundle.tgz -C deploy_bundle .
             ls -al deploy_bundle
-          '''
+          """
         }
 
-        archiveArtifacts artifacts: "${COMPOSE_DIR}/deploy_bundle.tgz", fingerprint: true, onlyIfSuccessful: true
+        // workspace 기준: backend/ai/deploy_bundle.tgz
+        archiveArtifacts artifacts: 'backend/ai/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
-    // 🔥 여기부터가 핵심: Deploy 단계 수정
     stage('Deploy to AI server') {
       steps {
         sshagent (credentials: ['ssh_deploy_key']) {
           withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
-            // 싱글쿼트 트리플('''...''') → Groovy가 $변수 안 건드림
-            sh '''
+            sh """
               set -euxo pipefail
+              test -f backend/ai/deploy_bundle.tgz
 
-              # 번들 파일 존재 확인 (환경변수 COMPOSE_DIR 사용)
-              test -f "$COMPOSE_DIR/deploy_bundle.tgz"
+              # 💡 백엔드와 동일 패턴: IP만 AI 서버로 변경
+              ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 'set -eux; mkdir -p ~/llm-app'
+              scp -o StrictHostKeyChecking=no backend/ai/deploy_bundle.tgz ubuntu@52.79.235.2:~/llm-app/
 
-              echo ">> Deploy to AI server: $AI_SERVER_IP"
-
-              # 1) 서버에 디렉토리 생성
-              ssh -o StrictHostKeyChecking=no ubuntu@$AI_SERVER_IP "set -eux; mkdir -p ~/$DEPLOY_DIR"
-
-              # 2) 번들 전송
-              scp -o StrictHostKeyChecking=no "$COMPOSE_DIR/deploy_bundle.tgz" ubuntu@$AI_SERVER_IP:~/$DEPLOY_DIR/
-
-              # 3) 서버에서 docker compose 실행
-              ssh -o StrictHostKeyChecking=no ubuntu@$AI_SERVER_IP "
-                set -euxo pipefail
-                cd ~/$DEPLOY_DIR
-                ls -al
-                tar xzf deploy_bundle.tgz
-                test -f docker-compose.yml
-
-                # env & key 파일 체크 (미리 만들어둔 상태여야 함)
-                ls -al .env.ai google-tts-key.json || echo '⚠️  .env.ai 또는 google-tts-key.json 이 없습니다.'
-
-                echo \"\$DOCKERHUB_TOKEN\" | docker login -u \$DOCKERHUB_USERNAME --password-stdin
-
-                TAG=\$TAG docker compose pull
-                TAG=\$TAG docker compose up -d
-
-                docker logout || true
-                docker image prune -f || true
-                docker compose ps
-              "
-            '''
+              ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 "set -euxo pipefail; \
+                cd ~/llm-app; \
+                ls -al; \
+                tar xzf deploy_bundle.tgz; \
+                test -f docker-compose.yml; \
+                # .env.ai / google-tts-key.json 은 서버에 미리 있어야 함
+                ls -al .env.ai google-tts-key.json || echo '⚠️  .env.ai 또는 google-tts-key.json 이 없습니다.'; \
+                echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; \
+                TAG=${env.TAG} docker compose pull; \
+                TAG=${env.TAG} docker compose up -d; \
+                docker logout || true; \
+                docker image prune -f || true; \
+                docker compose ps"
+            """
           }
         }
       }
