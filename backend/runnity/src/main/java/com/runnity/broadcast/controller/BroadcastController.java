@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -38,7 +39,11 @@ public class BroadcastController {
         }
     )
     @GetMapping("/active")
-    public ResponseEntity<List<BroadcastDto>> getActiveBroadcasts() {
-        return ResponseEntity.ok(broadcastService.getActiveBroadcasts());
+    public ResponseEntity<List<BroadcastDto>> getActiveBroadcasts(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "distance", required = false) List<String> distance, // ONE,TWO 반복키 방식
+            @RequestParam(value = "sort", required = false, defaultValue = "LATEST") String sort
+    ) {
+        return ResponseEntity.ok(broadcastService.getActiveBroadcasts(keyword, distance, sort));
     }
 }

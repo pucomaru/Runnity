@@ -24,9 +24,13 @@ public class BroadcastService {
     private final BroadcastClient broadcastClient;
 
     @Retryable(value = {RuntimeException.class}, maxAttempts = 2, backoff = @Backoff(delay = 1000))
-    public List<BroadcastDto> getActiveBroadcasts() {
+    public List<BroadcastDto> getActiveBroadcasts(
+            String keyword,
+            List<String> distance,
+            String sort
+    ) {
         try {
-            List<BroadcastDto> broadcasts = broadcastClient.getActiveBroadcasts();
+            List<BroadcastDto> broadcasts = broadcastClient.getActiveBroadcasts(keyword, distance, sort);
             log.info("Successfully fetched {} active broadcasts", broadcasts.size());
             return broadcasts;
         } catch (Exception e) {
