@@ -1,5 +1,6 @@
 package com.example.runnity.data.repository
 
+import android.content.Context
 import android.net.Uri
 import com.example.runnity.data.api.RetrofitInstance
 import com.example.runnity.data.model.common.ApiResponse
@@ -114,11 +115,13 @@ class AuthRepository(
      * 추가 정보 입력 (신규 회원)
      * multipart/form-data로 data + profileImage 전송
      *
+     * @param context Context
      * @param request 추가 정보 (nickname, gender, height, weight, birth)
      * @param profileImageUri 프로필 이미지 URI (선택)
      * @return ApiResponse<AddInfoResponse>
      */
     suspend fun addAdditionalInfo(
+        context: Context,
         request: AddInfoRequest,
         profileImageUri: Uri?
     ): ApiResponse<AddInfoResponse> {
@@ -128,7 +131,7 @@ class AuthRepository(
 
         // 이미지를 MultipartBody.Part로 변환
         val imagePart = profileImageUri?.let { uri ->
-            createMultipartFromUri(uri, "profileImage")
+            createMultipartFromUri(context, uri, "profileImage")
         }
 
         return safeApiCall {
@@ -150,24 +153,26 @@ class AuthRepository(
      * 내 프로필 수정
      * multipart/form-data로 data + profileImage 전송
      *
-     * @param request 수정할 정보 (nullable)
+     * @param context Context
+     * @param request 수정할 정보
      * @param profileImageUri 프로필 이미지 URI (선택)
-     * @return ApiResponse<ProfileResponse>
+     * @return ApiResponse<Unit>
      */
     suspend fun updateMyProfile(
+        context: Context,
         request: UpdateProfileRequest,
         profileImageUri: Uri?
-    ): ApiResponse<ProfileResponse> {
+    ): ApiResponse<Unit> {
         // JSON을 RequestBody로 변환
         val json = gson.toJson(request)
         val dataBody = json.toRequestBody("application/json".toMediaType())
 
         // 이미지를 MultipartBody.Part로 변환
         val imagePart = profileImageUri?.let { uri ->
-            createMultipartFromUri(uri, "profileImage")
+            createMultipartFromUri(context, uri, "profileImage")
         }
 
-        return safeApiCall {
+        return safeApiCallUnit {
             authApiService.updateMyProfile(dataBody, imagePart)
         }
     }
@@ -187,14 +192,12 @@ class AuthRepository(
 
     /**
      * Uri를 MultipartBody.Part로 변환
-     * 실제 구현은 Context가 필요하므로 ViewModel에서 처리하거나
-     * Repository에 Context를 주입해야 함
-     *
-     * TODO: 실제 구현 필요 (ContentResolver로 파일 읽기)
      */
-    private fun createMultipartFromUri(uri: Uri, paramName: String): MultipartBody.Part? {
-        // 실제 구현에서는 Context를 통해 Uri → File 변환 필요
-        // 임시로 null 반환
-        return null
+    private fun createMultipartFromUri(context: Context, uri: Uri, paramName: String): MultipartBody.Part? {
+        return com.example.runnity.data.util.FileUtils.createMultipartFromUri(
+            context = context,
+            uri = uri,
+            paramName = paramName
+        )
     }
 }

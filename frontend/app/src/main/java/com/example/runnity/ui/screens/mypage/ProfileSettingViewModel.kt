@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.mypage
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -64,6 +65,7 @@ class ProfileSettingViewModel(
      * 프로필 수정
      */
     fun updateProfile(
+        context: Context,
         nickname: String,
         height: Double,
         weight: Double,
@@ -78,12 +80,29 @@ class ProfileSettingViewModel(
                 weight = weight
             )
 
-            when (val result = authRepository.updateMyProfile(request, profileImageUri)) {
+            when (val result = authRepository.updateMyProfile(context, request, profileImageUri)) {
                 is ApiResponse.Success -> {
                     Timber.d("ProfileSetting: 프로필 수정 성공")
-                    // UserProfileManager에 저장
-                    UserProfileManager.saveProfile(result.data)
-                    _updateState.value = UpdateProfileState.Success
+
+                    // 수정 후 프로필 재조회
+                    when (val profileResult = authRepository.getMyProfile()) {
+                        is ApiResponse.Success -> {
+                            Timber.d("ProfileSetting: 프로필 재조회 성공")
+                            // UserProfileManager에 저장
+                            UserProfileManager.saveProfile(profileResult.data)
+                            _updateState.value = UpdateProfileState.Success
+                        }
+                        is ApiResponse.Error -> {
+                            Timber.e("ProfileSetting: 프로필 재조회 실패 (${profileResult.code}: ${profileResult.message})")
+                            // 재조회 실패해도 수정은 성공했으므로 Success로 처리
+                            _updateState.value = UpdateProfileState.Success
+                        }
+                        ApiResponse.NetworkError -> {
+                            Timber.e("ProfileSetting: 프로필 재조회 실패 (네트워크 에러)")
+                            // 재조회 실패해도 수정은 성공했으므로 Success로 처리
+                            _updateState.value = UpdateProfileState.Success
+                        }
+                    }
                 }
                 is ApiResponse.Error -> {
                     Timber.e("ProfileSetting: 프로필 수정 실패 (${result.code}: ${result.message})")

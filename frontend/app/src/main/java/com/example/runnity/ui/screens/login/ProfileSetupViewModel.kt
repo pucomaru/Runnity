@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.login
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.runnity.data.model.common.ApiResponse
@@ -58,6 +59,7 @@ class ProfileSetupViewModel(
      * 추가 정보 제출
      */
     fun submitAdditionalInfo(
+        context: Context,
         nickname: String,
         gender: Gender,
         height: Double,
@@ -75,7 +77,7 @@ class ProfileSetupViewModel(
                 birth = birth
             )
 
-            when (val result = authRepository.addAdditionalInfo(request, null)) {
+            when (val result = authRepository.addAdditionalInfo(context, request, null)) {
                 is ApiResponse.Success -> {
                     Timber.d("ProfileSetup: 추가 정보 입력 성공")
 
