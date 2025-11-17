@@ -94,6 +94,7 @@ data class ChallengeDetailResponse(
  * @param rank 랭킹
  * @param status 참여 상태 (JOINED 등)
  * @param averagePaceSec 평균 페이스 (초 단위)
+ * @param paceSec 페이스 (초 단위)
  */
 data class ChallengeParticipantInfo(
     val memberId: Long,
@@ -101,7 +102,8 @@ data class ChallengeParticipantInfo(
     val profileImage: String?,
     val rank: Int,
     val status: String,
-    val averagePaceSec: Int
+    val averagePaceSec: Int,
+    val paceSec: Int? = null
 )
 
 /**

@@ -11,7 +11,9 @@ import com.example.runnity.data.remote.interceptor.AuthInterceptor
 import com.example.runnity.data.remote.interceptor.TokenAuthenticator
 import com.example.runnity.data.remote.interceptor.TokenRefreshInterceptor
 import com.google.gson.GsonBuilder
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -42,17 +44,35 @@ object RetrofitInstance {
     private const val WRITE_TIMEOUT = 30L
 
     /**
-     * 로깅 Interceptor
+     * 로깅 Interceptor (이미지 업로드 시 바이너리 데이터 제외)
      * - 디버그 모드에서만 HTTP 로그 출력
+     * - multipart/form-data 요청의 경우 헤더만 로그 출력
      */
-    private val loggingInterceptor = HttpLoggingInterceptor { message ->
-        Timber.tag("HTTP").d(message)
-    }.apply {
-        level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BODY
-        } else {
-            HttpLoggingInterceptor.Level.NONE
+    private val loggingInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val contentType = request.body?.contentType()?.toString() ?: ""
+
+        if (!BuildConfig.DEBUG) {
+            // 릴리즈 모드에서는 로깅 안 함
+            return@Interceptor chain.proceed(request)
         }
+
+        // multipart/form-data 요청인 경우 헤더만 로그
+        val logger = if (contentType.startsWith("multipart/form-data")) {
+            HttpLoggingInterceptor { message ->
+                Timber.tag("HTTP").d(message)
+            }.apply {
+                level = HttpLoggingInterceptor.Level.HEADERS
+            }
+        } else {
+            HttpLoggingInterceptor { message ->
+                Timber.tag("HTTP").d(message)
+            }.apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+        }
+
+        logger.intercept(chain)
     }
 
     /**
@@ -67,7 +87,7 @@ object RetrofitInstance {
         .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
         .addInterceptor(AuthInterceptor())           // 토큰 자동 추가
         .addInterceptor(TokenRefreshInterceptor())   // 403 에러 시 자동 토큰 갱신
-        .addInterceptor(loggingInterceptor)          // HTTP 로깅
+        .addInterceptor(loggingInterceptor)          // HTTP 로깅 (이미지 바이너리 제외)
         .authenticator(TokenAuthenticator())         // 401 에러 시 자동 토큰 갱신
         .build()
 
