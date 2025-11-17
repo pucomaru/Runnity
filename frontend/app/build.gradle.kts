@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize") // ✅ Parcelable data class 용 (Intent 등에서 사용)
-
+    id ("com.google.gms.google-services")
 }
 
 // 추가
@@ -132,6 +132,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.animation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

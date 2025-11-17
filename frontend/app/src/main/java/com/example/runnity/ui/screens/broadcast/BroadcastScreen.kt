@@ -153,7 +153,6 @@ fun BroadcastScreen(
                                 onCardClick = {
                                     selectedChallengeId = broadcast.challengeId
                                     showJoinDialog = true
-                                    navController?.navigate("broadcast_live/${broadcast.challengeId}")
                                 }
                             )
                         }

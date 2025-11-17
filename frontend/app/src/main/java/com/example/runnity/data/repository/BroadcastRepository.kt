@@ -66,13 +66,15 @@ class BroadcastRepository(
             }
         }
     }
-//
-//    /**
-//     * 활성화된 중계방 목록 조회
-//     */
-//    suspend fun getBroadcastLive(): ApiResponse<BroadcastPage> =
-//        safeApiCall {
-//            val res = broadcastApiService.getActiveBroadcasts()
-//            // safeApiCall 내부에서 body() 반환
-//        }.map { list -> BroadcastMapper.toPage(list ?: emptyList()) }
+
+    /**
+     * 중계방 참여
+     */
+    //Todo: url나오면 연결
+//    suspend fun joinBroadcast(challengeId: Long): ApiResponse<Unit> {
+//        return safeApiCall {
+//            broadcastApiService.joinBroadcast(challengeId)
+//        }
+//    }
+
 }

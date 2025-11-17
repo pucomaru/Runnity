@@ -84,7 +84,9 @@ class BroadcastViewModel (
             )) {
                 is ApiResponse.Success -> {
                     val server = response.data
-                    val mapped = server.map(BroadcastMapper::toItem)
+                    val mapped = server
+                        .map(BroadcastMapper::toItem)
+                        .distinctBy { it.challengeId }
                     _broadcastsList.value = mapped
                     _uiState.value = BroadcastUiState.Success(mapped)
                     Timber.d("중계방 목록 로드 성공: %d개", mapped.size)
@@ -112,6 +114,8 @@ class BroadcastViewModel (
         viewModelScope.launch {
             runCatching {
                 // TODO : 중계 참여 구현하기
+//                repository.joinBroadcast(challengeId.toLong())
+//                Timber.d("중계방 입장 성공: challengeId=%s", challengeId)
             }.onFailure { Timber.e(it, "중계 참여 실패: %s", challengeId) }
         }
     }

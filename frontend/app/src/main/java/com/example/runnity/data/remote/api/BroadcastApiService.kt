@@ -4,6 +4,8 @@ import com.example.runnity.data.model.common.BaseResponse
 import com.example.runnity.data.model.response.BroadcastResponse
 import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -27,4 +29,8 @@ interface BroadcastApiService {
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 10
     ): Response<List<BroadcastResponse>>
+
+    //TODO: url나오면 연결
+//    @POST("/api/v1/broadcast/{challengeId}/join")
+//    suspend fun joinBroadcast(@Path("challengeId") challengeId: Long): Response<Unit>
 }
