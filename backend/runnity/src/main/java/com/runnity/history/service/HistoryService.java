@@ -186,6 +186,8 @@ public class HistoryService {
 
         runLapRepository.saveAll(laps);
 
+        updateMemberAveragePace(member);
+
         if (request.runType() == RunRecordType.CHALLENGE) {
             if (request.challengeId() == null) {
                 throw new GlobalException(ErrorStatus.CHALLENGE_ID_REQUIRED);
@@ -193,6 +195,24 @@ public class HistoryService {
 
             handleChallengeFinish(member, savedRecord, request.challengeId());
         }
+    }
+
+    private void updateMemberAveragePace(Member member) {
+        List<RunRecord> recentRecords =
+                runRecordRepository.findTop30ByMember_MemberIdAndIsDeletedFalseOrderByStartAtDesc(member.getMemberId());
+
+        if (recentRecords.isEmpty()) {
+            member.setAveragePace(null);
+            return;
+        }
+
+        double averagePace = recentRecords.stream()
+                .map(RunRecord::getPace)
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0.0);
+
+        member.setAveragePace((int) Math.round(averagePace));
     }
 
     @Transactional
