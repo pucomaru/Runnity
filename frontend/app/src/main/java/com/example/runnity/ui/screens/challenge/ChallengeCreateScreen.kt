@@ -272,30 +272,25 @@ fun ChallengeCreateScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 세 번째 줄: 15km, 하프 (가운데 정렬)
+            // 세 번째 줄: 15km, 하프, 100m, 500m
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SmallPillButton(
-                    text = "15km",
-                    selected = selectedDistance == "15km",
-                    onClick = {
-                        selectedDistance = if (selectedDistance == "15km") null else "15km"
-                    },
-                    modifier = Modifier.width(80.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                SmallPillButton(
-                    text = "하프",
-                    selected = selectedDistance == "하프",
-                    onClick = {
-                        selectedDistance = if (selectedDistance == "하프") null else "하프"
-                    },
-                    modifier = Modifier.width(80.dp)
-                )
+                Spacer(modifier = Modifier.weight(0.5f))
+                listOf("15km", "하프", "100m", "500m").forEach { distance ->
+                    SmallPillButton(
+                        text = distance,
+                        selected = selectedDistance == distance,
+                        onClick = {
+                            selectedDistance = if (selectedDistance == distance) null else distance
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(0.5f))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -503,6 +498,8 @@ private fun convertDistanceToCode(distance: String): String {
         "10km" -> "TEN"
         "15km" -> "FIFTEEN"
         "하프" -> "HALF"
+        "100m" -> "HUNDRED_METERS"
+        "500m" -> "FIVE_HUNDRED_METERS"
         else -> "FIVE"
     }
 }

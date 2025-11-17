@@ -125,38 +125,29 @@ fun BroadcastFilterScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 세 번째 줄: 15km, 하프 (가운데 정렬)
+            // 세 번째 줄: 15km, 하프, 100m, 500m
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SmallPillButton(
-                    text = "15km",
-                    selected = selectedDistances.contains("15km"),
-                    onClick = {
-                        selectedDistances = if (selectedDistances.contains("15km")) {
-                            selectedDistances - "15km"
-                        } else {
-                            selectedDistances + "15km"
-                        }
-                    },
-                    modifier = Modifier.width(80.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                SmallPillButton(
-                    text = "하프",
-                    selected = selectedDistances.contains("하프"),
-                    onClick = {
-                        selectedDistances = if (selectedDistances.contains("하프")) {
-                            selectedDistances - "하프"
-                        } else {
-                            selectedDistances + "하프"
-                        }
-                    },
-                    modifier = Modifier.width(80.dp)
-                )
+                Spacer(modifier = Modifier.weight(0.5f))
+                listOf("15km", "하프", "100m", "500m").forEach { distance ->
+                    SmallPillButton(
+                        text = distance,
+                        selected = selectedDistances.contains(distance),
+                        onClick = {
+                            selectedDistances = if (selectedDistances.contains(distance)) {
+                                selectedDistances - distance
+                            } else {
+                                selectedDistances + distance
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(0.5f))
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -191,6 +182,8 @@ private fun convertDistanceToCode(distance: String): String {
         "10km" -> "TEN"
         "15km" -> "FIFTEEN"
         "하프" -> "HALF"
+        "100m" -> "HUNDRED_METERS"
+        "500m" -> "FIVE_HUNDRED_METERS"
         else -> "FIVE" // 기본값
     }
 }
@@ -209,6 +202,8 @@ private fun convertCodeToDistance(code: String): String? {
         "TEN" -> "10km"
         "FIFTEEN" -> "15km"
         "HALF" -> "하프"
+        "HUNDRED_METERS" -> "100m"
+        "FIVE_HUNDRED_METERS" -> "500m"
         else -> null
     }
 }

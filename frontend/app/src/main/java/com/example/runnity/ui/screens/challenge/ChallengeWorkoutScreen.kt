@@ -603,6 +603,8 @@ private fun mapDistanceEnumToKm(distance: String): Double = when (distance.upper
     "FIFTEEN" -> 15.0
     // HALF 마라톤: 21.0975km
     "HALF" -> 21.0975
+    "HUNDRED_METERS" -> 0.1
+    "FIVE_HUNDRED_METERS" -> 0.5
     else -> 0.0
 }
 
