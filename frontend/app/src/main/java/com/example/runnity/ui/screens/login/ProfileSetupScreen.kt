@@ -563,6 +563,7 @@ fun ProfileSetupScreen(
 
                     // API 호출
                     viewModel.submitAdditionalInfo(
+                        context = context,
                         nickname = nickname,
                         gender = selectedGender!!,
                         height = heightValue!!,

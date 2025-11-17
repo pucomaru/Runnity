@@ -1,14 +1,17 @@
 package com.example.runnity.ui.screens.mypage
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Divider
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +62,16 @@ fun ProfileSettingScreen(
 
     // 수정 모드 상태
     var isEditMode by remember { mutableStateOf(false) }
+
+    // 선택된 프로필 이미지 URI
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 이미지 선택 런처
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
 
     // 수정 가능한 필드들
     var nickname by remember { mutableStateOf(profile?.nickname ?: "") }
@@ -176,6 +189,7 @@ fun ProfileSettingScreen(
                                     nickname = profile?.nickname ?: ""
                                     height = profile?.height?.toString() ?: ""
                                     weight = profile?.weight?.toString() ?: ""
+                                    selectedImageUri = null
                                     viewModel.resetNicknameCheck()
                                     nicknameErrorMessage = ""
                                     heightErrorMessage = ""
@@ -186,69 +200,98 @@ fun ProfileSettingScreen(
                 }
             )
 
-            // 스크롤 가능한 컨텐츠
+            // 컨텐츠
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 16.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
                 // 프로필 이미지
-                ProfileImageSection(profileImageUrl = profile?.profileImageUrl)
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 기본 정보 섹션
-                SectionHeader(subtitle = "기본 정보")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (isEditMode) {
-                    // 수정 모드: 닉네임 입력 필드
-                    NicknameInputSection(
-                        nickname = nickname,
-                        onNicknameChange = { newValue ->
-                            if (nicknameCheckState != NicknameCheckState.Loading) {
-                                val filtered = newValue.filter { char ->
-                                    char.isLetterOrDigit() && char != ' '
-                                }
-                                if (filtered.length <= 10) {
-                                    nickname = filtered
-                                    viewModel.resetNicknameCheck()
-                                    nicknameErrorMessage = ""
-                                }
-                            }
-                        },
-                        nicknameCheckState = nicknameCheckState,
-                        nicknameErrorMessage = nicknameErrorMessage,
-                        onNicknameErrorChange = { nicknameErrorMessage = it },
-                        onCheckNickname = { viewModel.checkNickname(nickname) },
-                        originalNickname = profile?.nickname ?: ""
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                } else {
-                    // 읽기 모드: 닉네임 표시
-                    InfoItem(
-                        label = "닉네임",
-                        value = profile?.nickname ?: "닉네임 없음"
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // 이메일 (항상 읽기 전용)
-                InfoItem(
-                    label = "이메일",
-                    value = profile?.email ?: "이메일 없음"
+                ProfileImageSection(
+                    profileImageUrl = profile?.profileImageUrl,
+                    selectedImageUri = selectedImageUri,
+                    isEditMode = isEditMode,
+                    onImageClick = {
+                        imagePickerLauncher.launch("image/*")
+                    }
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.3f)
+                        .heightIn(min = 16.dp)
+                )
 
-                // 신체 정보 섹션
-                SectionHeader(subtitle = "신체 정보")
+                // 닉네임
+                if (isEditMode) {
+                    // 수정 모드: 헤더와 입력창이 겹치는 레이아웃
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            SectionHeader(subtitle = "닉네임")
+                            Spacer(modifier = Modifier.height(8.dp))
 
+                            // 중복확인 버튼 없는 입력 필드
+                            NicknameInputFieldWithoutButton(
+                                nickname = nickname,
+                                onNicknameChange = { newValue ->
+                                    if (nicknameCheckState != NicknameCheckState.Loading) {
+                                        val filtered = newValue.filter { char ->
+                                            char.isLetterOrDigit() && char != ' '
+                                        }
+                                        if (filtered.length <= 10) {
+                                            nickname = filtered
+                                            viewModel.resetNicknameCheck()
+                                            nicknameErrorMessage = ""
+                                        }
+                                    }
+                                },
+                                nicknameCheckState = nicknameCheckState,
+                                nicknameErrorMessage = nicknameErrorMessage
+                            )
+                        }
+
+                        // 중복확인 버튼을 오른쪽 상단에 절대 위치로 배치
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 12.dp, end = 16.dp)
+                        ) {
+                            SmallPillButton(
+                                text = if (nicknameCheckState == NicknameCheckState.Loading) "확인 중..." else "중복 확인",
+                                selected = nicknameCheckState == NicknameCheckState.Available,
+                                onClick = {
+                                    if (nicknameCheckState != NicknameCheckState.Loading) {
+                                        if (nickname.isBlank()) {
+                                            nicknameErrorMessage = "닉네임을 입력해주세요."
+                                        } else if (nickname.length < 2) {
+                                            nicknameErrorMessage = "닉네임은 2글자 이상 입력해주세요."
+                                        } else if (nickname.length > 10) {
+                                            nicknameErrorMessage = "10자 이내로 입력해주세요."
+                                        } else if (nickname != profile?.nickname) {
+                                            nicknameErrorMessage = ""
+                                            viewModel.checkNickname(nickname)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.width(80.dp)
+                            )
+                        }
+                    }
+                } else {
+                    // 읽기 모드: 일반 헤더와 필드
+                    SectionHeader(subtitle = "닉네임")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ReadOnlyField(value = profile?.nickname ?: "닉네임 없음")
+                }
+
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.2f)
+                        .heightIn(min = 12.dp)
+                )
+
+                // 키
+                SectionHeader(subtitle = "키")
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (isEditMode) {
@@ -270,9 +313,24 @@ fun ProfileSettingScreen(
                         },
                         heightErrorMessage = heightErrorMessage
                     )
+                } else {
+                    // 읽기 모드: 키 표시
+                    ReadOnlyField(
+                        value = if (profile?.height != null) "${profile.height} cm" else "정보 없음"
+                    )
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.2f)
+                        .heightIn(min = 12.dp)
+                )
 
+                // 몸무게
+                SectionHeader(subtitle = "몸무게")
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isEditMode) {
                     // 수정 모드: 몸무게 입력 필드
                     WeightInputSection(
                         weight = weight,
@@ -292,38 +350,33 @@ fun ProfileSettingScreen(
                         weightErrorMessage = weightErrorMessage
                     )
                 } else {
-                    // 읽기 모드: 키/몸무게 표시
-                    InfoItem(
-                        label = "키",
-                        value = if (profile?.height != null) "${profile.height} cm" else "정보 없음"
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    InfoItem(
-                        label = "몸무게",
+                    // 읽기 모드: 몸무게 표시
+                    ReadOnlyField(
                         value = if (profile?.weight != null) "${profile.weight} kg" else "정보 없음"
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 추가 정보 섹션
-                SectionHeader(subtitle = "추가 정보")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 생년월일 (읽기 전용)
-                InfoItem(
-                    label = "생년월일",
-                    value = profile?.birth ?: "정보 없음"
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.2f)
+                        .heightIn(min = 12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // 생년월일
+                SectionHeader(subtitle = "생년월일")
+                Spacer(modifier = Modifier.height(8.dp))
+                ReadOnlyField(value = profile?.birth ?: "정보 없음")
 
-                // 성별 (읽기 전용)
-                InfoItem(
-                    label = "성별",
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.2f)
+                        .heightIn(min = 12.dp)
+                )
+
+                // 성별
+                SectionHeader(subtitle = "성별")
+                Spacer(modifier = Modifier.height(8.dp))
+                ReadOnlyField(
                     value = when (profile?.gender) {
                         Gender.MALE -> "남성"
                         Gender.FEMALE -> "여성"
@@ -331,30 +384,23 @@ fun ProfileSettingScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 로그아웃 버튼
-                PrimaryButton(
-                    text = if (logoutState == LogoutState.Loading) "로그아웃 중..." else "로그아웃",
-                    onClick = { viewModel.logout() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ColorPalette.Common.stopAccent,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                Spacer(
+                    modifier = Modifier
+                        .weight(0.5f)
+                        .heightIn(min = 16.dp)
                 )
-
-                Spacer(modifier = Modifier.height(if (isEditMode) 100.dp else 16.dp))
             }
         }
 
-        // 하단 고정 저장 버튼 (수정 모드일 때만 표시)
-        if (isEditMode) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .background(Color.White)
-            ) {
+        // 하단 고정 버튼
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.White)
+        ) {
+            if (isEditMode) {
+                // 수정 모드: 저장 버튼
                 PrimaryButton(
                     text = "저장",
                     onClick = {
@@ -392,13 +438,24 @@ fun ProfileSettingScreen(
 
                         if (!hasError) {
                             viewModel.updateProfile(
+                                context = context,
                                 nickname = nickname,
                                 height = heightValue!!,
                                 weight = weightValue!!,
-                                profileImageUri = null
+                                profileImageUri = selectedImageUri
                             )
                         }
                     }
+                )
+            } else {
+                // 읽기 모드: 로그아웃 버튼
+                PrimaryButton(
+                    text = if (logoutState == LogoutState.Loading) "로그아웃 중..." else "로그아웃",
+                    onClick = { viewModel.logout() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorPalette.Common.stopAccent,
+                        contentColor = Color.White
+                    )
                 )
             }
         }
@@ -409,7 +466,12 @@ fun ProfileSettingScreen(
  * 프로필 이미지 섹션
  */
 @Composable
-private fun ProfileImageSection(profileImageUrl: String?) {
+private fun ProfileImageSection(
+    profileImageUrl: String?,
+    selectedImageUri: Uri?,
+    isEditMode: Boolean,
+    onImageClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,65 +479,69 @@ private fun ProfileImageSection(profileImageUrl: String?) {
         contentAlignment = Alignment.Center
     ) {
         Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.size(160.dp)
         ) {
-            Image(
-                painter = if (profileImageUrl != null && profileImageUrl.isNotBlank()) {
-                    rememberAsyncImagePainter(profileImageUrl)
-                } else {
-                    painterResource(id = R.drawable.profile)
-                },
-                contentDescription = "프로필",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            // 프로필 이미지
+            Box(
+                modifier = Modifier
+                    .size(160.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = when {
+                        // 1순위: 선택된 이미지 URI
+                        selectedImageUri != null -> rememberAsyncImagePainter(selectedImageUri)
+                        // 2순위: 기존 프로필 URL
+                        profileImageUrl != null && profileImageUrl.isNotBlank() -> rememberAsyncImagePainter(profileImageUrl)
+                        // 3순위: 기본 이미지
+                        else -> painterResource(id = R.drawable.profile)
+                    },
+                    contentDescription = "프로필",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            // 수정 모드일 때만 카메라 아이콘 표시
+            if (isEditMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(ColorPalette.Light.primary)
+                        .clickable { onImageClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CameraAlt,
+                        contentDescription = "이미지 업로드",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * 닉네임 입력 섹션 (수정 모드)
+ * 닉네임 입력 필드 (중복확인 버튼 없이)
  */
 @Composable
-private fun NicknameInputSection(
+private fun NicknameInputFieldWithoutButton(
     nickname: String,
     onNicknameChange: (String) -> Unit,
     nicknameCheckState: NicknameCheckState,
-    nicknameErrorMessage: String,
-    onNicknameErrorChange: (String) -> Unit,
-    onCheckNickname: () -> Unit,
-    originalNickname: String
+    nicknameErrorMessage: String
 ) {
     Column {
         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
             CustomTextField(
                 value = nickname,
                 onValueChange = onNicknameChange,
-                placeholder = "2-10자, 한글/영문/숫자만 가능",
-                trailingContent = {
-                    SmallPillButton(
-                        text = if (nicknameCheckState == NicknameCheckState.Loading) "확인 중..." else "중복 확인",
-                        selected = nicknameCheckState == NicknameCheckState.Available,
-                        onClick = {
-                            if (nicknameCheckState != NicknameCheckState.Loading) {
-                                if (nickname.isBlank()) {
-                                    onNicknameErrorChange("닉네임을 입력해주세요.")
-                                } else if (nickname.length < 2) {
-                                    onNicknameErrorChange("닉네임은 2글자 이상 입력해주세요.")
-                                } else if (nickname.length > 10) {
-                                    onNicknameErrorChange("10자 이내로 입력해주세요.")
-                                } else if (nickname != originalNickname) {
-                                    onNicknameErrorChange("")
-                                    onCheckNickname()
-                                }
-                            }
-                        },
-                        modifier = Modifier.width(80.dp)
-                    )
-                }
+                placeholder = "2-10자, 한글/영문/숫자만 가능"
             )
         }
 
@@ -588,28 +654,37 @@ private fun WeightInputSection(
 }
 
 /**
- * 정보 아이템 (읽기 전용)
+ * 읽기 전용 필드 (값만 표시)
+ * - 수정 모드의 입력 필드와 동일한 높이를 유지
  */
 @Composable
-private fun InfoItem(
-    label: String,
-    value: String
-) {
+private fun ReadOnlyField(value: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = label,
-            style = Typography.Caption,
-            color = ColorPalette.Light.secondary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        // 값 표시
         Text(
             text = value,
             style = Typography.Body,
             color = ColorPalette.Light.primary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 밑줄
+        Divider(
+            modifier = Modifier.fillMaxWidth(),
+            color = ColorPalette.Light.component.copy(alpha = 0.3f),
+            thickness = 1.dp
+        )
+
+        // 메시지 영역 (고정 높이 - 입력 섹션과 동일)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
         )
     }
 }
