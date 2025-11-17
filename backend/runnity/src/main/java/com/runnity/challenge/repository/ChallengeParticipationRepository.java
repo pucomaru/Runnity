@@ -56,8 +56,10 @@ public interface ChallengeParticipationRepository extends JpaRepository<Challeng
      * 랭킹 순으로 정렬
      */
     @Query("""
-        SELECT cp
+        SELECT DISTINCT cp
         FROM ChallengeParticipation cp
+        LEFT JOIN FETCH cp.member
+        LEFT JOIN FETCH cp.runRecord
         WHERE cp.challenge.challengeId = :challengeId
         AND cp.isDeleted = false
         AND cp.status IN :activeStatuses
