@@ -1,12 +1,15 @@
 package com.runnity.stream.socket.util;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.*;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.Set;
 
 //Redis의 broadcast:* 키 관리 전담
 
@@ -14,7 +17,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class BroadcastRedisUtil {
 
+    @Qualifier("stringRedisTemplateBean")
     private final StringRedisTemplate stringRedisTemplate;  // Hash용
+    @Qualifier("stringRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate; // Set용
 
     // redis에서 활성화된 방송리스트 담는 Set
