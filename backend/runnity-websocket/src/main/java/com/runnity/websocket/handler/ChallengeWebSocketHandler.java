@@ -264,7 +264,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
                     challengeId, userId, distance, pace, ranking);
 
             // 완주 체크 (목표 거리 달성 시)
-            checkAndHandleFinish(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking);
+            checkAndHandleFinish(session, challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking);
 
         } catch (Exception e) {
             log.error("RECORD 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
@@ -291,6 +291,9 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             // 퇴장 처리
             handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
                     LeaveReason.QUIT.getValue());
+
+            // 이미 처리되었음을 표시 (중복 처리 방지)
+            session.getAttributes().put("leaveReason", LeaveReason.QUIT.getValue());
 
             // 연결 종료
             session.close(CloseStatus.NORMAL);
@@ -365,6 +368,9 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
                     LeaveReason.KICKED.getValue());
 
+            // 이미 처리되었음을 표시 (중복 처리 방지)
+            session.getAttributes().put("leaveReason", LeaveReason.KICKED.getValue());
+
             // 연결 종료
             session.close(CloseStatus.POLICY_VIOLATION);
 
@@ -383,7 +389,7 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
     /**
      * 완주 체크 및 처리
      */
-    private void checkAndHandleFinish(Long challengeId, Long userId, String nickname, String profileImage,
+    private void checkAndHandleFinish(WebSocketSession session, Long challengeId, Long userId, String nickname, String profileImage,
                                       Double distance, Integer pace, Integer ranking) {
         try {
             // 목표 거리 조회 (Redis 또는 외부 API)
@@ -405,6 +411,9 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
 
                 // Redis Pub/Sub으로 퇴장 이벤트 발행 (reason: FINISH)
                 redisPubSubService.publishUserLeft(challengeId, userId, LeaveReason.FINISH.getValue());
+
+                // 이미 처리되었음을 표시 (중복 처리 방지)
+                session.getAttributes().put("leaveReason", LeaveReason.FINISH.getValue());
 
                 // 세션 제거 (FINISH는 랭킹 유지)
                 sessionManager.removeSession(challengeId, userId, LeaveReason.FINISH.getValue());
@@ -468,6 +477,14 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
             String nickname = (String) session.getAttributes().get("nickname");
             String profileImage = (String) session.getAttributes().get("profileImage");
 
+            // 이미 처리된 경우 중복 처리 방지 (QUIT, TIMEOUT 등에서 이미 처리됨)
+            String alreadyProcessedReason = (String) session.getAttributes().get("leaveReason");
+            if (alreadyProcessedReason != null) {
+                log.debug("이미 처리된 퇴장: challengeId={}, userId={}, reason={}, sessionId={}", 
+                        challengeId, userId, alreadyProcessedReason, session.getId());
+                return; // 중복 처리 방지
+            }
+
             // 퇴장 사유 결정
             String reason = determineLeaveReason(status);
 
@@ -519,8 +536,9 @@ public class ChallengeWebSocketHandler extends TextWebSocketHandler {
 
         // CloseStatus 코드에 따라 사유 결정
         if (status.equals(CloseStatus.NORMAL)) {
-            // 정상 종료는 QUIT로 간주 (이미 QUIT 메시지로 처리됨)
-            return LeaveReason.QUIT.getValue();
+            // 정상 종료는 DISCONNECTED로 처리
+            // (QUIT는 이미 handleQuit에서 처리되었고, 플래그로 중복 방지됨)
+            return LeaveReason.DISCONNECTED.getValue();
         } else if (status.equals(CloseStatus.SERVER_ERROR) || status.equals(CloseStatus.POLICY_VIOLATION)) {
             return LeaveReason.ERROR.getValue();
         } else {

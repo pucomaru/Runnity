@@ -179,6 +179,8 @@ public class TimeoutCheckService {
             // 6. 세션이 있으면 연결 종료
             if (session != null && session.isOpen()) {
                 try {
+                    // 이미 처리되었음을 표시 (중복 처리 방지)
+                    session.getAttributes().put("leaveReason", LeaveReason.TIMEOUT.getValue());
                     session.close();
                 } catch (Exception e) {
                     log.error("세션 종료 실패: challengeId={}, userId={}", challengeId, userId, e);
