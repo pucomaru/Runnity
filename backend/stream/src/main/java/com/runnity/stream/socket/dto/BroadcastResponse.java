@@ -14,5 +14,5 @@ public class BroadcastResponse {
     private Integer viewerCount;       // 현재 시청자 수
     private Integer participantCount;  // 참가자 수
     private String createdAt;          // 세션 생성 시각
-
+    private String distance;           // 거리
 }

@@ -27,8 +27,12 @@ public class BroadcastController {
 
     // 현재 방송 중인 챌린지 목록 조회
     @GetMapping("/active")
-    public ResponseEntity<List<BroadcastResponse>> getActiveBroadcasts() {
-        return ResponseEntity.ok(broadcastSessionService.getActiveBroadcasts());
+    public ResponseEntity<List<BroadcastResponse>> getActiveBroadcasts(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "distance", required = false) List<String> distanceCodes,
+            @RequestParam(value = "sort", required = false, defaultValue = "POPULAR") String sort
+    ) {
+        return ResponseEntity.ok(broadcastSessionService.getActiveBroadcasts(keyword, distanceCodes, sort));
     }
 
     @PostMapping("/{challengeId}")

@@ -11,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -96,8 +98,8 @@ public class BroadcastSessionService {
     }
 
     // 챌린지 시작 시 방송 세션 생성
-    public void createBroadcastSession (Long challengeId, String title,int participantCount){
-        redisUtil.createSession(challengeId, title, participantCount);
+    public void createBroadcastSession (Long challengeId, String title,int participantCount, String distanceCode){
+        redisUtil.createSession(challengeId, title, participantCount, distanceCode);
     }
 
     // 방송 상태 변경(WAITING, LIVE, ENDED)
@@ -121,7 +123,11 @@ public class BroadcastSessionService {
     }
 
     // 현재 활성 방송 목록 조회
-    public List<BroadcastResponse> getActiveBroadcasts () {
+    public List<BroadcastResponse> getActiveBroadcasts (
+            String keyword,
+            List<String> distanceCodes,
+            String sort
+    ) {
         List<Map<String, String>> rawList = redisUtil.getActiveSessions();
         List<BroadcastResponse> result = new ArrayList<>();
 
@@ -132,13 +138,77 @@ public class BroadcastSessionService {
                 Integer viewerCount = Integer.parseInt(String.valueOf(map.get("viewerCount")));
                 Integer participantCount = Integer.parseInt(String.valueOf(map.get("participantCount")));
                 String createdAt = String.valueOf(map.get("createdAt"));
+                String distance = map.get("distance");
+                String distanceCode = normalizeDistance(distance);
 
-                result.add(new BroadcastResponse(challengeId, title, viewerCount, participantCount, createdAt));
+                result.add(new BroadcastResponse(challengeId, title, viewerCount, participantCount, createdAt, distanceCode));
             } catch (Exception e) {
                 log.error("Failed to parse broadcast info: {}", e.getMessage());
             }
         }
 
+        // 1) 키워드(제목) 필터
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.toLowerCase();
+            result = result.stream()
+                    .filter(b -> b.getTitle() != null && b.getTitle().toLowerCase().contains(kw))
+                    .toList();
+        }
+
+        // 2) 거리 필터(Optional)
+        if (distanceCodes != null && !distanceCodes.isEmpty()) {
+            result = result.stream()
+                    .filter(b -> b.getDistance() != null && distanceCodes.contains(b.getDistance()))
+                    .toList();
+        }
+
+        // 3) 정렬
+        if ("POPULAR".equalsIgnoreCase(sort)) {
+            result = result.stream()
+                    .sorted((a, b) -> Integer.compare(b.getViewerCount(), a.getViewerCount()))
+                    .toList();
+        } else { // LATEST(default): createdAt 역순
+            result = result.stream()
+                    .sorted((a, b) -> {
+                        try {
+                            LocalDateTime timeA = LocalDateTime.parse(a.getCreatedAt(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                            LocalDateTime timeB = LocalDateTime.parse(b.getCreatedAt(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                            return timeA.compareTo(timeB);
+                        } catch (Exception e) {
+                            log.warn("날짜 파싱 오류: a={}, b={}", a.getCreatedAt(), b.getCreatedAt(), e);
+                            // 파싱 실패 시 순서를 바꾸지 않음
+                            return 0;
+                        }
+                    })
+                    .toList();
+        }
+
         return result;
+    }
+
+    private String normalizeDistance(String raw) {
+        if (raw == null) return "UNKNOWN";
+        // 이미 코드로 저장된 경우 그대로 통과
+        switch (raw) {
+            case "ONE": case "TWO": case "THREE": case "FOUR": case "FIVE":
+            case "SIX": case "SEVEN": case "EIGHT": case "NINE": case "TEN":
+            case "FIFTEEN": case "HALF":
+                return raw;
+        }
+        // 숫자 문자열 → 코드 매핑
+        return switch (raw) {
+            case "1" -> "ONE";
+            case "2" -> "TWO";
+            case "3" -> "THREE";
+            case "4" -> "FOUR";
+            case "5" -> "FIVE";
+            case "6" -> "SIX";
+            case "7" -> "SEVEN";
+            case "8" -> "EIGHT";
+            case "9" -> "NINE";
+            case "10" -> "TEN";
+            case "15" -> "FIFTEEN";
+            default -> "HALF";
+        };
     }
 }
