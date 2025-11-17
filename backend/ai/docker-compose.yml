@@ -8,8 +8,7 @@ services:
       - .env.ai              # AI 서버용 환경변수 파일 (서버에만 있음)
     environment:
       # docker-compose env_file에 있는 값들을 override 가능
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-      GMS_API_KEY: ${GMS_API_KEY}
+
       GOOGLE_APPLICATION_CREDENTIALS: "/app/google-tts-key.json"
     volumes:
       # 서버 로컬에 있는 키 파일을 컨테이너로 마운트
