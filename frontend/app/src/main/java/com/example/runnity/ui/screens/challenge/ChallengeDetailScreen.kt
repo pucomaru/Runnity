@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.challenge
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -7,13 +8,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,9 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
+import com.example.runnity.R
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.ActionHeader
@@ -612,12 +614,15 @@ fun ParticipantCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // TODO: 실제 이미지 로딩 (Coil 라이브러리 사용)
-                Icon(
-                    imageVector = Icons.Filled.Person,
+                Image(
+                    painter = when {
+                        participant.avatarUrl != null && participant.avatarUrl.isNotBlank() ->
+                            rememberAsyncImagePainter(participant.avatarUrl)
+                        else -> painterResource(id = R.drawable.profile)
+                    },
                     contentDescription = "프로필",
-                    tint = if (isCurrentUser) ColorPalette.Common.accent else ColorPalette.Light.component,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             }
 
