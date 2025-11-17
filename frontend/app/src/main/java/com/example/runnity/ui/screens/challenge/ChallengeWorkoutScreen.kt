@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import timber.log.Timber
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.NavController
@@ -64,10 +65,10 @@ import com.kakao.vectormap.label.LabelStyles
 @Composable
 fun ChallengeWorkoutScreen(
     challengeId: String,
-    navController: NavController
+    navController: NavController,
+    socketViewModel: ChallengeSocketViewModel
 ) {
     val sessionViewModel: WorkoutSessionViewModel = viewModel()
-    val socketViewModel: ChallengeSocketViewModel = viewModel()
     val challengeViewModel: ChallengeViewModel = viewModel()
     val metrics by sessionViewModel.metrics.collectAsState()
     val currentPace by sessionViewModel.currentPaceSecPerKm.collectAsState()
@@ -86,10 +87,11 @@ fun ChallengeWorkoutScreen(
 
     val challengeIdLong = challengeId.toLongOrNull() ?: 0L
 
-    // 챌린지 상세 정보 로드 (목표 거리 확인용)
+    // 챌린지 상세 정보 로드 (목표 거리 확인용) 및 실시간 참가자/랭킹 관찰 시작
     LaunchedEffect(challengeIdLong) {
         if (challengeIdLong > 0) {
             challengeViewModel.loadChallengeDetail(challengeIdLong)
+            socketViewModel.observeSession(challengeIdLong)
         }
     }
 
@@ -493,6 +495,14 @@ fun ChallengeWorkoutScreen(
 
                 val rankingRows = remember(participantsState) {
                     selectRankingRows(participantsState)
+                }
+
+                LaunchedEffect(participantsState) {
+                    timber.log.Timber.d(
+                        "[ChallengeWorkout] participantsState size=%d, rankingRows size=%d",
+                        participantsState.size,
+                        rankingRows.size
+                    )
                 }
 
                 Column(

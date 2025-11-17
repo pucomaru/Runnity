@@ -35,7 +35,7 @@ fun ChallengeWaitingScreen(
     challengeId: String,
     navController: NavController,
     viewModel: ChallengeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
-    socketViewModel: ChallengeSocketViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    socketViewModel: ChallengeSocketViewModel
 ) {
     val challengeIdLong = challengeId.toLongOrNull() ?: 0L
 

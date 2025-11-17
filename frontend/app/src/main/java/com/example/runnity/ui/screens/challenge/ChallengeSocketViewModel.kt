@@ -120,7 +120,20 @@ class ChallengeSocketViewModel : ViewModel() {
                                 val current = _participants.value
                                 // 이미 존재하지 않을 때만 추가
                                 if (current.none { it.id == newParticipant.id }) {
-                                    _participants.value = applyRanking(current + newParticipant)
+                                    val next = applyRanking(current + newParticipant)
+                                    Timber.d(
+                                        "[ChallengeSocket] USER_ENTERED userId=%s, nickname=%s, size(before)=%d, size(after)=%d",
+                                        newParticipant.id,
+                                        newParticipant.nickname,
+                                        current.size,
+                                        next.size
+                                    )
+                                    _participants.value = next
+                                } else {
+                                    Timber.d(
+                                        "[ChallengeSocket] USER_ENTERED ignored because participant already exists, userId=%s",
+                                        newParticipant.id
+                                    )
                                 }
                             }
                         }
@@ -148,7 +161,16 @@ class ChallengeSocketViewModel : ViewModel() {
                                     )
                                 } else p
                             }
-                            _participants.value = applyRanking(updated)
+                            val next = applyRanking(updated)
+                            Timber.d(
+                                "[ChallengeSocket] PARTICIPANT_UPDATE userId=%d, distance=%.3f, pace=%.2f, size(before)=%d, size(after)=%d",
+                                update.userId,
+                                update.distance,
+                                update.pace,
+                                current.size,
+                                next.size
+                            )
+                            _participants.value = next
                         }
                         "PING" -> {
                             // 서버에서 보낸 PING에 대한 PONG 응답
