@@ -1,0 +1,114 @@
+pipeline {
+  agent any
+
+  environment {
+    DOCKERHUB_USERNAME = 'daum0604'
+    IMAGE = "docker.io/${DOCKERHUB_USERNAME}/runnity-llm"
+
+    // backend/ai/ 아래에 있는 docker-compose.yml 사용
+    COMPOSE_DIR = 'backend/ai'
+    COMPOSE_FILE = 'docker-compose.yml'
+
+    // 원격 AI 서버에서 사용할 디렉토리
+    DEPLOY_DIR = 'llm-app'
+  }
+
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.TAG = sh(returnStdout: true, script: "git rev-parse --short=7 HEAD").trim()
+          if (!env.TAG) { env.TAG = 'manual' }
+          echo "Using TAG: ${env.TAG}"
+        }
+      }
+    }
+
+    stage('Docker Build & Push') {
+      steps {
+        dir("${COMPOSE_DIR}") {
+          sh "pwd && ls -al"
+          withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+            sh """
+              set -euxo pipefail
+              echo "\$DOCKERHUB_TOKEN" | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+
+              docker build -t ${IMAGE}:${env.TAG} -t ${IMAGE}:latest -f Dockerfile .
+
+              docker push ${IMAGE}:${env.TAG}
+              docker push ${IMAGE}:latest
+              docker logout || true
+            """
+          }
+        }
+      }
+    }
+
+    stage('Bundle compose') {
+      steps {
+        dir("${COMPOSE_DIR}") {
+          sh """
+            set -euxo pipefail
+            mkdir -p deploy_bundle
+
+            # docker-compose.yml 번들링
+            cp -f ${COMPOSE_FILE} deploy_bundle/docker-compose.yml
+
+            # .env.ai는 민감해서 Jenkins에서 복사 안 함 (서버에만 존재)
+            # google-tts-key.json 도 마찬가지로 서버에만 있어야 함
+
+            tar czf deploy_bundle.tgz -C deploy_bundle .
+            ls -al deploy_bundle
+          """
+        }
+
+        archiveArtifacts artifacts: "${COMPOSE_DIR}/deploy_bundle.tgz", fingerprint: true, onlyIfSuccessful: true
+      }
+    }
+
+    stage('Deploy to AI server') {
+      steps {
+        sshagent (credentials: ['ssh_deploy_key']) {
+          withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+            sh """
+              set -euxo pipefail
+              test -f ${COMPOSE_DIR}/deploy_bundle.tgz
+
+              # 🔁 AI 서버 IP 여기에 넣기
+              AI_SERVER_IP="YOUR_AI_SERVER_IP"
+
+              ssh -o StrictHostKeyChecking=no ubuntu@${AI_SERVER_IP} 'set -eux; mkdir -p ~/${DEPLOY_DIR}'
+              scp -o StrictHostKeyChecking=no ${COMPOSE_DIR}/deploy_bundle.tgz ubuntu@${AI_SERVER_IP}:~/${DEPLOY_DIR}/
+
+              ssh -o StrictHostKeyChecking=no ubuntu@${AI_SERVER_IP} "
+                set -euxo pipefail
+                cd ~/${DEPLOY_DIR}
+                ls -al
+                tar xzf deploy_bundle.tgz
+                test -f docker-compose.yml
+
+                # .env.ai, google-tts-key.json 은 미리 이 디렉토리에 있다고 가정
+                ls -al .env.ai google-tts-key.json
+
+                echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+
+                TAG=${env.TAG} docker compose pull
+                TAG=${env.TAG} docker compose up -d
+
+                docker logout || true
+                docker image prune -f || true
+                docker compose ps
+              "
+            """
+          }
+        }
+      }
+    }
+  }
+}
