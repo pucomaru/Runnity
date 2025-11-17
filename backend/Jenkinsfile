@@ -62,36 +62,44 @@ pipeline {
         archiveArtifacts artifacts: 'backend/ai/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
-
     stage('Deploy to AI server') {
-      steps {
-        sshagent (credentials: ['ssh_deploy_key']) {
-          withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
-            sh """
-              set -euxo pipefail
-              test -f backend/ai/deploy_bundle.tgz
+        steps {
+            sshagent (credentials: ['ssh_deploy_key']) {
+            withCredentials([string(credentialsId: 'dockerhub_token', variable: 'DOCKERHUB_TOKEN')]) {
+                sh """
+                set -euxo pipefail
 
-              # 💡 백엔드와 동일 패턴: IP만 AI 서버로 변경
-              ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 'set -eux; mkdir -p ~/llm-app'
-              scp -o StrictHostKeyChecking=no backend/ai/deploy_bundle.tgz ubuntu@52.79.235.2:~/llm-app/
+                # 번들 파일 존재 확인
+                test -f backend/ai/deploy_bundle.tgz
 
-              ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 "set -euxo pipefail; \
-                cd ~/llm-app; \
-                ls -al; \
-                tar xzf deploy_bundle.tgz; \
-                test -f docker-compose.yml; \
-                # .env.ai / google-tts-key.json 은 서버에 미리 있어야 함
-                ls -al .env.ai google-tts-key.json || echo '⚠️  .env.ai 또는 google-tts-key.json 이 없습니다.'; \
-                echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; \
-                TAG=${env.TAG} docker-compose pull; \
-                TAG=${env.TAG} docker-compose up -d; \
-                docker logout || true; \
-                docker image prune -f || true; \
-                docker compose ps"
-            """
-          }
+                # 1) 서버에 디렉토리 생성
+                ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 'set -eux; mkdir -p ~/llm-app'
+
+                # 2) 번들 전송
+                scp -o StrictHostKeyChecking=no backend/ai/deploy_bundle.tgz ubuntu@52.79.235.2:~/llm-app/
+
+                # 3) 원격 서버에서 docker-compose 실행
+                ssh -o StrictHostKeyChecking=no ubuntu@52.79.235.2 "set -euxo pipefail; \
+                    cd ~/llm-app; \
+                    ls -al; \
+                    tar xzf deploy_bundle.tgz; \
+                    test -f docker-compose.yml; \
+                    # env & key 파일 체크
+                    ls -al .env.ai google-tts-key.json || echo '⚠️  .env.ai 또는 google-tts-key.json 이 없습니다.'; \
+                    # .env.ai → 환경변수로 export (compose 변수 치환용)
+                    set -a; [ -f .env.ai ] && . .env.ai; set +a; \
+                    echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; \
+                    TAG=${env.TAG} docker-compose pull; \
+                    TAG=${env.TAG} docker-compose up -d; \
+                    docker logout || true; \
+                    docker image prune -f || true; \
+                    docker-compose ps \
+                "
+                """
+            }
+            }
         }
-      }
     }
+
   }
 }
