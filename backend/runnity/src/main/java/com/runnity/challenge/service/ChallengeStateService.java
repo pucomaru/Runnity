@@ -34,12 +34,20 @@ public class ChallengeStateService {
      * 챌린지 상태를 RECRUITING → READY로 변경하고 알림 Outbox 생성
      * 챌린지 시작 5분 전에 호출되며, Redis에 meta 정보를 저장합니다.
      * 
+     * 중복 실행 방지: 이미 READY 이상 상태이면 무시
+     * 
      * @param challengeId 챌린지 ID
      */
     @Transactional
     public void handleReady(Long challengeId) {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+
+        // 중복 실행 방지: 이미 READY 이상 상태이면 무시
+        if (challenge.getStatus() != ChallengeStatus.RECRUITING) {
+            log.debug("이미 처리된 챌린지: challengeId={}, status={}", challengeId, challenge.getStatus());
+            return;
+        }
 
         challenge.ready();
 
@@ -104,12 +112,20 @@ public class ChallengeStateService {
      * 챌린지 상태를 READY → RUNNING으로 변경
      * 참여하지 않은 WAITING 상태 사용자를 NOT_STARTED로 변경
      * 
+     * 중복 실행 방지: 이미 RUNNING 이상 상태이면 무시
+     * 
      * @param challengeId 챌린지 ID
      */
     @Transactional
     public void handleRunning(Long challengeId) {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
+
+        // 중복 실행 방지: 이미 RUNNING 이상 상태이면 무시
+        if (challenge.getStatus() != ChallengeStatus.READY) {
+            log.debug("이미 처리된 챌린지: challengeId={}, status={}", challengeId, challenge.getStatus());
+            return;
+        }
 
         challenge.run();
 

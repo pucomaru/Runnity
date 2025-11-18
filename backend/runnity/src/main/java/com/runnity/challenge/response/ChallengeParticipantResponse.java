@@ -22,7 +22,10 @@ public record ChallengeParticipantResponse(
         String status,
 
         @Schema(description = "평균 페이스 (초 단위)", example = "305")
-        Integer averagePaceSec
+        Integer averagePaceSec,
+
+        @Schema(description = "해당 챌린지에서 기록한 페이스 (초 단위, 챌린지 완주 시에만 존재)", example = "310")
+        Integer paceSec
 ) {
         public static ChallengeParticipantResponse fromHost(Member member) {
                 return new ChallengeParticipantResponse(
@@ -31,19 +34,24 @@ public record ChallengeParticipantResponse(
                         member.getProfileImage(),
                         null,
                         "WAITING",
-                        member.getAveragePace()
+                        member.getAveragePace(),
+                        null
                 );
         }
 
         public static ChallengeParticipantResponse from(ChallengeParticipation participation) {
                 Member member = participation.getMember();
+                Integer paceSec = participation.getRunRecord() != null
+                        ? participation.getRunRecord().getPace()
+                        : null;
                 return new ChallengeParticipantResponse(
                         member.getMemberId(),
                         member.getNickname(),
                         member.getProfileImage(),
                         participation.getRanking(),
                         participation.getStatus().code(),
-                        member.getAveragePace()
+                        member.getAveragePace(),
+                        paceSec
                 );
         }
 }

@@ -39,7 +39,7 @@ public class HistoryService {
     private final RunLapRepository runLapRepository;
     private final MemberRepository memberRepository;
 
-    private static final int ENTERABLE_MINUTES_BEFORE_START = 5;
+    private static final int ENTERABLE_SECONDS_BEFORE_START = 300; // 5분
 
     public MyChallengesResponse getMyChallenges(Long memberId) {
 
@@ -104,8 +104,8 @@ public class HistoryService {
     }
 
     private boolean isEnterable(Challenge challenge) {
-        long minutes = ChronoUnit.MINUTES.between(LocalDateTime.now(), challenge.getStartAt());
-        return minutes <= ENTERABLE_MINUTES_BEFORE_START;
+        long seconds = ChronoUnit.SECONDS.between(LocalDateTime.now(), challenge.getStartAt());
+        return seconds <= ENTERABLE_SECONDS_BEFORE_START;
     }
 
     public RunRecordDetailResponse getRunRecordDetail(Long memberId, Long runRecordId) {
@@ -121,7 +121,15 @@ public class HistoryService {
                 .map(RunLapResponse::from)
                 .toList();
 
-        return RunRecordDetailResponse.from(record, laps);
+        // challengeId 조회 (챌린지 달리기인 경우에만 존재)
+        Long challengeId = null;
+        if (record.getRunType() == RunRecordType.CHALLENGE) {
+            challengeId = repository.findByRunRecordId(runRecordId)
+                    .map(cp -> cp.getChallenge().getChallengeId())
+                    .orElse(null);
+        }
+
+        return RunRecordDetailResponse.from(record, laps, challengeId);
     }
 
     public RunRecordMonthlyResponse getRunRecordsByMonth(Long memberId, int year, int month) {
@@ -180,6 +188,8 @@ public class HistoryService {
 
         runLapRepository.saveAll(laps);
 
+        updateMemberAveragePace(member);
+
         if (request.runType() == RunRecordType.CHALLENGE) {
             if (request.challengeId() == null) {
                 throw new GlobalException(ErrorStatus.CHALLENGE_ID_REQUIRED);
@@ -187,6 +197,24 @@ public class HistoryService {
 
             handleChallengeFinish(member, savedRecord, request.challengeId());
         }
+    }
+
+    private void updateMemberAveragePace(Member member) {
+        List<RunRecord> recentRecords =
+                runRecordRepository.findTop30ByMember_MemberIdAndIsDeletedFalseOrderByStartAtDesc(member.getMemberId());
+
+        if (recentRecords.isEmpty()) {
+            member.setAveragePace(null);
+            return;
+        }
+
+        double averagePace = recentRecords.stream()
+                .map(RunRecord::getPace)
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0.0);
+
+        member.setAveragePace((int) Math.round(averagePace));
     }
 
     @Transactional
