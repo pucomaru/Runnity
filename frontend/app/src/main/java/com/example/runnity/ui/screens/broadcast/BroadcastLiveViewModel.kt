@@ -171,7 +171,8 @@ class BroadcastLiveViewModel(
                     is ApiResponse.Success -> {
                         val joinData = response.data
                         Timber.d("중계방 입장 성공: wsUrl=${joinData.wsUrl}, topic=${joinData.topic}")
-                        connectStomp(joinData.wsUrl, joinData.topic, challengeId)
+//                        connectStomp(joinData.wsUrl, joinData.topic, challengeId)
+                        connectStomp("wss://runnity.p-e.kr/ws", joinData.topic, challengeId)
                     }
                     is ApiResponse.Error -> {
                         _uiState.update { it.copy(isLoading = false, errorMessage = "중계방 입장에 실패했습니다: ${response.message}") }
