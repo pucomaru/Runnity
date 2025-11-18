@@ -39,7 +39,7 @@ public class HistoryService {
     private final RunLapRepository runLapRepository;
     private final MemberRepository memberRepository;
 
-    private static final int ENTERABLE_MINUTES_BEFORE_START = 5;
+    private static final int ENTERABLE_SECONDS_BEFORE_START = 300; // 5분
 
     public MyChallengesResponse getMyChallenges(Long memberId) {
 
@@ -104,8 +104,8 @@ public class HistoryService {
     }
 
     private boolean isEnterable(Challenge challenge) {
-        long minutes = ChronoUnit.MINUTES.between(LocalDateTime.now(), challenge.getStartAt());
-        return minutes <= ENTERABLE_MINUTES_BEFORE_START;
+        long seconds = ChronoUnit.SECONDS.between(LocalDateTime.now(), challenge.getStartAt());
+        return seconds <= ENTERABLE_SECONDS_BEFORE_START;
     }
 
     public RunRecordDetailResponse getRunRecordDetail(Long memberId, Long runRecordId) {
