@@ -47,10 +47,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String createRefreshToken(String email) {
+    public String createRefreshToken(Long memberId) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
-                .setSubject(email)
+                .setSubject(memberId.toString())
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + refreshTokenValidityInMs))
                 .signWith(key, SignatureAlgorithm.HS512)
