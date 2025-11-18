@@ -41,6 +41,7 @@ import com.example.runnity.ui.components.PrimaryButton
 @Composable
 fun ProfileSection(
     userProfile: UserProfile,
+    averagePace: String,
     onEditClick: () -> Unit
 ) {
     Row(
@@ -72,13 +73,22 @@ fun ProfileSection(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // 닉네임
-        Text(
-            text = userProfile.nickname,
-            style = Typography.Heading,
-            color = ColorPalette.Light.primary,
-            modifier = Modifier.weight(1f)
-        )
+        // 닉네임 및 평균 페이스
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = userProfile.nickname,
+                style = Typography.Heading,
+                color = ColorPalette.Light.primary
+            )
+            Text(
+                text = "평균 페이스 $averagePace",
+                style = Typography.Caption,
+                color = ColorPalette.Light.secondary
+            )
+        }
 
         // 편집 버튼
         Icon(
@@ -450,12 +460,27 @@ private fun RunningRecordItem(
                         color = ColorPalette.Light.secondary
                     )
                     Text(
-                        text = "시간 ${record.time}",
+                        text = "시간 ${formatRunningTime(record.time)}",
                         style = Typography.Caption,
                         color = ColorPalette.Light.secondary
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * 러닝 시간 포맷팅
+ * "0:36" -> "0:36:00"
+ * "1:15" -> "1:15:00"
+ */
+private fun formatRunningTime(time: String): String {
+    return if (time.count { it == ':' } == 1) {
+        // H:MM 형식 -> H:MM:SS 형식으로 변환
+        "$time:00"
+    } else {
+        // 이미 H:MM:SS 형식이면 그대로 반환
+        time
     }
 }
