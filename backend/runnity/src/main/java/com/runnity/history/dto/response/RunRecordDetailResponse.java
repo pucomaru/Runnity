@@ -16,6 +16,9 @@ public record RunRecordDetailResponse(
         @Schema(description = "런 레코드 ID", example = "1")
         Long runRecordId,
 
+        @Schema(description = "챌린지 ID (챌린지 달리기인 경우)", example = "1")
+        Long challengeId,
+
         @Schema(description = "거리", example = "5.0")
         Float distance,
 
@@ -48,9 +51,10 @@ public record RunRecordDetailResponse(
         @Schema(description = "lap 목록 데이터")
         List<RunLapResponse> laps
 ) {
-    public static RunRecordDetailResponse from(RunRecord record, List<RunLapResponse> laps) {
+    public static RunRecordDetailResponse from(RunRecord record, List<RunLapResponse> laps, Long challengeId) {
         return RunRecordDetailResponse.builder()
                 .runRecordId(record.getRunRecordId())
+                .challengeId(challengeId)
                 .distance(record.getDistance())
                 .durationSec(record.getDurationSec())
                 .startAt(record.getStartAt()

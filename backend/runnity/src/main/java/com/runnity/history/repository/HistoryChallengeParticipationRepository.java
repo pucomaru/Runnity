@@ -63,4 +63,16 @@ public interface HistoryChallengeParticipationRepository extends JpaRepository<C
             @Param("challengeId") Long challengeId
     );
 
+    /**
+     * runRecordId로 ChallengeParticipation 조회
+     */
+    @Query("""
+        SELECT cp
+        FROM ChallengeParticipation cp
+        WHERE cp.runRecord.runRecordId = :runRecordId
+          AND cp.isDeleted = false
+    """)
+    Optional<ChallengeParticipation> findByRunRecordId(
+            @Param("runRecordId") Long runRecordId
+    );
 }
