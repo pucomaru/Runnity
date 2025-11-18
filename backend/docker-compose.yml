@@ -1,0 +1,41 @@
+services:
+  backend:
+    image: docker.io/daum0604/runnity-backend:${TAG:-latest}   # Jenkins가 푸시한 이미지 태그 사용
+    container_name: backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env   # 배포 서버에 있는 .env 사용
+    environment:
+      # ===== Database =====
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # ===== Redis (외부 인프라) =====
+      REDIS_CACHE_HOST: ${REDIS_HOST}
+      REDIS_CACHE_PORT: ${REDIS_CACHE_PORT}
+      REDIS_PUBSUB_HOST: ${REDIS_HOST}
+      REDIS_PUBSUB_PORT: ${REDIS_PUBSUB_PORT}
+
+      # ===== Kafka (외부 인프라) =====
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+
+      # ===== OAuth / JWT =====
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_ISS: ${KAKAO_ISS}
+      KAKAO_JWKS_URI: ${KAKAO_JWKS_URI}
+      JWT_SECRET: ${JWT_SECRET}
+
+    restart: unless-stopped
+    networks: [backend_net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  backend_net:
+    driver: bridge

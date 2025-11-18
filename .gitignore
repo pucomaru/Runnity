@@ -71,3 +71,10 @@ logs/
 *.tar
 *.gz
 *.zip
+
+**/.git
+**/.gradle
+**/build
+**/.idea
+**/*.iml
+**/node_modules
