@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorStatus implements BaseErrorStatus {
     // 공통
     BAD_REQUEST(HttpStatus.BAD_REQUEST, 400, "잘못된 요청입니다."),
+    VALIDATION_FAILED(HttpStatus.BAD_REQUEST, 400, "입력값 검증에 실패했습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "인증이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, 403, "접근 권한이 없습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, 404, "요청한 자원을 찾을 수 없습니다."),
