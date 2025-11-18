@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -76,12 +75,12 @@ fun HomeScreen(
                 val cancellationToken = CancellationTokenSource().token
 
                 fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    Priority.PRIORITY_HIGH_ACCURACY,
                     cancellationToken
                 ).addOnSuccessListener { location ->
                     if (location != null) {
                         viewModel.fetchWeather(location.latitude, location.longitude)
-                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                        Timber.d("현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
                     } else {
                         viewModel.fetchWeather(37.5665, 126.9780)
                         Timber.w("위치 정보 없음 → 서울 기본값 사용")
@@ -111,12 +110,12 @@ fun HomeScreen(
                 val cancellationToken = CancellationTokenSource().token
 
                 fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    Priority.PRIORITY_HIGH_ACCURACY,
                     cancellationToken
                 ).addOnSuccessListener { location ->
                     if (location != null) {
                         viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
-                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                        Timber.d("현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
                     } else {
                         viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
                         Timber.w("위치 정보 없음 → 서울 기본값 사용")
@@ -173,13 +172,13 @@ fun HomeScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-        // 1. 상단 앱바 (로고 + 알람)
+        // 1. 상단 앱바 (로고)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(ColorPalette.Common.accent)  // 액센트 색상 배경
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 로고 (이미지)
@@ -189,20 +188,6 @@ fun HomeScreen(
                 modifier = Modifier.height(32.dp),
                 contentScale = ContentScale.Fit
             )
-
-            // 알람 아이콘
-            IconButton(
-                onClick = {
-                    // TODO: 알람 페이지로 이동
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Notifications,
-                    contentDescription = "알림",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
         }
 
         // 2. 스크롤 가능한 내용
@@ -276,12 +261,12 @@ fun HomeScreen(
                                     val cancellationToken = CancellationTokenSource().token
 
                                     fusedLocationClient.getCurrentLocation(
-                                        Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                                        Priority.PRIORITY_HIGH_ACCURACY,
                                         cancellationToken
                                     ).addOnSuccessListener { location ->
                                         if (location != null) {
                                             viewModel.fetchWeather(location.latitude, location.longitude)
-                                            Timber.d("새로고침 - 현재 위치: ${location.latitude}, ${location.longitude}")
+                                            Timber.d("새로고침 - 현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
                                         } else {
                                             viewModel.fetchWeather(37.5665, 126.9780)
                                             Timber.w("새로고침 - 위치 정보 없음")

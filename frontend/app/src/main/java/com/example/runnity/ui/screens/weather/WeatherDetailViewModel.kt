@@ -33,23 +33,28 @@ class WeatherDetailViewModel : ViewModel() {
     /**
      * 위치 기반 날씨 정보 및 5일 예보 조회
      */
-    fun fetchWeather(lat: Double, lon: Double) {
+    fun fetchWeather(lat: Double, lon: Double, currentWeather: WeatherUiModel? = null) {
         viewModelScope.launch {
             _loading.value = true
 
-            // 현재 날씨 조회
-            when (val response = weatherRepository.getCurrentWeather(lat, lon)) {
-                is ApiResponse.Success -> {
-                    _weather.value = response.data.toUiModel()
-                    Timber.d("날씨 상세 정보 로드 성공")
-                }
-                is ApiResponse.Error -> {
-                    Timber.e("날씨 조회 실패: ${response.message}")
-                    _weather.value = null
-                }
-                is ApiResponse.NetworkError -> {
-                    Timber.e("날씨 네트워크 오류")
-                    _weather.value = null
+            // 현재 날씨 - 캐시된 데이터가 있으면 사용, 없으면 API 호출
+            if (currentWeather != null) {
+                _weather.value = currentWeather
+                Timber.d("날씨 상세 정보 - 캐시 사용")
+            } else {
+                when (val response = weatherRepository.getCurrentWeather(lat, lon)) {
+                    is ApiResponse.Success -> {
+                        _weather.value = response.data.toUiModel()
+                        Timber.d("날씨 상세 정보 로드 성공")
+                    }
+                    is ApiResponse.Error -> {
+                        Timber.e("날씨 조회 실패: ${response.message}")
+                        _weather.value = null
+                    }
+                    is ApiResponse.NetworkError -> {
+                        Timber.e("날씨 네트워크 오류")
+                        _weather.value = null
+                    }
                 }
             }
 
