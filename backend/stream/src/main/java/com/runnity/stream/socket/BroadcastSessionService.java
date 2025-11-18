@@ -231,6 +231,7 @@ public class BroadcastSessionService {
         if (raw == null) return "UNKNOWN";
         // 이미 코드로 저장된 경우 그대로 통과
         switch (raw) {
+            case "M100": case "M500":
             case "ONE": case "TWO": case "THREE": case "FOUR": case "FIVE":
             case "SIX": case "SEVEN": case "EIGHT": case "NINE": case "TEN":
             case "FIFTEEN": case "HALF":
@@ -238,6 +239,8 @@ public class BroadcastSessionService {
         }
         // 숫자 문자열 → 코드 매핑
         return switch (raw) {
+            case "0.1" -> "M100";
+            case "0.5" -> "M500";
             case "1" -> "ONE";
             case "2" -> "TWO";
             case "3" -> "THREE";
