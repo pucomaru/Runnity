@@ -7,12 +7,11 @@ import com.google.gson.annotations.SerializedName
  * GET /api/v1/broadcast/join
  */
 data class BroadcastJoinResponse(
-    @SerializedName("wsUrl")
     val wsUrl: String,
-
-    @SerializedName("topic")
     val topic: String,
-
-    @SerializedName("challengeId")
-    val challengeId: Long
+    val challengeId: Long,
+    val hlsUrl: String?,      // 백엔드에서 추가
+    val title: String?,       // 선택
+    val distance: String?,    // 선택 (예: "5km")
+    val totalDistanceMeter: Int?
 )

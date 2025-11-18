@@ -79,6 +79,7 @@ fun BroadcastLiveScreen(
 
     // 뒤로가기 버튼 처리
     BackHandler {
+        viewModel.disconnectStomp()
         navController.popBackStack()
     }
 
