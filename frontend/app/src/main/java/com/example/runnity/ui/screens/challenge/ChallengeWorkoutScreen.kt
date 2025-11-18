@@ -74,6 +74,7 @@ fun ChallengeWorkoutScreen(
     val currentPace by sessionViewModel.currentPaceSecPerKm.collectAsState()
     val currentLoc by sessionViewModel.currentLocation.collectAsState()
     val phase by sessionViewModel.phase.collectAsState()
+    val websocketState by WebSocketManager.state.collectAsState()
 
     val challengeDetailState by challengeViewModel.challengeDetail.collectAsState()
     val participantsState by socketViewModel.participants.collectAsState()
@@ -84,6 +85,10 @@ fun ChallengeWorkoutScreen(
     // 목표 거리(km) 캐시 및 최종 RECORD 전송 여부 플래그
     var targetKm by remember { mutableStateOf<Double?>(null) }
     var finalRecordSent by remember { mutableStateOf(false) }
+    // 최근 전송 실패한 RECORD/Pace 데이터를 임시로 보관해두었다가
+    // 소켓이 다시 열렸을 때 한 번만 재전송하기 위한 버퍼
+    var pendingRecord by remember { mutableStateOf<String?>(null) }
+    var pendingFinalRecord by remember { mutableStateOf<String?>(null) }
 
     val challengeIdLong = challengeId.toLongOrNull() ?: 0L
 
@@ -151,9 +156,15 @@ fun ChallengeWorkoutScreen(
                 "\"pace\":" + paceToSend + "," +
                 "\"timestamp\":" + System.currentTimeMillis() +
                 "}"
-            WebSocketManager.send(recordJson)
-            // 서버는 내 PARTICIPANT_UPDATE 를 보내지 않으므로, 클라이언트에서 내 참가자 정보도 함께 갱신
+
+            // 랭킹/UI는 전송 성공 여부와 상관없이 항상 최신 내 기록을 반영
             socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
+
+            // 최근 RECORD를 버퍼에 넣어두고, 실제 전송이 성공한 경우에만 버퍼를 비운다.
+            pendingRecord = recordJson
+            if (WebSocketManager.isOpen && WebSocketManager.send(recordJson)) {
+                pendingRecord = null
+            }
         }
     }
 
@@ -170,16 +181,42 @@ fun ChallengeWorkoutScreen(
                     "\"pace\":" + paceToSend + "," +
                     "\"timestamp\":" + System.currentTimeMillis() +
                     "}"
-                WebSocketManager.send(recordJson)
-                finalRecordSent = true
-                // 최종 기록도 랭킹에 반영
+
+                // 최종 기록도 랭킹에는 항상 반영
                 socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
+
+                // 최종 RECORD도 동일하게 OPEN일 때만 송신하고 실패 시 버퍼에 유지
+                pendingFinalRecord = recordJson
+                val sent = WebSocketManager.isOpen && WebSocketManager.send(recordJson)
+                if (sent) {
+                    finalRecordSent = true
+                    pendingFinalRecord = null
+                }
             }
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
             if (distanceKm >= goalKm) {
                 navController.navigate("challenge_result/$challengeId") {
                     popUpTo("challenge_workout/$challengeId") { inclusive = true }
+                }
+            }
+        }
+    }
+
+    // (서버 요구사항: 재접속 이후의 최신 데이터만 필요)
+    // 웹소켓 상태가 Open으로 전환될 때, 버퍼에 남아 있던 최신 RECORD/최종 RECORD를 한 번만 재전송
+    LaunchedEffect(websocketState) {
+        if (websocketState is WebSocketManager.WsState.Open) {
+            pendingRecord?.let { latest ->
+                if (WebSocketManager.send(latest)) {
+                    pendingRecord = null
+                }
+            }
+
+            pendingFinalRecord?.let { latest ->
+                if (WebSocketManager.send(latest)) {
+                    pendingFinalRecord = null
+                    finalRecordSent = true
                 }
             }
         }
