@@ -1,11 +1,22 @@
 services:
   backend:
+<<<<<<< HEAD
     image: docker.io/daum0604/runnity-backend:${TAG:-latest}   # Jenkins가 푸시한 이미지 태그 사용
     container_name: backend
+=======
+    image: docker.io/daum0604/runnity-stream:${TAG:-latest}   # Jenkins가 푸시한 이미지 태그 사용
+    container_name: stream
+>>>>>>> origin/consume
     ports:
       - "8080:8080"
     env_file:
       - .env   # 배포 서버에 있는 .env 사용
+<<<<<<< HEAD
+=======
+    volumes:
+      - ./fcmservice-account-key.json:/app/fcmservice-account-key.json:ro
+
+>>>>>>> origin/consume
     environment:
       # ===== Database =====
       SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8

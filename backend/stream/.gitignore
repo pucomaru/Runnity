@@ -17,7 +17,6 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-
 ### IntelliJ IDEA ###
 .idea
 *.iws
@@ -33,14 +32,9 @@ out/
 /dist/
 /nbdist/
 /.nb-gradle/
-backend/.env
-backend/.env.local
 
 ### VS Code ###
 .vscode/
-.env.local
-.env
-
-### file_upload ###
-/uploads/
-
+application-*.yml
+!application.yml    # 기본 application.yml은 예외로 포함
+/docker-compose.yml
