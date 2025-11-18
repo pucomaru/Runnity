@@ -22,6 +22,8 @@ Thumbs.db
 **/tmp/
 **/cache/
 **/data/
+!frontend/app/src/main/java/**/data/
+!frontend/watch/src/main/java/**/data/
 **/volumes/
 **/backups/
 

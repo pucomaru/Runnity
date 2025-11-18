@@ -1,9 +1,17 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize") // ✅ Parcelable data class 용 (Intent 등에서 사용)
+    id ("com.google.gms.google-services")
+}
 
+// 추가
+val properties = Properties().apply {
+    load(FileInputStream(rootProject.file("local.properties")))
 }
 
 android {
@@ -18,6 +26,72 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 추가: Kakao Map Key를 BuildConfig와 Manifest 모두에 주입
+        // BuildConfig(String) 값에는 반드시 따옴표가 포함되어야 합니다.
+        buildConfigField(
+            "String",
+            "KAKAO_MAP_KEY",
+            "\"${properties.getProperty("KAKAO_MAP_KEY")}\""
+        )
+        // AndroidManifest.xml의 ${KAKAO_MAP_KEY} 치환용
+        manifestPlaceholders["KAKAO_MAP_KEY"] = properties.getProperty("KAKAO_MAP_KEY")
+        // AndroidManifest.xml의 ${KAKAO_NATIVE_APP_KEY} 치환용 (Kakao Login)
+        manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = properties.getProperty("KAKAO_CLIENT_ID")
+
+        // API Base URL을 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "BASE_URL",
+            "\"${properties.getProperty("BASE_URL")}\""
+        )
+
+        // JWT Secret을 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "JWT_SECRET",
+            "\"${properties.getProperty("JWT_SECRET")}\""
+        )
+
+        // Google Client ID를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "GOOGLE_CLIENT_ID",
+            "\"${properties.getProperty("GOOGLE_CLIENT_ID")}\""
+        )
+
+        // Kakao Client ID를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_CLIENT_ID",
+            "\"${properties.getProperty("KAKAO_CLIENT_ID")}\""
+        )
+
+        // Kakao ISS를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_ISS",
+            "\"${properties.getProperty("KAKAO_ISS")}\""
+        )
+
+        // Kakao JWKS URI를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "KAKAO_JWKS_URI",
+            "\"${properties.getProperty("KAKAO_JWKS_URI")}\""
+        )
+
+        // Weather API Key를 BuildConfig에 주입
+        buildConfigField(
+            "String",
+            "WEATHER_API_KEY",
+            "\"${properties.getProperty("WEATHER_API_KEY")}\""
+        )
+
+        // 카카오 맵 SDK 네이티브 라이브러리 지원 아키텍처 설정
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -49,9 +123,17 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
+    implementation("androidx.compose.ui:ui-text")
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.foundation.layout)
+    implementation("androidx.compose.foundation:foundation")
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.animation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -64,6 +146,9 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
+    // Material Icons Extended (추가 아이콘 사용)
+    implementation("androidx.compose.material:material-icons-extended")
+
     // Retrofit + OkHttp (API 통신)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
@@ -74,6 +159,9 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 
+    // Google Play Services - Fused Location Provider (현재 위치 획득)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     // Coil
     implementation(libs.coil.compose)
 
@@ -83,8 +171,42 @@ dependencies {
     // EncryptedSharedPreferences (보안 토큰 저장)
     implementation(libs.security.crypto)
 
+    // ExifInterface (이미지 회전 정보 처리)
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // Timber (로깅)
     implementation(libs.timber)
+
+    // 카카오 지도 API
+    implementation("com.kakao.maps.open:android:2.12.18")
+
+    // 소셜 로그인 SDK
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // Kakao Login
+    implementation("com.kakao.sdk:v2-user:2.11.0")
+
+    // Splash Screen API (Android 12+)
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
+    // WearOS
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+
+    // fcm
+    implementation("com.google.firebase:firebase-messaging:23.4.0")
+
+    // 웹소켓
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+
+    // Media3 (통일)
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
+
+    // STOMP + RxJava2
+    implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
+    implementation("io.reactivex.rxjava2:rxjava:2.2.21")
+    implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
 
     //  테스트 라이브러리
     testImplementation(libs.junit)

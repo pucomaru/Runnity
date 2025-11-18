@@ -9,6 +9,15 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+
+        // 카카오 저장소 추가
+        maven {
+            url = uri("https://devrepo.kakao.com/nexus/repository/kakaomap-releases/")
+        }
+        maven {
+            url = uri("https://devrepo.kakao.com/nexus/content/groups/public/")
+        }
+
     }
 }
 dependencyResolutionManagement {
@@ -16,9 +25,17 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://devrepo.kakao.com/nexus/repository/kakaomap-releases/")
+        }
+        maven {
+            url = uri("https://devrepo.kakao.com/nexus/content/groups/public/")
+        }
+        maven(url = "https://jitpack.io")
     }
+
 }
 
 rootProject.name = "Runnity"
 include(":app")
- 
+include(":watch")

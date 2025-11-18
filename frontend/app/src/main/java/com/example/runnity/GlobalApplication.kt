@@ -2,6 +2,11 @@ package com.example.runnity
 
 import android.app.Application
 import com.example.runnity.data.util.TokenManager
+import com.example.runnity.data.util.UserProfileManager
+import com.example.runnity.data.util.ReservedChallengeManager
+import com.kakao.sdk.common.KakaoSdk
+import com.kakao.sdk.common.util.Utility
+import com.kakao.vectormap.KakaoMapSdk
 import timber.log.Timber
 
 /**
@@ -23,5 +28,25 @@ class GlobalApplication : Application() {
 
         // TokenManager 초기화
         TokenManager.init(this)
+
+        // UserProfileManager 초기화
+        UserProfileManager.init(this)
+
+        // ReservedChallengeManager 주기적 업데이트 시작 (1분마다)
+        ReservedChallengeManager.startPeriodicUpdates()
+
+        // Kakao Login SDK 초기화 (앱 시작 시 1회)
+        // Kakao Native App Key 사용
+        KakaoSdk.init(this, BuildConfig.KAKAO_CLIENT_ID)
+        Timber.d("GlobalApplication: KakaoSdk(Login).init called")
+
+        // 🔍 Kakao Key Hash 확인 (Kakao Developers 콘솔에 등록 필요)
+        val keyHash = Utility.getKeyHash(this)
+        Timber.d("🔑 Kakao Key Hash: $keyHash")
+        Timber.d("👉 이 Key Hash를 Kakao Developers 콘솔에 등록하세요!")
+
+        // Kakao Map SDK 초기화 (앱 시작 시 1회)
+        KakaoMapSdk.init(this, BuildConfig.KAKAO_MAP_KEY)
+        Timber.d("GlobalApplication: KakaoMapSdk.init called")
     }
 }
