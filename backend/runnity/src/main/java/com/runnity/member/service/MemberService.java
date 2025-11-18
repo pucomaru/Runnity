@@ -149,9 +149,7 @@ public class MemberService {
         }
 
         String accessToken = jwtTokenProvider.createAccessToken(member);
-        String refreshToken = jwtTokenProvider.createRefreshToken(
-                (email == null || email.isBlank()) ? (socialUid + "@kakao.local") : email
-        );
+        String refreshToken = jwtTokenProvider.createRefreshToken(member.getMemberId());
 
         boolean needAdditionalInfo = member.getNickname() == null || member.getNickname().isBlank();
 
@@ -326,10 +324,11 @@ public class MemberService {
         }
         Claims claims = jwtTokenProvider.parseClaims(refreshToken);
         String email = claims.getSubject();
-        Member member = memberRepository.findByEmail(email)
+        Long memberId = Long.parseLong(claims.getSubject());
+        Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
         String newAccess = jwtTokenProvider.createAccessToken(member);
-        String newRefresh = jwtTokenProvider.createRefreshToken(member.getEmail());
+        String newRefresh = jwtTokenProvider.createRefreshToken(memberId);
         return new TokenResponseDto(newAccess, newRefresh);
     }
 
