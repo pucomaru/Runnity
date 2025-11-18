@@ -498,8 +498,8 @@ private fun convertDistanceToCode(distance: String): String {
         "10km" -> "TEN"
         "15km" -> "FIFTEEN"
         "하프" -> "HALF"
-        "100m" -> "HUNDRED_METERS"
-        "500m" -> "FIVE_HUNDRED_METERS"
+        "100m" -> "M100"
+        "500m" -> "M500"
         else -> "FIVE"
     }
 }
