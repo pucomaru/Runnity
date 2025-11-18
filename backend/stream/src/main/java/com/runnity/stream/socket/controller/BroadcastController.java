@@ -107,17 +107,41 @@ public class BroadcastController {
     }
 
     private String normalize(String raw) {
+        if (raw == null) return "UNKNOWN";
+
+        // 이미 코드(M100, ONE, HALF...)로 들어온 경우는 그대로 사용
+        switch (raw) {
+            case "M100", "M500",
+                    "ONE", "TWO", "THREE", "FOUR", "FIVE",
+                    "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
+                    "FIFTEEN", "HALF" -> {
+                return raw;
+            }
+        }
+
+        // 숫자 문자열(0.1, 5.0, 21.0975 등)로 들어온 경우 ChallengeDistance 기준으로 매핑
         return switch (raw) {
-            case "0.1" -> "M100";
-            case "0.5" -> "M500";
-            case "1" -> "ONE";
-            case "2" -> "TWO";
-            case "3" -> "THREE";
-            case "4" -> "FOUR";
-            case "5" -> "FIVE";
+            case "0.1", "0.10" -> "M100";
+            case "0.5", "0.50" -> "M500";
+
+            case "1", "1.0" -> "ONE";
+            case "2", "2.0" -> "TWO";
+            case "3", "3.0" -> "THREE";
+            case "4", "4.0" -> "FOUR";
+            case "5", "5.0" -> "FIVE";
+            case "6", "6.0" -> "SIX";
+            case "7", "7.0" -> "SEVEN";
+            case "8", "8.0" -> "EIGHT";
+            case "9", "9.0" -> "NINE";
+            case "10", "10.0" -> "TEN";
+            case "15", "15.0" -> "FIFTEEN";
+
+            // HALF: 하프 마라톤(21.0975km)
+            case "21.0975" -> "HALF";
+
             default -> raw;
         };
-     }
+    }
 
     /** 테스트용 목업 프레임 송출 **/
     @PostMapping("/{challengeId}")
