@@ -299,8 +299,8 @@ fun ChallengeRunDetailContent(
             }
 
             val startText = try {
-                val dateTime = LocalDateTime.parse(data.startAt)
-                dateTime.format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"))
+                val dateTime = LocalDateTime.parse(data.startAt, DateTimeFormatter.ISO_DATE_TIME)
+                dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss"))
             } catch (e: Exception) {
                 data.startAt ?: ""
             }
@@ -352,7 +352,7 @@ fun ChallengeRunDetailContent(
                         color = ColorPalette.Light.secondary
                     )
                     Text(
-                        String.format("%.0fkm", data.distance),
+                        String.format("%.2fkm", data.distance),
                         style = Typography.Title
                     )
                 }

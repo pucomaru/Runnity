@@ -132,7 +132,7 @@ fun BroadcastFilterScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Spacer(modifier = Modifier.weight(0.5f))
+                Spacer(modifier = Modifier.weight(0.25f))
                 listOf("15km", "하프", "100m", "500m").forEach { distance ->
                     SmallPillButton(
                         text = distance,
@@ -144,10 +144,10 @@ fun BroadcastFilterScreen(
                                 selectedDistances + distance
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1.15f)
                     )
                 }
-                Spacer(modifier = Modifier.weight(0.5f))
+                Spacer(modifier = Modifier.weight(0.25f))
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

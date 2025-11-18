@@ -97,7 +97,6 @@ fun MyPageScreen(
                     item {
                         ProfileSection(
                             userProfile = state.userProfile,
-                            averagePace = state.stats.averagePace,
                             onEditClick = {
                                 navController?.navigate("profile_setting")
                             }

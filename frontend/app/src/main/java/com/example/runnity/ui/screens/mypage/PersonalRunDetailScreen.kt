@@ -156,222 +156,218 @@ fun RunDetailContent(data: RunRecordDetailResponse) {
         emptyList()
     }
 
-    // 1:1 분할 (상: 지도, 하: 요약)
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val halfH = this.maxHeight / 2
-        Column(modifier = Modifier.fillMaxSize()) {
-            // 상단: 지도
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(halfH)
-            ) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        MapView(ctx).apply {
-                            mapView = this
-                            start(
-                                object : MapLifeCycleCallback() {
-                                    override fun onMapDestroy() {}
-                                    override fun onMapError(error: Exception) {}
-                                },
-                                object : KakaoMapReadyCallback() {
-                                    override fun onMapReady(map: KakaoMap) {
-                                        kakaoMap = map
-                                        markerLayer = map.getLabelManager()?.getLayer()
-                                        if (markerStyles == null) {
-                                            markerStyles = map.getLabelManager()?.addLabelStyles(
-                                                LabelStyles.from(
-                                                    LabelStyle.from(R.drawable.ic_my_location_dot)
-                                                )
+    // 지도 + 요약 (반응형)
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 상단: 지도 (고정 높이)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        mapView = this
+                        start(
+                            object : MapLifeCycleCallback() {
+                                override fun onMapDestroy() {}
+                                override fun onMapError(error: Exception) {}
+                            },
+                            object : KakaoMapReadyCallback() {
+                                override fun onMapReady(map: KakaoMap) {
+                                    kakaoMap = map
+                                    markerLayer = map.getLabelManager()?.getLayer()
+                                    if (markerStyles == null) {
+                                        markerStyles = map.getLabelManager()?.addLabelStyles(
+                                            LabelStyles.from(
+                                                LabelStyle.from(R.drawable.ic_my_location_dot)
                                             )
+                                        )
+                                    }
+
+                                    val latLngs: List<LatLng> = MapUtil.getLatLngRoutePathFromGeo(route)
+                                    routeStyles = MapUtil.setRoutePathStyle(ctx)
+
+                                    if (latLngs.size >= 2) {
+                                        routeLine = MapUtil.drawRouteLine(map, latLngs, routeStyles!!)
+                                        MapUtil.moveCameraToRoute(map, latLngs, MapUtil.DEFAULT_ZOOM_LEVEL)
+                                    } else if (latLngs.size == 1) {
+                                        val p = latLngs.first()
+                                        map.moveCamera(CameraUpdateFactory.newCenterPosition(p))
+                                        map.moveCamera(CameraUpdateFactory.zoomTo(16))
+                                        val layer = markerLayer
+                                        val styles = markerStyles
+                                        if (layer != null && styles != null && startPointLabel == null) {
+                                            val opts = LabelOptions.from(p).setStyles(styles)
+                                            startPointLabel = layer.addLabel(opts)
+                                            startPointLabel?.scaleTo(0.18f, 0.18f)
                                         }
-
-                                        val latLngs: List<LatLng> = MapUtil.getLatLngRoutePathFromGeo(route)
-                                        routeStyles = MapUtil.setRoutePathStyle(ctx)
-
-                                        if (latLngs.size >= 2) {
-                                            routeLine = MapUtil.drawRouteLine(map, latLngs, routeStyles!!)
-                                            MapUtil.moveCameraToRoute(map, latLngs, MapUtil.DEFAULT_ZOOM_LEVEL)
-                                        } else if (latLngs.size == 1) {
-                                            val p = latLngs.first()
-                                            map.moveCamera(CameraUpdateFactory.newCenterPosition(p))
-                                            map.moveCamera(CameraUpdateFactory.zoomTo(16))
-                                            val layer = markerLayer
-                                            val styles = markerStyles
-                                            if (layer != null && styles != null && startPointLabel == null) {
-                                                val opts = LabelOptions.from(p).setStyles(styles)
-                                                startPointLabel = layer.addLabel(opts)
-                                                startPointLabel?.scaleTo(0.18f, 0.18f)
-                                            }
-                                        } else {
-                                            // 경로 정보 없을 때 현재 위치로 이동
-                                            val fused = LocationServices.getFusedLocationProviderClient(ctx)
-                                            fused.lastLocation.addOnSuccessListener { loc ->
-                                                loc?.let {
-                                                    val target = LatLng.from(it.latitude, it.longitude)
-                                                    map.moveCamera(CameraUpdateFactory.newCenterPosition(target))
-                                                    map.moveCamera(CameraUpdateFactory.zoomTo(16))
-                                                }
+                                    } else {
+                                        // 경로 정보 없을 때 현재 위치로 이동
+                                        val fused = LocationServices.getFusedLocationProviderClient(ctx)
+                                        fused.lastLocation.addOnSuccessListener { loc ->
+                                            loc?.let {
+                                                val target = LatLng.from(it.latitude, it.longitude)
+                                                map.moveCamera(CameraUpdateFactory.newCenterPosition(target))
+                                                map.moveCamera(CameraUpdateFactory.zoomTo(16))
                                             }
                                         }
                                     }
                                 }
-                            )
-                        }
+                            }
+                        )
                     }
+                }
+            )
+
+            DisposableEffect(lifecycleOwner, mapView) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> mapView?.resume()
+                        Lifecycle.Event.ON_PAUSE -> mapView?.pause()
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+        }
+
+        // 하단: 라벨 + 요약 (남은 공간 활용)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            // 라벨 행 (운동 타입 + 시작 시간)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val typeLabel = when (data.runType) {
+                    "PERSONAL" -> "개인 러닝"
+                    "CHALLENGE" -> "챌린지"
+                    else -> "러닝"
+                }
+                Text(
+                    text = typeLabel,
+                    style = Typography.Subtitle,
+                    color = ColorPalette.Light.secondary
                 )
 
-                DisposableEffect(lifecycleOwner, mapView) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        when (event) {
-                            Lifecycle.Event.ON_RESUME -> mapView?.resume()
-                            Lifecycle.Event.ON_PAUSE -> mapView?.pause()
-                            else -> Unit
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                val startText = try {
+                    val dateTime = LocalDateTime.parse(data.startAt, DateTimeFormatter.ISO_DATE_TIME)
+                    dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss"))
+                } catch (e: Exception) {
+                    data.startAt ?: ""
                 }
+                Text(
+                    text = startText,
+                    style = Typography.Caption,
+                    color = ColorPalette.Light.secondary
+                )
             }
 
-            // 하단: 라벨 + 요약
+            HorizontalDivider(color = Color(0xFFDDDDDD))
+
+            // 요약 내용
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(halfH)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 라벨 행 (운동 타입 + 시작 시간)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val typeLabel = when (data.runType) {
-                        "PERSONAL" -> "개인 러닝"
-                        "CHALLENGE" -> "챌린지"
-                        else -> "러닝"
-                    }
-                    Text(
-                        text = typeLabel,
-                        style = Typography.Subtitle,
-                        color = ColorPalette.Light.secondary
-                    )
+                // 큰 글씨: 총 거리
+                Text(
+                    text = "총 km",
+                    style = Typography.Subtitle,
+                    color = ColorPalette.Light.secondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = String.format("%.2f", data.distance),
+                    style = Typography.LargeTitle.copy(fontSize = 72.sp),
+                    color = ColorPalette.Light.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    val startText = try {
-                        val dateTime = LocalDateTime.parse(data.startAt)
-                        dateTime.format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"))
-                    } catch (e: Exception) {
-                        data.startAt ?: ""
-                    }
-                    Text(
-                        text = startText,
-                        style = Typography.Caption,
-                        color = ColorPalette.Light.secondary
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFFDDDDDD))
-
-                // 요약 내용
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // 큰 글씨: 총 거리
-                    Text(
-                        text = "총 km",
-                        style = Typography.Subtitle,
-                        color = ColorPalette.Light.secondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = String.format("%.1f", data.distance),
-                        style = Typography.LargeTitle.copy(fontSize = 72.sp),
-                        color = ColorPalette.Light.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 1행: 평균 페이스 + 시간
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val half = this.maxWidth / 2
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                // 1행: 평균 페이스 + 시간
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val half = this.maxWidth / 2
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.width(half),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.width(half),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "평균 페이스",
-                                    style = Typography.Caption,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    formatPace(data.pace.toDouble()),
-                                    style = Typography.Title
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.width(half),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "시간",
-                                    style = Typography.Caption,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    formatElapsed(data.durationSec.toLong() * 1000),
-                                    style = Typography.Title
-                                )
-                            }
+                            Text(
+                                "평균 페이스",
+                                style = Typography.Caption,
+                                color = ColorPalette.Light.secondary
+                            )
+                            Text(
+                                formatPace(data.pace.toDouble()),
+                                style = Typography.Title
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.width(half),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "시간",
+                                style = Typography.Caption,
+                                color = ColorPalette.Light.secondary
+                            )
+                            Text(
+                                formatElapsed(data.durationSec.toLong() * 1000),
+                                style = Typography.Title
+                            )
                         }
                     }
+                }
 
-                    Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-                    // 2행: 평균 심박수 + 칼로리
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val half = this.maxWidth / 2
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                // 2행: 평균 심박수 + 칼로리
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val half = this.maxWidth / 2
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.width(half),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.width(half),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "평균 심박수",
-                                    style = Typography.Caption,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    data.bpm.toString(),
-                                    style = Typography.Title
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.width(half),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "칼로리",
-                                    style = Typography.Caption,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    "${data.calories.toInt()} kcal",
-                                    style = Typography.Title
-                                )
-                            }
+                            Text(
+                                "평균 심박수",
+                                style = Typography.Caption,
+                                color = ColorPalette.Light.secondary
+                            )
+                            Text(
+                                data.bpm.toString(),
+                                style = Typography.Title
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.width(half),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "칼로리",
+                                style = Typography.Caption,
+                                color = ColorPalette.Light.secondary
+                            )
+                            Text(
+                                "${data.calories.toInt()} kcal",
+                                style = Typography.Title
+                            )
                         }
                     }
                 }
