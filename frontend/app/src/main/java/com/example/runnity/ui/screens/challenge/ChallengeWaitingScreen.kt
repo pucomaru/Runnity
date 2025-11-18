@@ -62,6 +62,11 @@ fun ChallengeWaitingScreen(
 
     val detail = challengeDetailState!!
 
+    // 챌린지 목표 거리(km)를 소켓 ViewModel에 설정 (완주자 랭킹 계산용)
+    LaunchedEffect(detail.id) {
+        socketViewModel.setGoalKm(detail.distance)
+    }
+
     // 챌린지 시작 시간 (카운트다운/표시용)
     val challengeStartTime = try {
         LocalDateTime.parse(detail.startAt, DateTimeFormatter.ISO_DATE_TIME)

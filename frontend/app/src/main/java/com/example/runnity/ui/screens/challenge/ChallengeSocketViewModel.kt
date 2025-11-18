@@ -28,10 +28,56 @@ class ChallengeSocketViewModel : ViewModel() {
     private var observeJob: Job? = null
     private var reconnectJob: Job? = null
 
+    // 챌린지 목표 거리(KM). 세션 시작 시 외부에서 설정해 준다.
+    // null 이면 "완주" 개념 없이 기존 거리 기준 랭킹만 사용한다.
+    private var goalKm: Double? = null
+
+    // 완주자 순서를 추적하기 위한 상태 (메시지 도착 순서 기준)
+    private val finishOrderById: MutableMap<String, Int> = mutableMapOf()
+    private var nextFinishOrder: Int = 1
+
     private val challengeRepository = ChallengeRepository()
 
     // 현재 사용자 ID (참가자 리스트에서 isMe 여부 판단용)
     private val currentUserId: String? = UserProfileManager.getProfile()?.memberId?.toString()
+
+    /**
+     * 챌린지 목표 거리(KM)를 설정한다.
+     * - 대기방/세션 진입 시 한 번만 세팅되면 된다.
+     */
+    fun setGoalKm(km: Double) {
+        goalKm = km
+    }
+
+    /**
+     * 주어진 참가자 리스트를 기준으로, 목표 거리를 처음 넘는 참가자에게 finishOrder 를 부여한다.
+     * - 메시지 도착 순서 기준으로 nextFinishOrder 를 증가시키며 기록한다.
+     */
+    private fun applyFinishOrder(list: List<Participant>): List<Participant> {
+        val goal = goalKm ?: return list
+        if (goal <= 0.0) return list
+
+        return list.map { p ->
+            val existingOrder = finishOrderById[p.id]
+            if (existingOrder != null) {
+                // 이미 완주자로 기록된 참가자
+                if (p.finishOrder != existingOrder) {
+                    p.copy(finishOrder = existingOrder)
+                } else {
+                    p
+                }
+            } else {
+                // 아직 완주자가 아니고, 이번에 목표 거리를 넘은 경우
+                if (p.distanceKm >= goal) {
+                    val order = nextFinishOrder++
+                    finishOrderById[p.id] = order
+                    p.copy(finishOrder = order)
+                } else {
+                    p
+                }
+            }
+        }
+    }
 
     /**
      * 서버가 나에 대한 PARTICIPANT_UPDATE 를 보내지 않는 경우를 대비해서,
@@ -42,7 +88,7 @@ class ChallengeSocketViewModel : ViewModel() {
         val current = _participants.value
         if (current.isEmpty()) return
 
-        val updated = current.map { p ->
+        val updatedRaw = current.map { p ->
             if (p.id == myId) {
                 p.copy(
                     distanceKm = distanceKm,
@@ -50,8 +96,8 @@ class ChallengeSocketViewModel : ViewModel() {
                 )
             } else p
         }
-
-        _participants.value = applyRanking(updated)
+        val withFinish = applyFinishOrder(updatedRaw)
+        _participants.value = applyRanking(withFinish)
     }
 
     /**
@@ -285,17 +331,24 @@ class ChallengeSocketViewModel : ViewModel() {
                                 val current = _participants.value
                                 val updated = current.map { p ->
                                     if (p.id == left.userId.toString()) {
-                                        // 챌린지 도중 퇴장한 참가자는 리스트에서 제거하지 않고 리타이어 상태로 표시
-                                        p.copy(isRetired = true)
+                                        // 이미 완주한 참가자는 USER_LEFT 가 와도 리타이어 처리하지 않는다.
+                                        val isFinished = p.finishOrder != null || (goalKm != null && p.distanceKm >= (goalKm ?: 0.0))
+                                        if (isFinished) {
+                                            p
+                                        } else {
+                                            // 챌린지 도중 퇴장한 참가자는 리스트에서 제거하지 않고 리타이어 상태로 표시
+                                            p.copy(isRetired = true)
+                                        }
                                     } else p
                                 }
-                                _participants.value = applyRanking(updated)
+                                val withFinish = applyFinishOrder(updated)
+                                _participants.value = applyRanking(withFinish)
                             }
                         }
                         "PARTICIPANT_UPDATE" -> {
                             val update = gson.fromJson(text, ParticipantUpdateMessage::class.java)
                             val current = _participants.value
-                            val updated = current.map { p ->
+                            val updatedRaw = current.map { p ->
                                 if (p.id == update.userId.toString()) {
                                     p.copy(
                                         distanceKm = update.distance,
@@ -303,7 +356,8 @@ class ChallengeSocketViewModel : ViewModel() {
                                     )
                                 } else p
                             }
-                            val next = applyRanking(updated)
+                            val withFinish = applyFinishOrder(updatedRaw)
+                            val next = applyRanking(withFinish)
                             Timber.d(
                                 "[ChallengeSocket] PARTICIPANT_UPDATE userId=%d, distance=%.3f, pace=%.2f, size(before)=%d, size(after)=%d",
                                 update.userId,
@@ -350,14 +404,24 @@ private fun applyRanking(list: List<Participant>): List<Participant> {
         return list.map { it.copy(rank = 0) }
     }
 
-    // 우선 distanceKm 내림차순, 동률일 때는 pace가 빠른 순으로 정렬
-    val sorted = list.sortedWith(
+    // 1) 완주자(finishOrder != null)를 먼저, 2) 미완주자를 그 다음에 배치
+    val (finishers, nonFinishers) = list.partition { it.finishOrder != null }
+
+    // 완주자: finishOrder 오름차순 (메시지 도착 순서 기준)
+    val sortedFinishers = finishers.sortedWith(
+        compareBy<Participant> { it.finishOrder ?: Int.MAX_VALUE }
+    )
+
+    // 미완주자: 기존처럼 distanceKm 내림차순, pace 빠른 순
+    val sortedNonFinishers = nonFinishers.sortedWith(
         compareByDescending<Participant> { it.distanceKm }
             .thenBy { it.paceSecPerKm ?: Double.MAX_VALUE }
     )
 
+    val merged = sortedFinishers + sortedNonFinishers
+
     var currentRank = 1
-    return sorted.map { p ->
+    return merged.map { p ->
         if (p.distanceKm > 0.0) {
             // 기록이 있는 참가자만 1,2,3... 순위를 부여
             val ranked = p.copy(rank = currentRank)
