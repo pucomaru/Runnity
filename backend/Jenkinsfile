@@ -70,7 +70,7 @@ pipeline {
               ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 'set -eux; mkdir -p ~/stream-app'
               scp -o StrictHostKeyChecking=no backend/deploy_bundle.tgz ubuntu@43.203.250.119:~/stream-app/
 
-              ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 "set -euxo pipefail; cd ~/stream-app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker image prune -f || true; docker compose ps"
+              ssh -o StrictHostKeyChecking=no ubuntu@43.203.250.119 "set -euxo pipefail; cd ~/stream-app; ls -al; tar xzf deploy_bundle.tgz; test -f docker-compose.yml; echo '\$DOCKERHUB_TOKEN' | docker login -u ${DOCKERHUB_USERNAME} --password-stdin; TAG=${env.TAG} docker compose pull; TAG=${env.TAG} docker compose up -d; docker logout || true; docker system prune -af --volumes || true; docker compose ps"
             """
           }
         }
