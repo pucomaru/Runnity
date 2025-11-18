@@ -51,13 +51,6 @@ public record AdminChallengeCreateRequest(
         return !startAt.isBefore(minStartAt);
     }
 
-    @AssertTrue(message = "시작일시는 현재 시점으로부터 1주일 이내여야 합니다")
-    @Schema(hidden = true)
-    public boolean isStartWithinAWeek() {
-        LocalDateTime now = LocalDateTime.now();
-        return !startAt.isAfter(now.plusWeeks(1));
-    }
-
     @AssertTrue(message = "비밀방일 경우 비밀번호를 입력해야 합니다")
     @Schema(hidden = true)
     public boolean isPasswordValidForPrivateChallenge() {

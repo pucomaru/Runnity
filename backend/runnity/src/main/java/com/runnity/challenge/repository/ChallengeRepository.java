@@ -81,4 +81,22 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             @Param("isPrivate") Boolean isPrivate,
             Pageable pageable
     );
+
+    /**
+     * 운영진(최대 참가자 수 100 초과) 챌린지 목록 조회 - 임박순
+     */
+    @Query("""
+        SELECT c, COUNT(cp)
+        FROM Challenge c
+        LEFT JOIN ChallengeParticipation cp 
+            ON cp.challenge.challengeId = c.challengeId
+            AND cp.isDeleted = false
+            AND cp.status != 'LEFT'
+        WHERE c.isDeleted = false
+        AND c.status = 'RECRUITING'
+        AND c.maxParticipants > 100
+        GROUP BY c.challengeId
+        ORDER BY c.startAt ASC
+    """)
+    Page<Object[]> findAdminChallengesWithParticipantCountOrderByLatest(Pageable pageable);
 }

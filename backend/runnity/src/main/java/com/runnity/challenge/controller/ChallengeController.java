@@ -78,6 +78,29 @@ public class ChallengeController {
         );
     }
 
+    @GetMapping("/admin")
+    @Operation(
+            summary = "운영진 챌린지 목록 조회",
+            description = "운영진이 만든(최대 참가자 수 100 초과) 챌린지 목록을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+            @ApiResponse(responseCode = "401", description = "인증 실패"),
+            @ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<ChallengeListResponse>> getAdminChallenges(
+            @ParameterObject @PageableDefault(size = 10, page = 0) Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long memberId = userPrincipal.getMemberId();
+        ChallengeListResponse response = challengeService.getAdminChallenges(pageable, memberId);
+        return com.runnity.global.response.ApiResponse.success(
+                SuccessStatus.OK,
+                response
+        );
+    }
+
     @GetMapping("/{challengeId}")
     @Operation(
             summary = "챌린지 상세 조회",
