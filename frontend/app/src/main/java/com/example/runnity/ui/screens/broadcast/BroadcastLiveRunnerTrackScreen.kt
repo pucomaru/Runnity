@@ -48,7 +48,7 @@ fun BroadcastLiveRunnerTrackScreen(
 
     // 상위 N명만 필터링 (성능 최적화)
     val topRunners = remember(runners) {
-        runners.sortedByDescending { it.distance }.take(showTop)
+        runners.sortedByDescending { it.distanceMeter }.take(showTop)
     }
 
     Box(
@@ -224,7 +224,7 @@ fun RunnerInfoBubble(runner: BroadcastLiveViewModel.RunnerUi) {
                 color = Color.Black
             )
             Text(
-                text = "${runner.rank}위 · ${String.format("%.2f", runner.distance / 1000f)}km",
+                text = "${runner.rank}위 · ${String.format("%.2f", runner.distanceMeter / 1000f)}km",
                 fontSize = 11.sp,
                 color = Color.Gray
             )

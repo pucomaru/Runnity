@@ -113,9 +113,8 @@ class BroadcastViewModel (
     fun joinBroadcast(challengeId: String) {
         viewModelScope.launch {
             runCatching {
-                // TODO : 중계 참여 구현하기
-//                repository.joinBroadcast(challengeId.toLong())
-//                Timber.d("중계방 입장 성공: challengeId=%s", challengeId)
+                repository.joinBroadcast(challengeId.toLong())
+                Timber.d("중계방 입장 성공: challengeId=%s", challengeId)
             }.onFailure { Timber.e(it, "중계 참여 실패: %s", challengeId) }
         }
     }
@@ -176,22 +175,4 @@ sealed class BroadcastUiState {
     object Loading : BroadcastUiState()
     data class Success(val broadcasts: List<BroadcastListItem>) : BroadcastUiState()
     data class Error(val message: String) : BroadcastUiState()
-}
-
-private fun convertDistanceToCode(distance: String): String {
-    return when (distance) {
-        "1km" -> "ONE"
-        "2km" -> "TWO"
-        "3km" -> "THREE"
-        "4km" -> "FOUR"
-        "5km" -> "FIVE"
-        "6km" -> "SIX"
-        "7km" -> "SEVEN"
-        "8km" -> "EIGHT"
-        "9km" -> "NINE"
-        "10km" -> "TEN"
-        "15km" -> "FIFTEEN"
-        "하프" -> "HALF"
-        else -> ""
-    }
 }

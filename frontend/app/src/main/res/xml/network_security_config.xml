@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 개발/테스트: 특정 IP/도메인만 HTTP 허용 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- EC2 서버 IP -->
+        <domain includeSubdomains="true">43.203.250.119</domain>
+
+        <!-- 로컬 테스트용 -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+
+        <!-- 실제 도메인 (있다면) -->
+        <domain includeSubdomains="true">api.runnity.com</domain>
+        <domain includeSubdomains="true">stream.runnity.com</domain>
+    </domain-config>
+</network-security-config>

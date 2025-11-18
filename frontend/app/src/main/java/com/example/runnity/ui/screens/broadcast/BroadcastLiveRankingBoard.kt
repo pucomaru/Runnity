@@ -32,7 +32,7 @@ fun BroadcastLiveRankingBoard(
     modifier: Modifier = Modifier
 ) {
     val top3 = remember(runners) {
-        runners.sortedByDescending { it.distance }.take(3)
+        runners.sortedByDescending { it.distanceMeter }.take(3)
     }
 
     Row(
@@ -111,7 +111,7 @@ fun TopRankItem(
 
         // 거리 (애니메이션 없이 즉시 표시)
         Text(
-            text = "${String.format("%.2f", runner.distance / 1000f)}km",
+            text = "${String.format("%.2f", runner.distanceMeter / 1000f)}km",
             color = Color.Gray,
             fontSize = 12.sp
         )

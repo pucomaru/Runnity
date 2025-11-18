@@ -1,5 +1,7 @@
 package com.example.runnity.data.model.response
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * 중계방 목록 조회 응답
  *
@@ -8,24 +10,38 @@ package com.example.runnity.data.model.response
  * @param viewerCount 현재 시청자 수
  * @param participantCount 참가자 수
  * @param createdAt 생성 일시
+ * @param distance 거리
  */
 data class BroadcastResponse(
+    @SerializedName("challengeId")
     val challengeId: Long,
+
+    @SerializedName("title")
     val title: String,
+
+    @SerializedName("viewerCount")
     val viewerCount: Int,
+
+    @SerializedName("participantCount")
     val participantCount: Int,
-    val createdAt: String,
-    val distance: String
+
+    @SerializedName("createdAt")
+    val createdAt: String,  // ISO 8601 형식 (예: "2025-11-17T08:00:00")
+
+    @SerializedName("distance")
+    val distance: String  // ← 거리 코드 (예: "FIVE" = 5km)
 )
 
 /**
- * 챌린지 목록 아이템
+ * 중계 목록 아이템
  *
  * @param challengeId 챌린지 고유 ID
  * @param title 챌린지 제목
  * @param viewerCount 현재 시청자 수
  * @param participantCount 참가자 수
  * @param createdAt 생성 일시
+ * @param distance 거리
+ *
  */
 data class BroadcastListItem(
     val challengeId: Long, // 챌린지 고유 ID
@@ -36,6 +52,17 @@ data class BroadcastListItem(
     val distance: String // 거리
 )
 
+
+/**
+ * 중계 페이지
+ *
+ * @param content 컨텐츠
+ * @param totalElements 총 요소
+ * @param totalPages 총 페이지
+ * @param page 페이지
+ * @param size 보여줄 요소 개수
+ *
+ */
 data class BroadcastPage(
     val content: List<BroadcastListItem>,
     val totalElements: Long,
