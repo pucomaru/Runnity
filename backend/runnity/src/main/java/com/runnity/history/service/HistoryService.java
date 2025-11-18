@@ -164,6 +164,8 @@ public class HistoryService {
                 .build();
 
         RunRecord savedRecord = runRecordRepository.save(runRecord);
+        log.info("RunRecord saved - runRecordId={}", savedRecord.getRunRecordId());
+
 
         List<RunLap> laps = request.laps().stream()
                 .map(lapReq -> RunLap.builder()
@@ -190,6 +192,7 @@ public class HistoryService {
     @Transactional
     public void handleChallengeFinish(Member member, RunRecord runRecord, Long challengeId) {
 
+        log.info("handleChallengeFinish() called - memberId={}, challengeId={}, runRecordId={}", member.getMemberId(), challengeId, runRecord.getRunRecordId());
         var cp = repository.findCompletedByMemberIdAndChallengeId(member.getMemberId(), challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_PARTICIPATION_NOT_FOUND));
 
