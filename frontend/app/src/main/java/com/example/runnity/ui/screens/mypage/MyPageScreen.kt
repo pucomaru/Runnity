@@ -97,6 +97,7 @@ fun MyPageScreen(
                     item {
                         ProfileSection(
                             userProfile = state.userProfile,
+                            averagePace = state.stats.averagePace,
                             onEditClick = {
                                 navController?.navigate("profile_setting")
                             }
@@ -247,8 +248,9 @@ private fun SwipeableGraphSection(
         state = pagerState,
         modifier = Modifier.fillMaxWidth()
     ) { page ->
-        // 각 페이지에 대한 그래프 데이터 생성
+        // 각 페이지에 대한 그래프 데이터 가져오기
         val graphData = viewModel.getGraphDataForIndex(page)
+
         GraphSection(
             graphData = graphData,
             periodType = periodType
@@ -270,18 +272,25 @@ private fun GraphSection(
             .padding(16.dp)
     ) {
         // 막대 그래프 (재사용 가능한 컴포넌트 사용)
-        // 월 그래프: X축 레이블을 1, 15, 마지막 날만 표시하도록 변경
+        // 월 그래프: X축 레이블을 1일, 15일, 마지막 날만 표시
         val displayData = remember(periodType, graphData) {
-            if (periodType == PeriodType.MONTH) {
-                val maxDay = graphData.mapNotNull { it.label.removeSuffix("일").toIntOrNull() }.maxOrNull() ?: 0
-                android.util.Log.d("MyPageScreen", "월 그래프: maxDay=$maxDay, total=${graphData.size}")
+            if (periodType == PeriodType.MONTH && graphData.isNotEmpty()) {
+                // graphData의 label은 이미 "14일" 형태임
+                val days = graphData.mapNotNull { it.label.removeSuffix("일").toIntOrNull() }
+                val maxDay = days.maxOrNull() ?: 0
+
                 graphData.map {
                     val day = it.label.removeSuffix("일").toIntOrNull() ?: 0
-                    val displayLabel = if (day == 1 || day == 15 || day == maxDay) "${day}일" else ""
-                    android.util.Log.d("MyPageScreen", "day=$day, label=${it.label}, displayLabel=$displayLabel")
+                    // 1일, 15일, 마지막 날만 레이블 표시
+                    val displayLabel = if (day == 1 || day == 15 || day == maxDay) {
+                        "${day}일"
+                    } else {
+                        ""
+                    }
                     BarChartData(displayLabel, it.distance)
                 }
             } else {
+                // 주/연/전체: 레이블 그대로 사용
                 graphData.map { BarChartData(it.label, it.distance) }
             }
         }
