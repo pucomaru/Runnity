@@ -3,8 +3,8 @@ import json
 from app.utils.logger import logger
 import os
 from app.models.highlight_event import HighlightEvent
-from app.llm.tts import generate_tts_mp3
-
+# from app.llm.tts import generate_tts_mp3
+from app.models.llm_commentary import LLMCommentaryMessage
 
 # commentary-event 발행
 
@@ -46,23 +46,35 @@ def send_commentary(event: HighlightEvent):
     # 2) 텍스트 코멘터리
     text = event.commentary or ""
 
-    # 3) Google TTS 음성 생성
-    try:
-        audio_path = generate_tts_mp3(text)
-    except Exception as e:
-        logger.error(f"TTS generation failed: {e}")
-        audio_path = None
+    # Stream서버 규격에 맞는 LLM 메시지 생성
+    llm_msg = LLMCommentaryMessage(
+        challengeId=event.challengeId,
+        runnerId=event.runnerId,
+        nickname=event.nickname,
+        profileImage=event.profileImage,
+
+        highlightType=event.highlightType,
+        commentary=text,
+
+        targetRunnerId=event.targetRunnerId,
+        targetNickname=event.targetNickname,
+        targetProfileImage=event.targetProfileImage,
+
+        distance=event.distance,
+        pace=event.pace,
+        ranking=event.rank
+    )
 
     # 4) Kafka 전송 데이터 구성
-    data = event.dict()
-    data["audio_path"] = audio_path
+    data = llm_msg.dict()
+    # data["audio_path"] = audio_path
 
     # 5) Kafka 발행
     try:
-        producer.send("commentary-event", value=data)
+        producer.send("highlight-llm-commentary", value=data)
         producer.flush()
     except Exception as e:
         logger.error(f"Kafka send error: {e}")
         return
 
-    logger.info(f"[COMMENTARY SENT] {text} (TTS={audio_path})")
+    logger.info(f"[COMMENTARY SENT] {text}")
