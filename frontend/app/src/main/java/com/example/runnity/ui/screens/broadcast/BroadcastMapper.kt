@@ -103,8 +103,8 @@ fun formatDistance(distance: String): String {
         "TEN" -> "10"
         "FIFTEEN" -> "15"
         "HALF" -> "하프"
-        "HUNDRED_METERS" -> "100m"
-        "FIVE_HUNDRED_METERS" -> "500m"
+        "M100" -> "100m"
+        "M500" -> "500m"
         else -> "${distance}km"
     }
 }
