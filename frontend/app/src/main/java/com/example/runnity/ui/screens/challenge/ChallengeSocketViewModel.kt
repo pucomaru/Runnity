@@ -2,8 +2,11 @@ package com.example.runnity.ui.screens.challenge
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.repository.ChallengeRepository
+import com.example.runnity.data.util.TokenManager
 import com.example.runnity.data.util.UserProfileManager
+import com.example.runnity.socket.WebSocketManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +27,8 @@ class ChallengeSocketViewModel : ViewModel() {
     private val gson = Gson()
     private var observeJob: Job? = null
     private var reconnectJob: Job? = null
+
+    private val challengeRepository = ChallengeRepository()
 
     // 현재 사용자 ID (참가자 리스트에서 isMe 여부 판단용)
     private val currentUserId: String? = UserProfileManager.getProfile()?.memberId?.toString()
@@ -86,19 +91,42 @@ class ChallengeSocketViewModel : ViewModel() {
                                         if (!this.isActive) return@launch
                                         kotlinx.coroutines.delay(delayMs)
                                         Timber.w("[ChallengeSocket] 웹소켓 상태=%s, 재연결 시도 (delay=%dms)", state, delayMs)
-                                        val started = WebSocketManager.reconnect()
-                                        if (!started) {
-                                            Timber.e("[ChallengeSocket] 재연결 설정이 없어 reconnect() 실패")
-                                            return@launch
-                                        }
 
-                                        // 이번 시도에서 Open 또는 Failed 로 전이될 때까지 대기
-                                        val resultState = WebSocketManager.state.first {
-                                            it is WebSocketManager.WsState.Open || it is WebSocketManager.WsState.Failed
-                                        }
-                                        if (resultState is WebSocketManager.WsState.Open) {
-                                            Timber.d("[ChallengeSocket] 웹소켓 재연결 성공")
-                                            return@launch
+                                        // 티켓이 1회용이므로 매 재시도마다 enterChallenge 를 다시 호출해
+                                        // 새로운 ticket/wsUrl 을 받아온 뒤 WebSocketManager.connect 로 재연결한다.
+                                        val resp = challengeRepository.enterChallenge(challengeId)
+                                        when (resp) {
+                                            is ApiResponse.Success -> {
+                                                val ticket = resp.data.ticket
+                                                val wsUrl = resp.data.wsUrl
+                                                val url = "$wsUrl?ticket=$ticket"
+
+                                                WebSocketManager.connect(
+                                                    url = url,
+                                                    tokenProvider = { TokenManager.getAccessToken() }
+                                                )
+
+                                                // 이번 시도에서 Open 또는 Failed 로 전이될 때까지 대기
+                                                val resultState = WebSocketManager.state.first {
+                                                    it is WebSocketManager.WsState.Open || it is WebSocketManager.WsState.Failed
+                                                }
+                                                if (resultState is WebSocketManager.WsState.Open) {
+                                                    Timber.d("[ChallengeSocket] 웹소켓 재연결 성공")
+                                                    return@launch
+                                                } else {
+                                                    Timber.w("[ChallengeSocket] 웹소켓 재연결 실패, 다음 딜레이로 재시도")
+                                                }
+                                            }
+                                            is ApiResponse.Error -> {
+                                                Timber.e(
+                                                    "[ChallengeSocket] enterChallenge 재시도 실패: code=%d, message=%s",
+                                                    resp.code,
+                                                    resp.message
+                                                )
+                                            }
+                                            is ApiResponse.NetworkError -> {
+                                                Timber.e("[ChallengeSocket] enterChallenge 재시도 네트워크 오류")
+                                            }
                                         }
                                     }
                                     Timber.e("[ChallengeSocket] 웹소켓 자동 재연결 최대 횟수 초과")

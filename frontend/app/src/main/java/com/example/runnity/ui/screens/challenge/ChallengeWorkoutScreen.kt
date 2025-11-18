@@ -66,9 +66,9 @@ import com.kakao.vectormap.label.LabelStyles
 fun ChallengeWorkoutScreen(
     challengeId: String,
     navController: NavController,
-    socketViewModel: ChallengeSocketViewModel
+    socketViewModel: ChallengeSocketViewModel,
+    sessionViewModel: WorkoutSessionViewModel
 ) {
-    val sessionViewModel: WorkoutSessionViewModel = viewModel()
     val challengeViewModel: ChallengeViewModel = viewModel()
     val metrics by sessionViewModel.metrics.collectAsState()
     val currentPace by sessionViewModel.currentPaceSecPerKm.collectAsState()
