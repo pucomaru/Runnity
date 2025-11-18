@@ -2,14 +2,19 @@ package com.example.runnity.ui.screens.challenge
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.repository.ChallengeRepository
+import com.example.runnity.data.util.TokenManager
 import com.example.runnity.data.util.UserProfileManager
+import com.example.runnity.socket.WebSocketManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -21,6 +26,9 @@ class ChallengeSocketViewModel : ViewModel() {
 
     private val gson = Gson()
     private var observeJob: Job? = null
+    private var reconnectJob: Job? = null
+
+    private val challengeRepository = ChallengeRepository()
 
     // 현재 사용자 ID (참가자 리스트에서 isMe 여부 판단용)
     private val currentUserId: String? = UserProfileManager.getProfile()?.memberId?.toString()
@@ -57,11 +65,81 @@ class ChallengeSocketViewModel : ViewModel() {
             launch {
                 while (true) {
                     delay(30_000L)
-                    val pingJson = "{" +
-                        "\"type\":\"PING\"," +
-                        "\"timestamp\":" + System.currentTimeMillis() +
-                        "}"
-                    WebSocketManager.send(pingJson)
+                    if (WebSocketManager.isOpen) {
+                        val pingJson = "{" +
+                            "\"type\":\"PING\"," +
+                            "\"timestamp\":" + System.currentTimeMillis() +
+                            "}"
+                        WebSocketManager.send(pingJson)
+                    } else {
+                        Timber.w("[ChallengeSocket] 웹소켓이 닫혀 있어 PING 생략")
+                    }
+                }
+            }
+
+            // 웹소켓 상태를 감시하여 Closed/Failed 시 제한된 자동 재연결 시도
+            launch {
+                WebSocketManager.state.collect { state ->
+                    when (state) {
+                        is WebSocketManager.WsState.Closed,
+                        is WebSocketManager.WsState.Failed -> {
+                            if (reconnectJob == null || reconnectJob?.isActive == false) {
+                                reconnectJob = launch {
+                                    val delays = listOf(1000L, 3000L, 5000L)
+                                    for (delayMs in delays) {
+                                        // 화면을 벗어나 observeJob 이 취소되면 재연결 루프도 중단
+                                        if (!this.isActive) return@launch
+                                        kotlinx.coroutines.delay(delayMs)
+                                        Timber.w("[ChallengeSocket] 웹소켓 상태=%s, 재연결 시도 (delay=%dms)", state, delayMs)
+
+                                        // 티켓이 1회용이므로 매 재시도마다 enterChallenge 를 다시 호출해
+                                        // 새로운 ticket/wsUrl 을 받아온 뒤 WebSocketManager.connect 로 재연결한다.
+                                        val resp = challengeRepository.enterChallenge(challengeId)
+                                        when (resp) {
+                                            is ApiResponse.Success -> {
+                                                val ticket = resp.data.ticket
+                                                val wsUrl = resp.data.wsUrl
+                                                val url = "$wsUrl?ticket=$ticket"
+
+                                                WebSocketManager.connect(
+                                                    url = url,
+                                                    tokenProvider = { TokenManager.getAccessToken() }
+                                                )
+
+                                                // 이번 시도에서 Open 또는 Failed 로 전이될 때까지 대기
+                                                val resultState = WebSocketManager.state.first {
+                                                    it is WebSocketManager.WsState.Open || it is WebSocketManager.WsState.Failed
+                                                }
+                                                if (resultState is WebSocketManager.WsState.Open) {
+                                                    Timber.d("[ChallengeSocket] 웹소켓 재연결 성공")
+                                                    return@launch
+                                                } else {
+                                                    Timber.w("[ChallengeSocket] 웹소켓 재연결 실패, 다음 딜레이로 재시도")
+                                                }
+                                            }
+                                            is ApiResponse.Error -> {
+                                                Timber.e(
+                                                    "[ChallengeSocket] enterChallenge 재시도 실패: code=%d, message=%s",
+                                                    resp.code,
+                                                    resp.message
+                                                )
+                                            }
+                                            is ApiResponse.NetworkError -> {
+                                                Timber.e("[ChallengeSocket] enterChallenge 재시도 네트워크 오류")
+                                            }
+                                        }
+                                    }
+                                    Timber.e("[ChallengeSocket] 웹소켓 자동 재연결 최대 횟수 초과")
+                                }
+                            }
+                        }
+                        is WebSocketManager.WsState.Open,
+                        is WebSocketManager.WsState.Connecting -> {
+                            // 연결이 다시 열리면 재연결 job은 더 이상 필요 없다
+                            reconnectJob?.cancel()
+                            reconnectJob = null
+                        }
+                    }
                 }
             }
 
@@ -80,10 +158,12 @@ class ChallengeSocketViewModel : ViewModel() {
                                 message.userId
                             )
                             if (message.challengeId == challengeId) {
-                                // 서버 participants 리스트와 me 필드를 모두 반영해 참가자 목록 구성
+                                // 서버 participants 리스트와 me 필드를 모두 반영해 참가자 목록 구성하되,
+                                // 이미 클라이언트에 쌓여 있는 distance/pace 기록은 유지한다 (재연결 시 0으로 초기화 방지).
                                 val myId = currentUserId ?: message.userId.toString()
 
-                                val fromParticipants = message.participants.map { p ->
+                                val serverList = mutableListOf<Participant>()
+                                serverList += message.participants.map { p ->
                                     Participant(
                                         id = p.userId.toString(),
                                         nickname = p.nickname,
@@ -95,36 +175,54 @@ class ChallengeSocketViewModel : ViewModel() {
                                     )
                                 }
 
-                                // 서버가 me를 별도 필드로 내려주는 경우도 참가자로 포함
-                                val meParticipant = message.me?.let { m ->
-                                    Participant(
-                                        id = m.userId.toString(),
-                                        nickname = m.nickname,
-                                        avatarUrl = m.profileImage,
-                                        averagePace = "",
-                                        distanceKm = m.distance,
-                                        paceSecPerKm = m.pace,
-                                        isMe = true
-                                    )
-                                }
-
-                                val merged = buildList {
-                                    addAll(fromParticipants)
-                                    if (meParticipant != null && none { it.id == meParticipant.id }) {
-                                        add(meParticipant)
+                                message.me?.let { m ->
+                                    val meId = m.userId.toString()
+                                    if (serverList.none { it.id == meId }) {
+                                        serverList += Participant(
+                                            id = meId,
+                                            nickname = m.nickname,
+                                            avatarUrl = m.profileImage,
+                                            averagePace = "",
+                                            distanceKm = m.distance,
+                                            paceSecPerKm = m.pace,
+                                            isMe = true
+                                        )
                                     }
                                 }
-                                Timber.d(
-                                    "[ChallengeSocket] CONNECTED applied, mergedSize=%d, fromParticipants=%d, hasMe=%b",
+
+                                val current = _participants.value
+                                val byId = serverList.associateBy { it.id }.toMutableMap()
+                                val merged = mutableListOf<Participant>()
+
+                                // 1) 이미 존재하는 참가자는 distance/pace/isRetired 를 유지하면서
+                                //    닉네임/프로필 등 메타데이터만 서버 값으로 갱신
+                                current.forEach { existing ->
+                                    val fromServer = byId.remove(existing.id)
+                                    if (fromServer != null) {
+                                        merged += existing.copy(
+                                            nickname = fromServer.nickname,
+                                            avatarUrl = fromServer.avatarUrl ?: existing.avatarUrl,
+                                            isMe = existing.isMe || fromServer.isMe
+                                        )
+                                    } else {
+                                        merged += existing
+                                    }
+                                }
+
+                                // 2) 재연결 이후 새로 발견된 참가자는 그대로 추가
+                                byId.values.forEach { p -> merged += p }
+
+                     Timber.d(
+                                    "[ChallengeSocket] CONNECTED merged, before=%d, after=%d, server=%d",
+                                    current.size,
                                     merged.size,
-                                    fromParticipants.size,
-                                    meParticipant != null
+                                    serverList.size
                                 )
 
                                 _participants.value = applyRanking(merged).also {
                                     Timber.d("[ChallengeSocket] participants after CONNECTED, size=%d", it.size)
                                 }
-                            }
+                            }           
                         }
                         "USER_ENTERED" -> {
                             val entered = gson.fromJson(text, UserEnteredMessage::class.java)
@@ -139,23 +237,46 @@ class ChallengeSocketViewModel : ViewModel() {
                                     isMe = (currentUserId != null && currentUserId == entered.userId.toString())
                                 )
                                 val current = _participants.value
-                                // 이미 존재하지 않을 때만 추가
-                                if (current.none { it.id == newParticipant.id }) {
-                                    val next = applyRanking(current + newParticipant)
-                                    Timber.d(
-                                        "[ChallengeSocket] USER_ENTERED userId=%s, nickname=%s, size(before)=%d, size(after)=%d",
-                                        newParticipant.id,
-                                        newParticipant.nickname,
-                                        current.size,
-                                        next.size
-                                    )
-                                    _participants.value = next
+                                val existing = current.find { it.id == newParticipant.id }
+
+                                val next = if (existing == null) {
+                                    // 처음 들어오는 참가자: 그대로 추가
+                                    applyRanking(current + newParticipant).also {
+                                        Timber.d(
+                                            "[ChallengeSocket] USER_ENTERED new userId=%s, nickname=%s, size(before)=%d, size(after)=%d",
+                                            newParticipant.id,
+                                            newParticipant.nickname,
+                                            current.size,
+                                            it.size
+                                        )
+                                    }
                                 } else {
-                                    Timber.d(
-                                        "[ChallengeSocket] USER_ENTERED ignored because participant already exists, userId=%s",
-                                        newParticipant.id
-                                    )
+                                    // 이미 존재하던 참가자가 다시 들어온 경우:
+                                    // - isRetired 를 해제하고
+                                    // - 닉네임/프로필/거리/페이스를 서버 값으로 갱신
+                                    val updated = current.map { p ->
+                                        if (p.id == newParticipant.id) {
+                                            p.copy(
+                                                nickname = newParticipant.nickname,
+                                                avatarUrl = newParticipant.avatarUrl ?: p.avatarUrl,
+                                                distanceKm = newParticipant.distanceKm,
+                                                paceSecPerKm = newParticipant.paceSecPerKm,
+                                                isRetired = false,
+                                                isMe = p.isMe || newParticipant.isMe
+                                            )
+                                        } else p
+                                    }
+                                    applyRanking(updated).also {
+                                        Timber.d(
+                                            "[ChallengeSocket] USER_ENTERED revive userId=%s, nickname=%s, size=%d",
+                                            newParticipant.id,
+                                            newParticipant.nickname,
+                                            it.size
+                                        )
+                                    }
                                 }
+
+                                _participants.value = next
                             }
                         }
                         "USER_LEFT" -> {

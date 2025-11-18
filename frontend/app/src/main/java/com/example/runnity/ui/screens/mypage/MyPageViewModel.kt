@@ -46,6 +46,9 @@ class MyPageViewModel(
     private val _selectedRecordTab = MutableStateFlow(0)
     val selectedRecordTab: StateFlow<Int> = _selectedRecordTab.asStateFlow()
 
+    // 그래프 데이터 캐시 (인덱스별로 저장)
+    private val graphDataCache = mutableMapOf<String, List<GraphPoint>>()
+
     init {
         loadUserProfile()
         loadStats()
@@ -92,25 +95,40 @@ class MyPageViewModel(
      * 선택된 기간 타입과 인덱스에 따라 API 호출
      */
     private fun loadStats() {
+        loadStatsForIndex(_selectedPeriodIndex.value)
+    }
+
+    /**
+     * 특정 인덱스의 통계 데이터 로드
+     */
+    private fun loadStatsForIndex(targetIndex: Int) {
         viewModelScope.launch {
             try {
-                val (startDate, endDate, period) = calculateDateRange()
+                val (startDate, endDate, period) = calculateDateRangeForIndex(targetIndex)
+                val cacheKey = "${_selectedPeriodType.value}_${targetIndex}"
 
-                Timber.d("MyPage: 통계 로드 - startDate=$startDate, endDate=$endDate, period=$period")
+                Timber.d("MyPage: 통계 로드 - targetIndex=$targetIndex, startDate=$startDate, endDate=$endDate, period=$period, cacheKey=$cacheKey")
 
                 when (val response = statsRepository.getStatsSummary(startDate, endDate, period)) {
                     is ApiResponse.Success -> {
                         val statsData = response.data
-                        Timber.d("MyPage: 통계 로드 성공 - totalDistance=${statsData.totalDistance}")
+                        Timber.d("MyPage: 통계 로드 성공 - targetIndex=$targetIndex, totalDistance=${statsData.totalDistance}")
 
-                        val currentState = _uiState.value
-                        if (currentState is MyPageUiState.Success) {
-                            _uiState.value = currentState.copy(
-                                stats = convertToRunningStats(statsData),
-                                graphData = convertToGraphData(statsData),
-                                personalRecords = convertPersonalRecordsToRunningRecords(statsData.personals),
-                                challengeRecords = convertChallengeRecordsToRunningRecords(statsData.challenges)
-                            )
+                        val graphData = convertToGraphData(statsData)
+                        // 캐시에 저장 (targetIndex 사용)
+                        graphDataCache[cacheKey] = graphData
+
+                        // 현재 선택된 인덱스만 UI 상태 업데이트
+                        if (targetIndex == _selectedPeriodIndex.value) {
+                            val currentState = _uiState.value
+                            if (currentState is MyPageUiState.Success) {
+                                _uiState.value = currentState.copy(
+                                    stats = convertToRunningStats(statsData),
+                                    graphData = graphData,
+                                    personalRecords = convertPersonalRecordsToRunningRecords(statsData.personals),
+                                    challengeRecords = convertChallengeRecordsToRunningRecords(statsData.challenges)
+                                )
+                            }
                         }
                     }
                     is ApiResponse.Error -> {
@@ -131,9 +149,15 @@ class MyPageViewModel(
      * @return Triple(startDate, endDate, period)
      */
     private fun calculateDateRange(): Triple<String, String, String> {
+        return calculateDateRangeForIndex(_selectedPeriodIndex.value)
+    }
+
+    /**
+     * 특정 인덱스에 대한 날짜 범위 계산
+     */
+    private fun calculateDateRangeForIndex(periodIndex: Int): Triple<String, String, String> {
         val today = LocalDate.now()
         val periodType = _selectedPeriodType.value
-        val periodIndex = _selectedPeriodIndex.value
 
         return when (periodType) {
             PeriodType.WEEK -> {
@@ -143,6 +167,8 @@ class MyPageViewModel(
                 val weekFields = WeekFields.of(DayOfWeek.MONDAY, 1)
                 val startOfWeek = targetWeek.with(weekFields.dayOfWeek(), 1)
                 val endOfWeek = startOfWeek.plusDays(6)
+
+                Timber.d("MyPage: WEEK - index=$periodIndex, weeksBack=$weeksBack, range=${startOfWeek} ~ ${endOfWeek}")
 
                 Triple(
                     "${startOfWeek}T00:00:00",
@@ -157,6 +183,8 @@ class MyPageViewModel(
                 val startOfMonth = targetMonth.with(TemporalAdjusters.firstDayOfMonth())
                 val endOfMonth = targetMonth.with(TemporalAdjusters.lastDayOfMonth())
 
+                Timber.d("MyPage: MONTH - index=$periodIndex, monthsBack=$monthsBack, targetMonth=${targetMonth.format(DateTimeFormatter.ofPattern("yyyy.MM"))}")
+
                 Triple(
                     "${startOfMonth}T00:00:00",
                     "${endOfMonth}T23:59:59",
@@ -169,6 +197,8 @@ class MyPageViewModel(
                 val targetYear = today.year - yearsBack
                 val startOfYear = LocalDate.of(targetYear, 1, 1)
                 val endOfYear = LocalDate.of(targetYear, 12, 31)
+
+                Timber.d("MyPage: YEAR - index=$periodIndex, yearsBack=$yearsBack, targetYear=$targetYear")
 
                 Triple(
                     "${startOfYear}T00:00:00",
@@ -189,6 +219,8 @@ class MyPageViewModel(
 
     fun selectPeriodType(type: PeriodType) {
         _selectedPeriodType.value = type
+        // 기간 타입 변경 시 캐시 초기화
+        graphDataCache.clear()
         // 기본값을 이번 주/월/연으로 설정
         _selectedPeriodIndex.value = when (type) {
             PeriodType.WEEK -> 3  // 이번 주 (4개 중 마지막)
@@ -239,6 +271,7 @@ class MyPageViewModel(
     }
 
     fun selectPeriodIndex(index: Int) {
+        Timber.d("MyPage: selectPeriodIndex - index=$index, periodType=${_selectedPeriodType.value}")
         _selectedPeriodIndex.value = index
         // 세부 기간 변경 시 통계 재조회
         loadStats()
@@ -301,7 +334,7 @@ class MyPageViewModel(
 
     /**
      * 그래프 레이블 포맷팅
-     * "2025-W46" -> "W46", "2025-11" -> "11월", "2025-11-14" -> "14"
+     * "2025-W46" -> "W46", "2025-11" -> "11월", "2025-11-14" -> "14일"
      */
     private fun formatGraphLabel(label: String): String {
         return when {
@@ -309,8 +342,8 @@ class MyPageViewModel(
             label.contains("-W") -> label.substringAfter("-")
             // 월별: "2025-11" -> "11월"
             label.matches(Regex("\\d{4}-\\d{2}")) -> "${label.substringAfter("-").toInt()}월"
-            // 일별: "2025-11-14" -> "14"
-            label.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> label.substringAfterLast("-").toInt().toString()
+            // 일별: "2025-11-14" -> "14일" (일단 모두 "일" 붙이기)
+            label.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> "${label.substringAfterLast("-").toInt()}일"
             // 년별: "2025" -> "2025"
             else -> label
         }
@@ -408,21 +441,25 @@ class MyPageViewModel(
 
     /**
      * 특정 인덱스에 대한 그래프 데이터 반환
-     * 현재 선택된 인덱스일 경우에만 실제 API 데이터 반환
+     * 캐시에서 가져오거나, 없으면 API 호출하여 로드
      */
     fun getGraphDataForIndex(index: Int): List<GraphPoint> {
-        // 현재 선택된 인덱스가 아니면 빈 데이터 반환 (스와이프 시 깜빡임 방지)
-        if (index != _selectedPeriodIndex.value) {
-            return emptyList()
+        val cacheKey = "${_selectedPeriodType.value}_${index}"
+
+        Timber.d("MyPage: getGraphDataForIndex - index=$index, selectedIndex=${_selectedPeriodIndex.value}, cacheKey=$cacheKey")
+
+        // 캐시에 있으면 반환
+        graphDataCache[cacheKey]?.let {
+            Timber.d("MyPage: 캐시에서 데이터 반환 - $cacheKey, size=${it.size}")
+            return it
         }
 
-        // 현재 UiState에서 그래프 데이터 가져오기
-        val currentState = _uiState.value
-        return if (currentState is MyPageUiState.Success) {
-            currentState.graphData
-        } else {
-            emptyList()
-        }
+        // 캐시에 없으면 API 호출
+        Timber.d("MyPage: 캐시에 없음 - API 호출 - $cacheKey")
+        loadStatsForIndex(index)
+
+        // API 응답 대기 중이므로 빈 리스트 반환
+        return emptyList()
     }
 
     fun selectRecordTab(index: Int) {

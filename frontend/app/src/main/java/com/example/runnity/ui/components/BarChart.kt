@@ -69,80 +69,28 @@ fun SimpleBarChart(
         (0..4).map { (step * it).toInt().toDouble() }.reversed()
     }
 
-    BoxWithConstraints(modifier = modifier) {
+    BoxWithConstraints(
+        modifier = modifier,
+        propagateMinConstraints = false
+    ) {
         val graphWidth = maxWidth
 
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // 캡션 영역 (고정 위치)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(70.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                if (selectedBarIndex >= 0 && detailedData != null && selectedBarIndex < detailedData.size) {
-                    val detailData = detailedData[selectedBarIndex]
-
-                    // 데이터가 0보다 클 때만 캡션 표시
-                    if (detailData.distance > 0) {
-                        // Y축 레이블 공간 제외한 실제 그래프 영역 비율
-                        val yAxisWidth = 48.dp
-                        val graphAreaWidth = graphWidth - yAxisWidth
-
-                        // 선택된 막대의 X 위치 계산
-                        val barCount = data.size
-                        val barSpacing = graphAreaWidth / barCount
-                        val xOffset = barSpacing * selectedBarIndex + (barSpacing / 2)
-
-                        Card(
-                            modifier = Modifier
-                                .offset(x = xOffset - (graphWidth / 2) + (yAxisWidth / 2))
-                                .zIndex(10f),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.White
-                            ),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = 4.dp
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                // 날짜/기간 표시
-                                Text(
-                                    text = formatCaptionLabel(detailData.label),
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.component
-                                )
-                                Text(
-                                    text = String.format("%.2f km", detailData.distance),
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.primary
-                                )
-                                Text(
-                                    text = formatTime(detailData.time),
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    text = formatPace(detailData.pace),
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.secondary
-                                )
-                                Text(
-                                    text = "${detailData.count}회",
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.secondary
-                                )
-                            }
-                        }
-                    }
+        // 선택된 막대의 높이 계산 (캡션 Y 위치 계산용)
+        val selectedBarHeight = remember(selectedBarIndex, data, maxValue) {
+            if (selectedBarIndex >= 0 && selectedBarIndex < data.size) {
+                val point = data[selectedBarIndex]
+                if (maxValue > 0 && point.value > 0) {
+                    (point.value / maxValue * 150).dp
+                } else {
+                    1.dp
                 }
+            } else {
+                0.dp
             }
+        }
 
+        // 메인 그래프 Column
+        Column(modifier = Modifier.fillMaxWidth()) {
             // 그래프 영역 (막대 + Y축)
             Row(
                 modifier = Modifier
@@ -213,32 +161,150 @@ fun SimpleBarChart(
 
             // X축 레이블
             if (showXAxisLabels) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(20.dp)
-                ) {
+                // 월 그래프 (많은 막대 + 적은 레이블)인지 확인
+                val labels = data.filter { it.label.isNotEmpty() }
+                val isMonthGraph = data.size > 20 && labels.size <= 3
+
+                if (isMonthGraph && labels.size == 3) {
+                    // 월 그래프: 레이블이 여러 칸을 차지하도록 배치
                     Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(20.dp)
                     ) {
-                        data.forEachIndexed { index, point ->
-                            // 빈 문자열이 아닌 경우에만 표시
-                            if (point.label.isNotEmpty()) {
-                                Text(
-                                    text = point.label,
-                                    style = Typography.CaptionSmall,
-                                    color = ColorPalette.Light.secondary,
-                                    modifier = Modifier.weight(1f),
-                                    textAlign = TextAlign.Center
-                                )
-                            } else {
-                                // 빈 문자열인 경우 공간만 차지
-                                Spacer(modifier = Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // 1일 (왼쪽)
+                            Text(
+                                text = labels[0].label,
+                                style = Typography.CaptionSmall,
+                                color = ColorPalette.Light.secondary,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Start
+                            )
+                            // 15일 (중앙)
+                            Text(
+                                text = labels[1].label,
+                                style = Typography.CaptionSmall,
+                                color = ColorPalette.Light.secondary,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center
+                            )
+                            // 마지막 날 (오른쪽)
+                            Text(
+                                text = labels[2].label,
+                                style = Typography.CaptionSmall,
+                                color = ColorPalette.Light.secondary,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.End
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(48.dp)) // Y축 레이블 공간만큼 패딩
+                    }
+                } else {
+                    // 기존 로직 (주/연/전체)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            data.forEachIndexed { index, point ->
+                                // 빈 문자열이 아닌 경우에만 표시
+                                if (point.label.isNotEmpty()) {
+                                    Text(
+                                        text = point.label,
+                                        style = Typography.CaptionSmall,
+                                        color = ColorPalette.Light.secondary,
+                                        modifier = Modifier.weight(1f),
+                                        textAlign = TextAlign.Center
+                                    )
+                                } else {
+                                    // 빈 문자열인 경우 공간만 차지
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.width(48.dp)) // Y축 레이블 공간만큼 패딩
                     }
-                    Spacer(modifier = Modifier.width(48.dp)) // Y축 레이블 공간만큼 패딩
+                }
+            }
+        }
+
+        // 캡션 오버레이 (공간 차지 안하고 선택된 막대 바로 위에 표시)
+        if (selectedBarIndex >= 0 && detailedData != null && selectedBarIndex < detailedData.size) {
+            val detailData = detailedData[selectedBarIndex]
+
+            // 데이터가 0보다 클 때만 캡션 표시
+            if (detailData.distance > 0) {
+                // Y축 레이블 공간 제외한 실제 그래프 영역 비율
+                val yAxisWidth = 48.dp
+                val graphAreaWidth = graphWidth - yAxisWidth
+
+                // 선택된 막대의 X 위치 계산
+                val barCount = data.size
+                val barSpacing = graphAreaWidth / barCount
+                val xOffset = barSpacing * selectedBarIndex + (barSpacing / 2)
+
+                // 캡션 Y 위치 계산: 그래프 영역 높이(150dp) - 막대 높이 - 캡션 높이(약 90dp)
+                // 음수가 되지 않도록 최소값 설정 (위로 잘리지 않게)
+                val captionHeight = 90.dp
+                val captionMargin = 8.dp  // 캡션을 조금 더 위로
+                val yOffset = (150.dp - selectedBarHeight - captionHeight - captionMargin).coerceAtLeast(0.dp)
+
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(
+                            x = xOffset - (graphWidth / 2) + (yAxisWidth / 2),
+                            y = yOffset  // 선택된 막대 바로 위에 위치
+                        )
+                        .zIndex(10f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 4.dp
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        // 날짜/기간 표시
+                        Text(
+                            text = formatCaptionLabel(detailData.label),
+                            style = Typography.CaptionSmall,
+                            color = ColorPalette.Light.component
+                        )
+                        Text(
+                            text = String.format("%.2f km", detailData.distance),
+                            style = Typography.CaptionSmall,
+                            color = ColorPalette.Light.primary
+                        )
+                        Text(
+                            text = formatTime(detailData.time),
+                            style = Typography.CaptionSmall,
+                            color = ColorPalette.Light.secondary
+                        )
+                        Text(
+                            text = formatPace(detailData.pace),
+                            style = Typography.CaptionSmall,
+                            color = ColorPalette.Light.secondary
+                        )
+                        Text(
+                            text = "${detailData.count}회",
+                            style = Typography.CaptionSmall,
+                            color = ColorPalette.Light.secondary
+                        )
+                    }
                 }
             }
         }
@@ -285,20 +351,22 @@ private fun formatPace(seconds: Int): String {
 
 /**
  * 캡션 레이블 포맷팅
- * "1" -> "1일", "월" -> "월요일", "1월" -> "1월", "2024" -> "2024년"
+ * "1일" -> "1일", "월" -> "월요일", "1월" -> "1월", "2024" -> "2024년"
  */
 private fun formatCaptionLabel(label: String): String {
     return when {
-        // 숫자만 있으면 일자 (월 그래프)
-        label.matches(Regex("\\d+")) -> "${label}일"
-        // "월", "화" 등 한 글자 요일
-        label.matches(Regex("[월화수목금토일]")) -> "${label}요일"
+        // 이미 "일"이 붙어있는 경우 (예: "14일")
+        label.endsWith("일") -> label
         // "1월", "2월" 등 이미 "월" 포함
         label.endsWith("월") -> label
+        // "월", "화" 등 한 글자 요일
+        label.matches(Regex("[월화수목금토일]")) -> "${label}요일"
         // 4자리 숫자는 년도
         label.matches(Regex("\\d{4}")) -> "${label}년"
         // 주간 포맷 "W46" 등
         label.startsWith("W") -> label
+        // 숫자만 있으면 일자 (월 그래프) - 하위호환성
+        label.matches(Regex("\\d+")) -> "${label}일"
         // 기타
         else -> label
     }

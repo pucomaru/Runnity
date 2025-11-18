@@ -69,13 +69,11 @@ import timber.log.Timber
 fun ChallengeResultScreen(
     challengeId: Int,
     socketViewModel: ChallengeSocketViewModel,
+    sessionViewModel: WorkoutSessionViewModel,
     onClose: (() -> Unit)? = null
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
-    // 개인/챌린지 공통으로 사용하는 WorkoutSessionViewModel
-    // (거리, 시간, 페이스, 랩, 경로 등 모든 운동 기록을 여기서 관리)
-    val sessionViewModel: WorkoutSessionViewModel = viewModel(context as androidx.lifecycle.ViewModelStoreOwner)
     val metrics by sessionViewModel.metrics.collectAsState()
     val route by sessionViewModel.route.collectAsState()
     val sessionStartTime by sessionViewModel.sessionStartTime.collectAsState()
