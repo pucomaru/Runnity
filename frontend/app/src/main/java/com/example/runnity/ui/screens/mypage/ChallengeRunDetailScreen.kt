@@ -581,7 +581,7 @@ private fun ChallengeRankingItem(
             val paceToShow = participant.paceSec ?: participant.averagePaceSec
             formatPace(paceToShow.toDouble())
         } else {
-            "-'--\"/km"
+            "-'--\""
         }
         Text(
             text = paceText,
@@ -605,5 +605,5 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }

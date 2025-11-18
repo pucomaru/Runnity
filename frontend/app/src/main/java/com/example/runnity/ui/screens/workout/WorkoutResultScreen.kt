@@ -284,7 +284,7 @@ fun WorkoutResultScreen(
                                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
+                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "-'--\""
                                         Text(paceText, style = Typography.Title)
                                     }
                                     Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -303,7 +303,7 @@ fun WorkoutResultScreen(
                                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("평균 페이스", style = Typography.Caption, color = ColorPalette.Light.secondary)
-                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "--:--/km"
+                                        val paceText = metrics.avgPaceSecPerKm?.let { formatPace(it) } ?: "-'--\""
                                         Text(paceText, style = Typography.Title)
                                     }
                                     Column(modifier = Modifier.width(half), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -367,7 +367,7 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }
 
 private fun formatCalories(kcal: Double): String = String.format("%.0f", kcal)

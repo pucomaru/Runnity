@@ -54,6 +54,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun WeatherDetailScreen(
     navController: NavController,
+    homeViewModel: com.example.runnity.ui.screens.home.HomeViewModel,
     viewModel: WeatherDetailViewModel = viewModel()
 ) {
     val weatherData by viewModel.weather.collectAsState()
@@ -61,7 +62,10 @@ fun WeatherDetailScreen(
     val loading by viewModel.loading.collectAsState()
     val context = LocalContext.current
 
-    // 날씨 데이터 로드
+    // HomeViewModel에서 현재 날씨 데이터 가져오기
+    val homeWeather by homeViewModel.weather.collectAsState()
+
+    // 날씨 데이터 로드 - HomeViewModel의 캐시된 데이터 사용
     LaunchedEffect(Unit) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
@@ -71,18 +75,19 @@ fun WeatherDetailScreen(
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
-                    viewModel.fetchWeather(location.latitude, location.longitude)
+                    // HomeViewModel의 캐시된 날씨 데이터 전달
+                    viewModel.fetchWeather(location.latitude, location.longitude, homeWeather)
                 } else {
                     // 위치를 가져올 수 없으면 서울 좌표 사용
-                    viewModel.fetchWeather(37.5665, 126.9780)
+                    viewModel.fetchWeather(37.5665, 126.9780, homeWeather)
                 }
             }.addOnFailureListener {
                 // 실패 시 서울 좌표 사용
-                viewModel.fetchWeather(37.5665, 126.9780)
+                viewModel.fetchWeather(37.5665, 126.9780, homeWeather)
             }
         } else {
             // 권한 없으면 서울 좌표 사용
-            viewModel.fetchWeather(37.5665, 126.9780)
+            viewModel.fetchWeather(37.5665, 126.9780, homeWeather)
         }
     }
 
