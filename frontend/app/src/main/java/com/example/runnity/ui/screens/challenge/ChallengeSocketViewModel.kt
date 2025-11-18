@@ -212,7 +212,7 @@ class ChallengeSocketViewModel : ViewModel() {
                                 // 2) 재연결 이후 새로 발견된 참가자는 그대로 추가
                                 byId.values.forEach { p -> merged += p }
 
-                                Timber.d(
+                     Timber.d(
                                     "[ChallengeSocket] CONNECTED merged, before=%d, after=%d, server=%d",
                                     current.size,
                                     merged.size,
@@ -222,7 +222,7 @@ class ChallengeSocketViewModel : ViewModel() {
                                 _participants.value = applyRanking(merged).also {
                                     Timber.d("[ChallengeSocket] participants after CONNECTED, size=%d", it.size)
                                 }
-                            }
+                            }           
                         }
                         "USER_ENTERED" -> {
                             val entered = gson.fromJson(text, UserEnteredMessage::class.java)
@@ -237,23 +237,46 @@ class ChallengeSocketViewModel : ViewModel() {
                                     isMe = (currentUserId != null && currentUserId == entered.userId.toString())
                                 )
                                 val current = _participants.value
-                                // 이미 존재하지 않을 때만 추가
-                                if (current.none { it.id == newParticipant.id }) {
-                                    val next = applyRanking(current + newParticipant)
-                                    Timber.d(
-                                        "[ChallengeSocket] USER_ENTERED userId=%s, nickname=%s, size(before)=%d, size(after)=%d",
-                                        newParticipant.id,
-                                        newParticipant.nickname,
-                                        current.size,
-                                        next.size
-                                    )
-                                    _participants.value = next
+                                val existing = current.find { it.id == newParticipant.id }
+
+                                val next = if (existing == null) {
+                                    // 처음 들어오는 참가자: 그대로 추가
+                                    applyRanking(current + newParticipant).also {
+                                        Timber.d(
+                                            "[ChallengeSocket] USER_ENTERED new userId=%s, nickname=%s, size(before)=%d, size(after)=%d",
+                                            newParticipant.id,
+                                            newParticipant.nickname,
+                                            current.size,
+                                            it.size
+                                        )
+                                    }
                                 } else {
-                                    Timber.d(
-                                        "[ChallengeSocket] USER_ENTERED ignored because participant already exists, userId=%s",
-                                        newParticipant.id
-                                    )
+                                    // 이미 존재하던 참가자가 다시 들어온 경우:
+                                    // - isRetired 를 해제하고
+                                    // - 닉네임/프로필/거리/페이스를 서버 값으로 갱신
+                                    val updated = current.map { p ->
+                                        if (p.id == newParticipant.id) {
+                                            p.copy(
+                                                nickname = newParticipant.nickname,
+                                                avatarUrl = newParticipant.avatarUrl ?: p.avatarUrl,
+                                                distanceKm = newParticipant.distanceKm,
+                                                paceSecPerKm = newParticipant.paceSecPerKm,
+                                                isRetired = false,
+                                                isMe = p.isMe || newParticipant.isMe
+                                            )
+                                        } else p
+                                    }
+                                    applyRanking(updated).also {
+                                        Timber.d(
+                                            "[ChallengeSocket] USER_ENTERED revive userId=%s, nickname=%s, size=%d",
+                                            newParticipant.id,
+                                            newParticipant.nickname,
+                                            it.size
+                                        )
+                                    }
                                 }
+
+                                _participants.value = next
                             }
                         }
                         "USER_LEFT" -> {
