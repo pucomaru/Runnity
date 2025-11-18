@@ -467,18 +467,6 @@ private fun CalendarDateItem(
                         }
                     }
                 }
-                isToday && !isSelected -> {
-                    // 오늘 표시 (운동 기록이 없을 때만)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .background(
-                                color = ColorPalette.Common.accent,
-                                shape = CircleShape
-                            )
-                    )
-                }
                 else -> {
                     // 빈 공간 유지 (레이아웃 일관성을 위해)
                     Spacer(modifier = Modifier.height(6.dp))
@@ -613,7 +601,7 @@ private fun RunningRecordItem(
             ) {
                 // 거리
                 Text(
-                    text = "${record.distance} km",
+                    text = String.format("%.2f km", record.distance),
                     style = Typography.Subheading,
                     color = ColorPalette.Light.primary
                 )

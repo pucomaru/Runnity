@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.home
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -69,24 +70,28 @@ fun HomeScreen(
 
     val locationLauncher = rememberLocationPermissionLauncher { granted ->
         if (granted) {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            val cancellationToken = CancellationTokenSource().token
+            @SuppressLint("MissingPermission")
+            fun fetchLocation() {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource().token
 
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cancellationToken
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.fetchWeather(location.latitude, location.longitude)
-                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
-                } else {
+                fusedLocationClient.getCurrentLocation(
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    cancellationToken
+                ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.fetchWeather(location.latitude, location.longitude)
+                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                    } else {
+                        viewModel.fetchWeather(37.5665, 126.9780)
+                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                    }
+                }.addOnFailureListener { exception ->
+                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
                     viewModel.fetchWeather(37.5665, 126.9780)
-                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
-            }.addOnFailureListener { exception ->
-                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
-                viewModel.fetchWeather(37.5665, 126.9780)
             }
+            fetchLocation()
         } else {
             viewModel.fetchWeather(37.5665, 126.9780)
             Timber.w("위치 권한 거부 → 서울 기본값 사용")
@@ -100,24 +105,28 @@ fun HomeScreen(
         if (!PermissionUtils.hasLocationPermission(context)) {
             requestLocationPermissions(locationLauncher)
         } else {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            val cancellationToken = CancellationTokenSource().token
+            @SuppressLint("MissingPermission")
+            fun fetchInitialLocation() {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource().token
 
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cancellationToken
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
-                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
-                } else {
+                fusedLocationClient.getCurrentLocation(
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    cancellationToken
+                ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
+                        Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
+                    } else {
+                        viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
+                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                    }
+                }.addOnFailureListener { exception ->
+                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
                     viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
-                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
-            }.addOnFailureListener { exception ->
-                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
-                viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
             }
+            fetchInitialLocation()
         }
 
         if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)) {
@@ -260,20 +269,32 @@ fun HomeScreen(
                             navController?.navigate("weather_detail")
                         },
                         onRefresh = {
-                            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                            val cancellationToken = CancellationTokenSource().token
+                            if (PermissionUtils.hasLocationPermission(context)) {
+                                @SuppressLint("MissingPermission")
+                                fun refreshLocation() {
+                                    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                                    val cancellationToken = CancellationTokenSource().token
 
-                            fusedLocationClient.getCurrentLocation(
-                                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                                cancellationToken
-                            ).addOnSuccessListener { location ->
-                                if (location != null) {
-                                    viewModel.fetchWeather(location.latitude, location.longitude)
-                                } else {
-                                    viewModel.fetchWeather(37.5665, 126.9780)
+                                    fusedLocationClient.getCurrentLocation(
+                                        Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                                        cancellationToken
+                                    ).addOnSuccessListener { location ->
+                                        if (location != null) {
+                                            viewModel.fetchWeather(location.latitude, location.longitude)
+                                            Timber.d("새로고침 - 현재 위치: ${location.latitude}, ${location.longitude}")
+                                        } else {
+                                            viewModel.fetchWeather(37.5665, 126.9780)
+                                            Timber.w("새로고침 - 위치 정보 없음")
+                                        }
+                                    }.addOnFailureListener { exception ->
+                                        Timber.e(exception, "새로고침 - 위치 조회 실패")
+                                        viewModel.fetchWeather(37.5665, 126.9780)
+                                    }
                                 }
-                            }.addOnFailureListener {
+                                refreshLocation()
+                            } else {
                                 viewModel.fetchWeather(37.5665, 126.9780)
+                                Timber.w("새로고침 - 위치 권한 없음")
                             }
                         }
                     )
