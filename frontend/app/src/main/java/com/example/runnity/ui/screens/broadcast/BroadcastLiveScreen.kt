@@ -3,34 +3,29 @@ package com.example.runnity.ui.screens.broadcast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.runnity.data.repository.BroadcastRepository
 import com.example.runnity.data.util.DistanceUtils
 import com.example.runnity.ui.components.LiveBadge
 import com.example.runnity.ui.components.PrimaryButton
 import com.example.runnity.ui.screens.broadcast.components.LiveRankingSection
 import com.example.runnity.ui.screens.broadcast.components.MarathonTrackSection
+import timber.log.Timber
 
 /**
  * 브로드캐스트 라이브 화면
@@ -40,139 +35,108 @@ import com.example.runnity.ui.screens.broadcast.components.MarathonTrackSection
 fun BroadcastLiveScreen(
     challengeId: String,
     navController: NavController,
+    broadcastViewModel: BroadcastViewModel,
+    liveViewModel: BroadcastLiveViewModel,
     modifier: Modifier = Modifier
 ) {
-    val viewModel: BroadcastLiveViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by liveViewModel.uiState.collectAsState()
+
+    val leaveAction: () -> Unit = {
+        liveViewModel.disconnectStomp()
+        navController.popBackStack()
+    }
 
     // STOMP 연결
     LaunchedEffect(challengeId) {
+        Timber.d("[BroadcastUI] challengeId=${challengeId}")
+        val initialData = broadcastViewModel.selectedBroadcast.value
+        if (initialData != null) {
+            // Live ViewModel을 목록 데이터로 초기화
+            liveViewModel.initializeFrom(initialData)
+        }
         // 중계방 입장 API → WebSocket 연결 자동 진행
-        viewModel.joinAndConnect(challengeId.toLong())
-    }
-
-    // 로딩 상태 표시
-    if (uiState.isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-    }
-
-    // 에러 메시지 표시
-    uiState.errorMessage?.let { error ->
-        Snackbar(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(text = error)
-        }
+        liveViewModel.joinAndConnect(challengeId.toLong())
     }
 
     // 화면 종료 시 정리
     DisposableEffect(Unit) {
+        Timber.d("[BroadcastUI] 화면 종료")
         onDispose {
-            viewModel.disconnectStomp()
+            liveViewModel.disconnectStomp()
         }
     }
 
     // 뒤로가기 버튼 처리
     BackHandler {
-        viewModel.disconnectStomp()
-        navController.popBackStack()
+        Timber.d("[BroadcastUI] 뒤로가기")
+        leaveAction()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(uiState.title) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "뒤로가기")
-                    }
-                },
-                actions = {
-                    // 시청자 수, 참가자 수 등 표시
-                    Text(text = "시청자: ${uiState.viewerCount}", modifier = Modifier.padding(end = 16.dp))
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
 
-                uiState.errorMessage != null -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = uiState.errorMessage ?: "오류가 발생했습니다.")
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { navController.popBackStack() }) {
-                            Text("돌아가기")
-                        }
-                    }
-                }
 
-                else -> {
-                    // TODO: 여기에 실제 중계 화면 UI 구현 (지도, 러너 목록 등)
-                    // 지금은 간단히 텍스트로 표시
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("거리: ${uiState.distance}")
-                        Text("총 참가자: ${uiState.participantCount}")
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("참가자 순위:")
-                        uiState.runners.forEach { runner ->
-                            Text("${runner.rank}위: ${runner.nickname} (${runner.distanceMeter}m, ${runner.pace})")
-                        }
-                    }
-                }
+//
+//    // 로딩 상태 표시
+//    if (uiState.isLoading) {
+//        Box(
+//            modifier = Modifier.fillMaxSize(),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            CircularProgressIndicator()
+//        }
+//    }
+//
+//    // 에러 메시지 표시
+//    uiState.errorMessage?.let { error ->
+//        Snackbar(
+//            modifier = Modifier.padding(16.dp)
+//        ) {
+//            Text(text = error)
+//        }
+//    }
+
+
+    Scaffold { paddingValues ->
+        // 화면의 실제 컨텐츠
+        BroadcastLiveContent(
+            modifier = modifier.padding(paddingValues),
+            uiState = uiState, // liveViewModel의 uiState 사용
+            onRunnerClick = { runnerId -> liveViewModel.selectRunner(runnerId) },
+            onLeaveClick = {
+                liveViewModel.disconnectStomp()
+                navController.popBackStack()
             }
-        }
+        )
     }
-
-    BroadcastLiveContent(
-        title = uiState.title,
-        viewerCount = uiState.viewerCount,
-        totalDistanceMeter = uiState.totalDistanceMeter,
-        runners = uiState.runners,
-        selectedRunnerId = uiState.selectedRunnerId,
-        onRunnerClick = { runnerId -> viewModel.selectRunner(runnerId) },
-        navController = navController,
-        modifier = modifier
-    )
 }
 
+//    BroadcastLiveContent(
+//        title = uiState.title,
+//        viewerCount = uiState.viewerCount,
+//        totalDistanceMeter = uiState.totalDistanceMeter,
+//        runners = uiState.runners,
+//        selectedRunnerId = uiState.selectedRunnerId,
+//        onRunnerClick = { runnerId -> viewModel.selectRunner(runnerId) },
+//        onLeaveClick = {
+//            viewModel.disconnectStomp()
+//            navController.navigateUp()
+//        },
+//        navController = navController,
+//        modifier = modifier
+//    )
+//}
 /**
  * 브로드캐스트 라이브 화면 컨텐츠
  */
 @Composable
 fun BroadcastLiveContent(
-    title: String,
-    viewerCount: Int,
-    totalDistanceMeter: Int,
-    runners: List<BroadcastLiveViewModel.RunnerUi>,
-    selectedRunnerId: Long?,
+    uiState: BroadcastLiveViewModel.LiveUi,
     onRunnerClick: (Long?) -> Unit,
-    navController: NavController,
+    onLeaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // 실시간으로 순위 정렬
-    val sortedRunners = remember(runners) {
-        runners.sortedByDescending { it.distanceMeter }
+    val sortedRunners = remember(uiState.runners) {
+        uiState.runners.sortedBy { it.rank }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -181,7 +145,7 @@ fun BroadcastLiveContent(
                 .fillMaxSize()
                 .background(Color(0xFFF5F7FA))
         ) {
-            // ✅ 1. 헤더 (고정)
+            // 1. 헤더 (고정)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -189,7 +153,7 @@ fun BroadcastLiveContent(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { navController.navigateUp() }) {
+                IconButton(onLeaveClick) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "뒤로가기",
@@ -203,7 +167,7 @@ fun BroadcastLiveContent(
                 Spacer(Modifier.width(8.dp))
 
                 Text(
-                    text = title.ifEmpty { "라이브 중계" },
+                    text = uiState.title.ifEmpty { uiState.title },
                     color = Color(0xFF222222),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -211,14 +175,14 @@ fun BroadcastLiveContent(
                 )
 
                 Text(
-                    text = DistanceUtils.meterToKmString(totalDistanceMeter),
+                    text = DistanceUtils.meterToKmString(uiState.totalDistanceMeter),
                     color = Color(0xFF666666),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // ✅ 2. 시청자 수 (고정)
+            // 2. 시청자 수 (고정)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -227,7 +191,7 @@ fun BroadcastLiveContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${viewerCount}명 시청 중",
+                    text = "${uiState.viewerCount}명 시청 중",
                     color = Color(0xFF666666),
                     fontSize = 13.sp
                 )
@@ -235,10 +199,10 @@ fun BroadcastLiveContent(
 
             Spacer(Modifier.height(8.dp))
 
-            // ✅ 3. 마라톤 트랙 (고정)
+            // 3. 마라톤 트랙 (고정)
             MarathonTrackSection(
                 runners = sortedRunners.take(10),
-                selectedRunnerId = selectedRunnerId,
+                selectedRunnerId = uiState.selectedRunnerId,
                 onRunnerClick = onRunnerClick,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -248,28 +212,32 @@ fun BroadcastLiveContent(
 
             Spacer(Modifier.height(8.dp))
 
-            // ✅ 4. 실시간 순위표 (스크롤 가능)
+            // 4. 실시간 순위표 (스크롤 가능)
             LiveRankingSection(
                 runners = sortedRunners,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)  // ← 남은 공간 모두 차지
+                    .weight(1f)
                     .background(Color.White)
                     .padding(16.dp)
                     .padding(bottom = 70.dp)  // 하단 버튼 공간
             )
         }
 
-        // ✅ 5. 하단 고정 버튼
+        // 5. 하단 고정 버튼
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
             PrimaryButton(
                 text = "나가기",
-                onClick = { navController.navigateUp() },
+                onClick = {
+//                    navController.navigateUp()
+                    onLeaveClick()
+                },
                 modifier = Modifier.padding(16.dp)
             )
         }
     }
 }
+

@@ -171,8 +171,15 @@ fun BroadcastScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         selectedChallengeId?.let { id ->
-                            viewModel.joinBroadcast(id.toString())
-                            navController?.navigate("broadcast_live/$id")
+                            val itemToPass = (uiState as? BroadcastUiState.Success)
+                                ?.broadcasts?.find { it.challengeId == id }
+
+                            if (itemToPass != null) {
+                                // 2. 공유 ViewModel에 아이템 정보 저장
+                                viewModel.selectBroadcastForLive(itemToPass)
+                                // 3. 파라미터 없이 ID만 가지고 이동
+                                navController?.navigate("broadcast_live/$id")
+                            }
                         }
                         showJoinDialog = false
                     }) { Text("입장하기") }

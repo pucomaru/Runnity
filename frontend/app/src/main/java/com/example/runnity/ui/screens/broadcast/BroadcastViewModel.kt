@@ -54,6 +54,14 @@ class BroadcastViewModel (
         loadActiveBroadcasts()
     }
 
+    private val _selectedBroadcast = MutableStateFlow<BroadcastListItem?>(null)
+    val selectedBroadcast: StateFlow<BroadcastListItem?> = _selectedBroadcast.asStateFlow()
+
+    fun selectBroadcastForLive(item: BroadcastListItem) {
+        _selectedBroadcast.value = item
+        Timber.d("선택된 중계방: id=${item.challengeId}, title=${item.title}")
+    }
+
     /**
      * 중계방 목록 로드
      */

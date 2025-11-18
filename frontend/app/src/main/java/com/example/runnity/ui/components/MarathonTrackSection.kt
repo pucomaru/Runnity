@@ -104,7 +104,7 @@ fun BoxScope.MarathonRunnerMarker(
     val x = with(density) { (xPx - w / 2).toDp() }
     val y = with(density) { (yPx - h / 2).toDp() }
 
-    // ✅ 말풍선 (선택되었을 때만 표시)
+    // 말풍선 (선택되었을 때만 표시)
     if (isSelected) {
         Card(
             modifier = Modifier

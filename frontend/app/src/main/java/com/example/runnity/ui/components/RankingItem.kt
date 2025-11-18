@@ -18,7 +18,7 @@ import com.example.runnity.ui.screens.broadcast.BroadcastLiveViewModel
 fun RankingItem(
     rank: Int,
     runner: BroadcastLiveViewModel.RunnerUi,
-    modifier: Modifier = Modifier  // ← 애니메이션용 Modifier
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier  // ← 적용

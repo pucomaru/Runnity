@@ -51,7 +51,7 @@ fun LiveRankingSection(
                     key = { runner -> runner.runnerId }
                 ) { runner ->
                     RankingItem(
-                        rank = runners.indexOfFirst { it.runnerId == runner.runnerId } + 1,
+                        rank = runner.rank,
                         runner = runner
                     )
 

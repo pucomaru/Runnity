@@ -26,10 +26,10 @@ data class BroadcastResponse(
     val participantCount: Int,
 
     @SerializedName("createdAt")
-    val createdAt: String,  // ISO 8601 형식 (예: "2025-11-17T08:00:00")
+    val createdAt: String,
 
     @SerializedName("distance")
-    val distance: String  // ← 거리 코드 (예: "FIVE" = 5km)
+    val distance: String
 )
 
 /**
@@ -50,23 +50,4 @@ data class BroadcastListItem(
     val participantCount: Int, // 챌린지 참가자 수
     val createdAt: String, // 세션 생성 시작 날짜
     val distance: String // 거리
-)
-
-
-/**
- * 중계 페이지
- *
- * @param content 컨텐츠
- * @param totalElements 총 요소
- * @param totalPages 총 페이지
- * @param page 페이지
- * @param size 보여줄 요소 개수
- *
- */
-data class BroadcastPage(
-    val content: List<BroadcastListItem>,
-    val totalElements: Long,
-    val totalPages: Int,
-    val page: Int,
-    val size: Int
 )

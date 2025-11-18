@@ -1,6 +1,7 @@
 package com.example.runnity.ui.screens.broadcast
 
 import android.app.Application
+import android.speech.tts.TextToSpeech
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,10 +24,11 @@ import timber.log.Timber
 import ua.naiksoftware.stomp.Stomp
 import ua.naiksoftware.stomp.dto.LifecycleEvent
 import ua.naiksoftware.stomp.dto.StompHeader
+import java.util.Locale
 
 class BroadcastLiveViewModel(
     application: Application
-) : AndroidViewModel(application) {
+) : AndroidViewModel(application), TextToSpeech.OnInitListener {
 
     private val gson = Gson()
     private val tokenProvider: () -> String? = { TokenManager.getAccessToken() }
@@ -37,7 +39,7 @@ class BroadcastLiveViewModel(
         val viewerCount: Int = 0,
         val participantCount: Int = 0,
         val distance: String = "",
-        val totalDistanceMeter: Int = 5000,          // 기본 5km 정도, 필요하면 서버 값으로 교체
+        val totalDistanceMeter: Int = 0,
         val hlsUrl: String = "",
         val runners: List<RunnerUi> = emptyList(),
         val selectedRunnerId: Long? = null,
@@ -51,9 +53,9 @@ class BroadcastLiveViewModel(
         val nickname: String,
         val profileImage: String? = null,
         val color: Color,
-        val distanceMeter: Int,
-        val ratio: Float,          // distance / total
-        val pace: String,          // 서버가 넘겨준 pace 그대로 문자열로 보여줄 거면 String으로 변경 가능
+        val distanceMeter: Double,  // Double로 변경
+        val ratio: Float,
+        val pace: Double,          // Double로 변경
         val rank: Int
     )
 
@@ -71,6 +73,26 @@ class BroadcastLiveViewModel(
     private val maxReconnectAttempts = 3
 
     private var pingJob = viewModelScope.launch { } // 초기 dummy, 실제는 startPingLoop에서 교체
+
+    private var tts: TextToSpeech? = null
+
+    init {
+        tts = TextToSpeech(application.applicationContext, this)
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale.KOREAN)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Timber.e("TTS: 한국어를 지원하지 않습니다.")
+                _uiState.update { it.copy(errorMessage = "음성 안내를 지원하지 않는 기기입니다.") }
+            } else {
+                Timber.d("TTS 엔진 초기화 성공")
+            }
+        } else {
+            Timber.e("TTS 초기화 실패")
+        }
+    }
 
     // 러너 선택 (말풍선용)
     fun selectRunner(runnerId: Long?) {
@@ -91,18 +113,47 @@ class BroadcastLiveViewModel(
         _player = null
     }
 
+    fun initializeFrom(item: com.example.runnity.data.model.response.BroadcastListItem) {
+        _uiState.update {
+            it.copy(
+                title = item.title,
+                viewerCount = item.viewerCount,
+                participantCount = item.participantCount,
+                distance = com.example.runnity.data.util.DistanceUtils.codeToLabel(item.distance),
+                totalDistanceMeter = com.example.runnity.data.util.DistanceUtils.codeToMeter(item.distance)
+            )
+        }
+    }
+
     /**
      * 1. /api/v1/broadcast/join → wsUrl, topic
      * 2. wsUrl 로 STOMP 연결
      * 3. topic 구독 → STREAM / LLM 수신
      */
     fun joinAndConnect(challengeId: Long) {
+
         if (_uiState.value.isLoading.not() && stompClient?.isConnected == true) {
             Timber.d("이미 STOMP 연결 상태")
             return
         }
+        viewModelScope.launch {
+            when (val response = repository.joinBroadcast(challengeId)) {
+                is ApiResponse.Success -> {
+                    val join = response.data
+                    _uiState.update {
+                        it.copy(
+                            hlsUrl = join.wsUrl,
+                            title = uiState.value.title,
+                            totalDistanceMeter = uiState.value.totalDistanceMeter,
+                            viewerCount = uiState.value.viewerCount
+                        )
+                    }
+                }
 
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                else -> {}
+            }
+        }
+
         reconnectAttempts = 0
 
         viewModelScope.launch {
@@ -143,14 +194,14 @@ class BroadcastLiveViewModel(
             Timber.d("STOMP Lifecycle: ${event.type}")
             when (event.type) {
                 LifecycleEvent.Type.OPENED -> {
-                    Timber.d("✅ STOMP 연결 성공, 토픽 구독 시작")
+                    Timber.d("STOMP 연결 성공, 토픽 구독 시작")
                     reconnectAttempts = 0
                     subscribeToTopic(client, topic)
                     startPingLoop(client)
                     _uiState.update { it.copy(isLoading = false) }
                 }
                 LifecycleEvent.Type.ERROR -> {
-                    Timber.e(event.exception, "❌ STOMP 연결 에러")
+                    Timber.e(event.exception, "STOMP 연결 에러")
                     attemptReconnect(wsUrl, topic, challengeId)
                 }
                 LifecycleEvent.Type.CLOSED -> {
@@ -214,7 +265,7 @@ class BroadcastLiveViewModel(
                 }
             },
             { error ->
-                Timber.e(error, "❌ STOMP 구독 에러: ${error.message}")
+                Timber.e(error, "STOMP 구독 에러: ${error.message}")
                 _uiState.update {
                     it.copy(errorMessage = "실시간 데이터 수신 실패: ${error.localizedMessage}")
                 }
@@ -225,6 +276,15 @@ class BroadcastLiveViewModel(
     private fun handleSocketPayload(json: String) {
         try {
             val wrapper = gson.fromJson(json, WebSocketWrapper::class.java)
+
+            Timber.d(
+                "[BroadcastWS] raw wrapper: type=%s, subtype=%s, challengeId=%d, payload=%s",
+                wrapper.type,
+                wrapper.subtype,
+                wrapper.challengeId,
+                wrapper.payload?.toString()
+            )
+
             when (wrapper.type) {
                 "STREAM" -> handleStreamMessage(wrapper)
                 "LLM"    -> handleLlmMessage(wrapper)
@@ -243,12 +303,51 @@ class BroadcastLiveViewModel(
         val payloadObj: JsonObject = wrapper.payload
         val stream = gson.fromJson(payloadObj, StreamPayload::class.java)
 
+
+        Timber.d(
+            "[BroadcastWS][STREAM-%s] runnerId=%d, nick=%s, dist=%.2f, pace=%.2f, rank=%d",
+            wrapper.subtype,
+            stream.runnerId,
+            stream.nickname,
+            stream.distance,
+            stream.pace,
+            stream.ranking
+        )
+
+
+        val total = _uiState.value.totalDistanceMeter.takeIf { it > 0 } ?: 1
+        val current = _uiState.value.runners
+        val existing = current.find { it.runnerId == stream.runnerId }
+        val color = existing?.color ?: pickColor(current.size)
+
+
         when (wrapper.subtype) {
             "START" -> {
                 Timber.d("STREAM START")
             }
 
             "RUNNING" -> {
+//                val updated = RunnerUi( //더미
+//                    runnerId = stream.runnerId,
+//                    nickname = stream.nickname,
+//                    profileImage = stream.profileImage,
+//                    color = color,
+//                    distanceMeter = stream.distance.toInt(),
+//                    ratio = (stream.distance.toFloat() / total).coerceIn(0f, 1f),
+//                    pace = String.format("%.2f", stream.pace),
+//                    rank = stream.ranking
+//                )
+//
+//                val merged = if (existing == null) {
+//                    current + updated
+//                } else {
+//                    current.map { if (it.runnerId == stream.runnerId) updated else it }
+//                }
+//
+//                _uiState.update {
+//                    it.copy(runners = merged.sortedBy { r -> r.rank })
+//                }
+
                 val total = _uiState.value.totalDistanceMeter.takeIf { it > 0 } ?: 1
                 val current = _uiState.value.runners
                 val existing = current.find { it.runnerId == stream.runnerId }
@@ -259,9 +358,9 @@ class BroadcastLiveViewModel(
                     nickname = stream.nickname,
                     profileImage = stream.profileImage,
                     color = color,
-                    distanceMeter = stream.distance.toInt(),
+                    distanceMeter = stream.distance,
                     ratio = (stream.distance.toFloat() / total).coerceIn(0f, 1f),
-                    pace = String.format("%.2f", stream.pace), // 그냥 숫자 그대로 문자열로 보여줌
+                    pace = stream.pace,
                     rank = stream.ranking
                 )
 
@@ -270,6 +369,8 @@ class BroadcastLiveViewModel(
                 } else {
                     current.map { if (it.runnerId == stream.runnerId) updated else it }
                 }
+
+                Timber.d("Updating runners: new size = ${merged.size}")
 
                 _uiState.update {
                     it.copy(
@@ -305,6 +406,17 @@ class BroadcastLiveViewModel(
                 highlightCommentary = llm.commentary
             )
         }
+
+        speakOut(llm.commentary)
+    }
+
+    private fun speakOut(text: String) {
+        if (tts == null) {
+            Timber.e("TTS가 초기화되지 않았습니다.")
+            return
+        }
+        // 음성이 겹치지 않도록 QUEUE_FLUSH 사용
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
     }
 
     private fun pickColor(index: Int): Color {
@@ -331,5 +443,10 @@ class BroadcastLiveViewModel(
         super.onCleared()
         releasePlayer()
         disconnectStomp()
+
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+        Timber.d("TTS 엔진 해제 완료")
     }
 }
