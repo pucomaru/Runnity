@@ -13,7 +13,7 @@ object ColorPalette {
     }
 
     object Common {
-        val accent = Color(0xFF595858)               // #595858
+        val accent = Color(0xFF3958BD)               // #3958BD
         val stopAccent = Color(0xFFFF6868)           // #FF6868
     }
 }
