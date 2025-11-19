@@ -48,6 +48,22 @@ interface ChallengeApiService {
         @Query("size") size: Int = 10
     ): Response<BaseResponse<ChallengeListResponse>>
 
+    /**
+     * 운영진 챌린지 목록 조회
+     * 운영진이 만든(최대 참가자 수 100 초과) 챌린지 목록을 조회합니다.
+     *
+     * @param page 페이지 번호 (기본: 0)
+     * @param size 페이지 크기 (기본: 10)
+     * @param sort 정렬 기준 (예: createdAt,desc)
+     * @return 운영진 챌린지 목록
+     */
+    @GET("api/v1/challenges/admin")
+    suspend fun getAdminChallenges(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 10,
+        @Query("sort") sort: List<String>? = null
+    ): Response<BaseResponse<ChallengeListResponse>>
+
 
     // ==================== 챌린지 생성 ====================
 
