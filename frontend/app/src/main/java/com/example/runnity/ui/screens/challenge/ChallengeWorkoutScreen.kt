@@ -57,6 +57,7 @@ import com.example.runnity.ui.components.TabBar
 import com.example.runnity.socket.WebSocketManager
 import com.example.runnity.data.datalayer.sendSessionControl
 import com.example.runnity.data.datalayer.SessionMetricsBus
+import com.example.runnity.data.datalayer.sendSessionMetricsToWatch
 import com.example.runnity.ui.screens.workout.WorkoutLocationTracker
 import com.example.runnity.ui.screens.workout.WorkoutPhase
 import com.example.runnity.ui.screens.workout.WorkoutSessionViewModel
@@ -131,6 +132,20 @@ fun ChallengeWorkoutScreen(
                 elapsedMs = m.elapsedMs,
                 paceSpKm = m.paceSpKm,
                 caloriesKcal = m.caloriesKcal
+            )
+        }
+    }
+
+    // 폰에서 계산된 메트릭을 워치로 전송하여, 챌린지 모드에서도 워치 UI가 거리/페이스/칼로리를 폰 기준으로 표시하도록 한다.
+    LaunchedEffect(metrics, phase) {
+        if (phase == WorkoutPhase.Running) {
+            val paceToSend = currentPace ?: metrics.avgPaceSecPerKm
+            sendSessionMetricsToWatch(
+                context = context,
+                distanceMeters = metrics.distanceMeters,
+                paceSecPerKm = paceToSend,
+                caloriesKcal = metrics.caloriesKcal,
+                elapsedMs = metrics.activeElapsedMs,
             )
         }
     }
