@@ -45,19 +45,29 @@ public class BroadcastService {
 
     public BroadcastJoinResponse joinBroadcast(Long challengeId) {
 
-        // 1) 방송 활성화 여부 확인 (stream 서버에 물어볼 수도 있음)
-        // 지금은 간단히 challengeId만 체크하는 로직으로.
+        log.info("[JOIN-BROADCAST] 요청 들어옴! challengeId={}", challengeId);
 
+        // 1) STREAM_SERVER_URL 확인
         String streamBaseUrl = System.getenv("STREAM_SERVER_URL");
+        log.info("[JOIN-BROADCAST] STREAM_SERVER_URL={}", streamBaseUrl);
+
         if (streamBaseUrl == null) {
+            log.error("[JOIN-BROADCAST] STREAM_SERVER_URL 미설정!!");
             throw new RuntimeException("STREAM_SERVER_URL not configured");
         }
 
-        // http:// → ws:// 변환
+        // 2) http:// → ws:// 변환
         String wsUrl = streamBaseUrl.replace("http://", "ws://") + "/ws";
+        log.info("[JOIN-BROADCAST] 변환된 WS URL={}", wsUrl);
 
+        // 3) topic 생성
         String topic = "/topic/broadcast/" + challengeId;
+        log.info("[JOIN-BROADCAST] 구독 대상 topic={}", topic);
 
-        return new BroadcastJoinResponse(wsUrl, topic, challengeId);
+        BroadcastJoinResponse response = new BroadcastJoinResponse(wsUrl, topic, challengeId);
+
+        log.info("[JOIN-BROADCAST] 최종 Response 생성 완료 = {}", response);
+
+        return response;
     }
 }

@@ -28,7 +28,7 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(
             @Value("${JWT_SECRET}") String secretKey,                    // ✅ secret 읽음
-            @Value("${jwt.access-token-expiration:3600}") long accessTokenExpiration,        // ✅ 사용
+            @Value("${jwt.access-token-expiration:7200}") long accessTokenExpiration,        // ✅ 사용
             @Value("${jwt.refresh-token-expiration:604800}") long refreshTokenExpiration    // ✅ 사용
     ) {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
@@ -47,10 +47,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String createRefreshToken(String email) {
+    public String createRefreshToken(Long memberId) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
-                .setSubject(email)
+                .setSubject(memberId.toString())
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + refreshTokenValidityInMs))
                 .signWith(key, SignatureAlgorithm.HS512)

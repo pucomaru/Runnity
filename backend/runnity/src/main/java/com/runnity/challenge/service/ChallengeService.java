@@ -137,6 +137,37 @@ public class ChallengeService {
         return ChallengeListResponse.from(items);
     }
 
+    public ChallengeListResponse getAdminChallenges(Pageable pageable, Long memberId) {
+        Pageable pageableWithoutSort = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+        );
+
+        Page<Object[]> result = challengeRepository.findAdminChallengesWithParticipantCountOrderByLatest(pageableWithoutSort);
+
+        List<Long> challengeIds = result.stream()
+                .map(arr -> ((Challenge) arr[0]).getChallengeId())
+                .toList();
+
+        Set<Long> joinedIds = challengeIds.isEmpty()
+                ? Set.of()
+                : Set.copyOf(participationRepository.findJoinedChallengeIds(
+                challengeIds,
+                memberId,
+                ParticipationStatus.TOTAL_APPLICANT_STATUSES
+        ));
+
+        Page<ChallengeListItemResponse> items = result.map(arr ->
+                ChallengeListItemResponse.from(
+                        (Challenge) arr[0],
+                        ((Long) arr[1]).intValue(),
+                        joinedIds.contains(((Challenge) arr[0]).getChallengeId())
+                )
+        );
+
+        return ChallengeListResponse.from(items);
+    }
+
     public ChallengeResponse getChallenge(Long challengeId, Long memberId) {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new GlobalException(ErrorStatus.CHALLENGE_NOT_FOUND));
