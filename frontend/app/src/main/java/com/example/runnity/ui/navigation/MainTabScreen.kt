@@ -454,9 +454,17 @@ fun MainTabScreen(
                 // 홈 그래프와 동일한 화면이지만, 백스택이 다름 (뒤로가기 시 각자의 리스트로)
                 composable("challenge_detail/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                    // challenge_graph 레벨에서 공유되는 ChallengeViewModel 사용
+                    val challengeViewModel: com.example.runnity.ui.screens.challenge.ChallengeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Challenge.graphRoute)
+                            }
+                        )
                     ChallengeDetailScreen(
                         challengeId = challengeId,
-                        navController = navController
+                        navController = navController,
+                        viewModel = challengeViewModel
                     )
                 }
 

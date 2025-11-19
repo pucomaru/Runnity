@@ -39,12 +39,27 @@ suspend fun <T> safeApiCall(
             // 에러 body에서 상세 메시지 추출 시도
             val errorBody = response.errorBody()?.string()
             val errorMessage = try {
-                // errorBody를 파싱하여 message 필드 추출 (간단한 JSON 파싱)
                 errorBody?.let {
+                    // 먼저 errors 배열에서 첫 번째 에러 메시지 추출 시도
+                    val errorsStart = it.indexOf("\"errors\"")
+                    if (errorsStart != -1) {
+                        // errors 배열 내 첫 번째 message 추출
+                        val firstErrorMessageStart = it.indexOf("\"message\"", errorsStart)
+                        if (firstErrorMessageStart != -1) {
+                            val valueStart = it.indexOf(":", firstErrorMessageStart) + 1
+                            val valueEnd = it.indexOf(",", valueStart).takeIf { idx -> idx != -1 } ?: it.indexOf("}", valueStart)
+                            val extracted = it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
+                            if (extracted.isNotBlank()) {
+                                return@let extracted
+                            }
+                        }
+                    }
+
+                    // errors가 없으면 기본 message 필드 추출
                     val messageStart = it.indexOf("\"message\"")
                     if (messageStart != -1) {
                         val valueStart = it.indexOf(":", messageStart) + 1
-                        val valueEnd = it.indexOf(",", valueStart).takeIf { it != -1 } ?: it.indexOf("}", valueStart)
+                        val valueEnd = it.indexOf(",", valueStart).takeIf { idx -> idx != -1 } ?: it.indexOf("}", valueStart)
                         it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
                     } else {
                         null
@@ -104,10 +119,25 @@ suspend fun <T> safeApiCallUnit(
             val errorBody = response.errorBody()?.string()
             val errorMessage = try {
                 errorBody?.let {
+                    // 먼저 errors 배열에서 첫 번째 에러 메시지 추출 시도
+                    val errorsStart = it.indexOf("\"errors\"")
+                    if (errorsStart != -1) {
+                        val firstErrorMessageStart = it.indexOf("\"message\"", errorsStart)
+                        if (firstErrorMessageStart != -1) {
+                            val valueStart = it.indexOf(":", firstErrorMessageStart) + 1
+                            val valueEnd = it.indexOf(",", valueStart).takeIf { idx -> idx != -1 } ?: it.indexOf("}", valueStart)
+                            val extracted = it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
+                            if (extracted.isNotBlank()) {
+                                return@let extracted
+                            }
+                        }
+                    }
+
+                    // errors가 없으면 기본 message 필드 추출
                     val messageStart = it.indexOf("\"message\"")
                     if (messageStart != -1) {
                         val valueStart = it.indexOf(":", messageStart) + 1
-                        val valueEnd = it.indexOf(",", valueStart).takeIf { it != -1 } ?: it.indexOf("}", valueStart)
+                        val valueEnd = it.indexOf(",", valueStart).takeIf { idx -> idx != -1 } ?: it.indexOf("}", valueStart)
                         it.substring(valueStart, valueEnd).trim().removeSurrounding("\"")
                     } else {
                         null

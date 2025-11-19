@@ -63,6 +63,14 @@ fun ChallengeScreen(
             ).show()
         }
     }
+
+    // 대기 중인 새로고침 처리
+    val pendingRefresh by viewModel.pendingRefresh.collectAsState()
+    LaunchedEffect(pendingRefresh) {
+        if (pendingRefresh) {
+            viewModel.consumePendingRefresh()
+        }
+    }
     // ViewModel 상태 관찰
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -213,6 +221,7 @@ fun ChallengeScreen(
                                     title = challenge.title,
                                     startDateTime = challenge.startDateTime,
                                     participants = challenge.participants,
+                                    isPrivate = challenge.isPrivate,
                                     buttonState = challenge.buttonState,
                                     onCardClick = {
                                         navController?.navigate("challenge_detail/${challenge.id}")

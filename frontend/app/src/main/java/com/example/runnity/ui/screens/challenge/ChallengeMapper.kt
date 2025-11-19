@@ -22,6 +22,7 @@ object ChallengeMapper {
             title = apiItem.title,
             startDateTime = formatStartDateTime(apiItem.startAt),
             participants = "${apiItem.currentParticipants}/${apiItem.maxParticipants}명",
+            isPrivate = apiItem.isPrivate,
             buttonState = determineButtonState(apiItem.startAt, apiItem.isJoined)
         )
     }
