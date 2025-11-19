@@ -1,10 +1,13 @@
 package com.example.runnity.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -12,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.runnity.theme.ColorPalette
@@ -21,13 +25,15 @@ import com.example.runnity.theme.Typography
  * 추천 챌린지 아이템 데이터
  *
  * @param id 챌린지 고유 ID
- * @param imageUrl 챌린지 이미지 URL (null이면 회색 placeholder)
+ * @param imageUrl 챌린지 이미지 URL (null이면 imageRes 사용)
+ * @param imageRes 로컬 drawable 리소스 ID (imageUrl이 null일 때 사용)
  * @param title 챌린지 제목 (예: "러니티 추천 챌린지")
  * @param description 설명 (예: "대규모 러닝 실시간 경쟁")
  */
 data class RecommendedChallengeItem(
     val id: String,
     val imageUrl: String? = null,  // 이미지 URL (null 가능)
+    val imageRes: Int? = null,     // 로컬 drawable 리소스 ID
     val title: String,
     val description: String
 )
@@ -37,7 +43,8 @@ data class RecommendedChallengeItem(
  * - 이미지 + 제목 + 설명
  * - 세로 방향 레이아웃
  *
- * @param imageUrl 이미지 URL (null이면 회색 placeholder)
+ * @param imageUrl 이미지 URL (null이면 imageRes 사용)
+ * @param imageRes 로컬 drawable 리소스 ID
  * @param title 제목
  * @param description 설명
  * @param onClick 카드 클릭 이벤트
@@ -46,6 +53,7 @@ data class RecommendedChallengeItem(
 @Composable
 private fun RecommendedChallengeCard(
     imageUrl: String?,                 // 이미지 URL
+    imageRes: Int?,                    // 로컬 drawable 리소스 ID
     title: String,                     // 제목
     description: String,               // 설명
     onClick: () -> Unit,               // 클릭 이벤트
@@ -67,23 +75,33 @@ private fun RecommendedChallengeCard(
                 defaultElevation = 2.dp
             )
         ) {
-            if (imageUrl != null) {
-                // 이미지 로드 (Coil 라이브러리 사용)
-                // 참고: build.gradle에 Coil 라이브러리 추가 필요
-                // implementation("io.coil-kt:coil-compose:2.5.0")
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,  // 이미지 크롭
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // 이미지 없을 때 회색 placeholder
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(ColorPalette.Light.component)  // 회색 (#9E9E9E)
-                )
+            when {
+                imageUrl != null -> {
+                    // 이미지 로드 (Coil 라이브러리 사용)
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                imageRes != null -> {
+                    // 로컬 drawable 이미지 사용
+                    Image(
+                        painter = painterResource(id = imageRes),
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    // 이미지 없을 때 회색 placeholder
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ColorPalette.Light.component)
+                    )
+                }
             }
         }
 
@@ -95,7 +113,9 @@ private fun RecommendedChallengeCard(
             Text(
                 text = title,
                 style = Typography.Body,        // 14px, Medium (변경)
-                color = ColorPalette.Light.primary  // 검정색
+                color = ColorPalette.Light.primary,  // 검정색
+                maxLines = 1,
+                modifier = Modifier.horizontalScroll(rememberScrollState())
             )
 
             // 설명
@@ -156,6 +176,7 @@ fun RecommendedChallengeCarousel(
         ) { challenge ->
             RecommendedChallengeCard(
                 imageUrl = challenge.imageUrl,
+                imageRes = challenge.imageRes,
                 title = challenge.title,
                 description = challenge.description,
                 onClick = { onChallengeClick(challenge.id) }

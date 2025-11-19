@@ -13,6 +13,7 @@ import com.example.runnity.data.repository.RunHistoryRepository
 import com.example.runnity.data.model.common.ApiResponse
 import com.example.runnity.data.model.response.ChallengeSimpleInfo
 import com.example.runnity.ui.components.ChallengeListItem
+import com.example.runnity.ui.components.RecommendedChallengeItem
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -24,6 +25,7 @@ import com.example.runnity.data.repository.WeatherRepository
 import com.example.runnity.data.model.response.WeatherUiModel
 import com.example.runnity.data.model.response.toUiModel
 import timber.log.Timber
+import com.example.runnity.R
 
 /**
  * 홈 화면 ViewModel
@@ -55,12 +57,20 @@ class HomeViewModel : ViewModel() {
     private val _weatherLoading = MutableStateFlow(false)
     val weatherLoading: StateFlow<Boolean> = _weatherLoading.asStateFlow()
 
+    // 운영진 챌린지 상태
+    private val _adminChallenges = MutableStateFlow<List<RecommendedChallengeItem>>(emptyList())
+    val adminChallenges: StateFlow<List<RecommendedChallengeItem>> = _adminChallenges.asStateFlow()
+
+    private val _adminChallengesLoading = MutableStateFlow(false)
+    val adminChallengesLoading: StateFlow<Boolean> = _adminChallengesLoading.asStateFlow()
+
     // 마지막 날씨 조회 시간 (밀리초)
     private var lastWeatherFetchTime: Long = 0
     private val WEATHER_CACHE_DURATION = 30 * 60 * 1000L // 30분
 
     init {
         loadHomeData()
+        fetchAdminChallenges()
     }
 
     private fun loadHomeData() {
@@ -135,6 +145,49 @@ class HomeViewModel : ViewModel() {
     fun fetchReservedChallenges() {
         viewModelScope.launch {
             ReservedChallengeManager.refresh()
+        }
+    }
+
+    /**
+     * 운영진 챌린지 목록 조회
+     */
+    fun fetchAdminChallenges() {
+        viewModelScope.launch {
+            _adminChallengesLoading.value = true
+
+            // 더미 이미지 리소스 목록
+            val dummyImages = listOf(
+                R.drawable.running_challenge_1,
+                R.drawable.running_challenge_2,
+                R.drawable.running_challenge_3,
+                R.drawable.running_challenge_4
+            )
+
+            when (val response = challengeRepository.getAdminChallenges(page = 0, size = 10)) {
+                is ApiResponse.Success -> {
+                    val challenges = response.data.content.mapIndexed { index, challenge ->
+                        RecommendedChallengeItem(
+                            id = challenge.challengeId.toString(),
+                            imageUrl = null,
+                            imageRes = dummyImages[index % dummyImages.size],
+                            title = challenge.title,
+                            description = "${challenge.currentParticipants}/${challenge.maxParticipants}명 참여중"
+                        )
+                    }
+                    _adminChallenges.value = challenges
+                    Timber.d("운영진 챌린지 목록 조회 성공: ${challenges.size}개")
+                }
+                is ApiResponse.Error -> {
+                    Timber.e("운영진 챌린지 목록 조회 실패: ${response.message}")
+                    _adminChallenges.value = emptyList()
+                }
+                is ApiResponse.NetworkError -> {
+                    Timber.e("운영진 챌린지 네트워크 오류")
+                    _adminChallenges.value = emptyList()
+                }
+            }
+
+            _adminChallengesLoading.value = false
         }
     }
 
