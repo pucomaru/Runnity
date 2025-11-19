@@ -462,7 +462,6 @@ Member: "3" (userId), Score: 4.2 (distance)
 - 해당 챌린지의 모든 참가자에 대해 EXPIRED 처리
 - 참가자 상태는 이미 비즈니스 서버에서 DB에 `EXPIRED`로 업데이트됨
 - 세션/Redis 정리, Redis Pub/Sub 발행 (USER_LEFT, reason: EXPIRED), Kafka 이벤트 발행 (LEAVE, reason: EXPIRED)
-- 챌린지 레벨 Kafka 이벤트 발행 (DONE)
 
 ---
 
@@ -478,7 +477,7 @@ Member: "3" (userId), Score: 4.2 (distance)
 * **Value 예시**:
 ```json
 {
-  "eventType": "ready|start|running|finish|leave|done",
+  "eventType": "start|running|finish|leave",
   "challengeId": 100,
   "runnerId": 1,
   "nickname": "러너1",
@@ -492,34 +491,21 @@ Member: "3" (userId), Score: 4.2 (distance)
 }
 ```
 
-#### 3.1. eventType: `ready`
-**발행 시점**: 챌린지 ready 상태가 됐을 때  
-**필드**: `challengeId`, `isBroadcast` 필수, `runnerId`, `nickname`, `profileImage`, `distance`, `pace`, `ranking`, `reason` 없음  
-**구조**:
-```json
-{
-  "eventType": "ready",
-  "challengeId": 100,
-  "isBroadcast": true,
-  "timestamp": 1699999999999
-}
-```
-
-#### 3.2. eventType: `start`
+#### 3.1. eventType: `start`
 **발행 시점**: 첫 입장 시  
 **필드**: `reason` 없음
 
-#### 3.3. eventType: `running`
+#### 3.2. eventType: `running`
 **발행 시점**: 주기적 RECORD 처리 시, 재접속 시  
 **필드**: `reason` 없음
 
 **참고**: `TIMEOUT`, `DISCONNECTED`, `ERROR`로 인한 퇴장 후 재접속 시 `running` 이벤트 발행
 
-#### 3.4. eventType: `finish`
+#### 3.3. eventType: `finish`
 **발행 시점**: 완주 달성 시  
 **필드**: `reason` 없음
 
-#### 3.5. eventType: `leave`
+#### 3.4. eventType: `leave`
 **발행 시점**: 퇴장 시  
 **필드**: `reason` 필수
 
@@ -531,15 +517,3 @@ Member: "3" (userId), Score: 4.2 (distance)
 - `KICKED`: 강제 퇴장
 - `EXPIRED`: 시간 만료
 
-#### 3.6. eventType: `done`
-**발행 시점**: 챌린지 종료 처리 후 (비즈니스 서버에서 `challenge:done` Redis Pub/Sub 이벤트 수신 시)  
-**필드**: `challengeId`, `isBroadcast` 필수, `runnerId`, `nickname`, `profileImage`, `distance`, `pace`, `ranking`, `reason` 없음  
-**구조**:
-```json
-{
-  "eventType": "done",
-  "challengeId": 100,
-  "isBroadcast": true,
-  "timestamp": 1699999999999
-}
-```
