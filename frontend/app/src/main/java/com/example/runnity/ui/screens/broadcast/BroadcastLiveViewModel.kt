@@ -39,7 +39,7 @@ class BroadcastLiveViewModel(
         val viewerCount: Int = 0,
         val participantCount: Int = 0,
         val distance: String = "",
-        val totalDistanceMeter: Int = 0,
+        val totaldistanceKm: Int = 0,
         val hlsUrl: String = "",
         val runners: List<RunnerUi> = emptyList(),
         val selectedRunnerId: Long? = null,
@@ -53,7 +53,7 @@ class BroadcastLiveViewModel(
         val nickname: String,
         val profileImage: String? = null,
         val color: Color,
-        val distanceMeter: Double,  // Double로 변경
+        val distanceKm: Double,  // Double로 변경
         val ratio: Float,
         val rank: Int,
         val distanceKmFormatted: String,
@@ -121,7 +121,7 @@ class BroadcastLiveViewModel(
                 viewerCount = item.viewerCount,
                 participantCount = item.participantCount,
                 distance = com.example.runnity.data.util.DistanceUtils.codeToLabel(item.distance),
-                totalDistanceMeter = com.example.runnity.data.util.DistanceUtils.codeToMeter(item.distance)
+                totaldistanceKm = com.example.runnity.data.util.DistanceUtils.codeToMeter(item.distance)
             )
         }
     }
@@ -284,29 +284,55 @@ class BroadcastLiveViewModel(
     /**
      * STREAM: distance / pace / ranking 은 서버가 다 계산해서 줌
      * → 여기서는 그대로 UI에 반영만 한다.
-     * 
+     *
      * 주의: 서버에서 distance는 km 단위로 전송됨 (예: 0.1 = 100m)
      */
     private fun handleStreamMessage(wrapper: WebSocketWrapper) {
         val payloadObj: JsonObject = wrapper.payload
         val stream = gson.fromJson(payloadObj, StreamPayload::class.java)
 
-        // 서버에서 distance는 km 단위로 전송됨 → meter로 변환
+        // 서버에서 distance는 km 단위로 전송됨
         val distanceKm = stream.distance
-        val distanceMeter = distanceKm * 1000.0
 
         Timber.d(
-            "[BroadcastWS][STREAM-%s] runnerId=%d, nick=%s, dist=%.3f km (%.1f m), pace=%.2f, rank=%d",
-            wrapper.subtype, stream.runnerId, stream.nickname, distanceKm, distanceMeter, stream.pace, stream.ranking
+            "[BroadcastWS][Parsed StreamPayload] runnerId=%d, nick=%s, distanceKm=%.2f, pace=%.2f, ranking=%d",
+            stream.runnerId,
+            stream.nickname,
+            stream.distance,
+            stream.pace,
+            stream.ranking
         )
 
-        val total = _uiState.value.totalDistanceMeter.takeIf { it > 0 } ?: 1
+        Timber.d(
+            "[BroadcastWS][STREAM-%s] runnerId=%d, nick=%s, dist=%.2f km, pace=%.2f, rank=%d",
+            wrapper.subtype, stream.runnerId, stream.nickname, distanceKm, stream.pace, stream.ranking
+        )
+
+        // totaldistanceKm은 실제로 meter 단위이므로 km로 변환
+        val totalMeter = _uiState.value.totaldistanceKm.takeIf { it > 0 } ?: 1
+        val totalKm = totalMeter / 1000.0  // meter를 km로 변환
+        
         val current = _uiState.value.runners
         val existing = current.find { it.runnerId == stream.runnerId }
         val color = existing?.color ?: pickColor(current.size)
 
-        // ratio 계산: 현재 거리(m) / 전체 거리(m)
-        val ratio = (distanceMeter.toFloat() / total).coerceIn(0f, 1f)
+        Timber.d(
+            "[BroadcastWS][UI Base] totalDistanceMeter=%d (%.2f km), currentRunnerCount=%d, distanceKm=%.2f km",
+            totalMeter,
+            totalKm,
+            current.size,
+            distanceKm
+        )
+
+        // ratio 계산: 현재 거리(km) / 전체 거리(km) - 단위를 맞춰서 계산
+        val ratio = (distanceKm.toFloat() / totalKm.toFloat()).coerceIn(0f, 1f)
+        
+        Timber.d(
+            "[BroadcastWS][Ratio Calc] distanceKm=%.2f, totalKm=%.2f, ratio=%.4f",
+            distanceKm,
+            totalKm,
+            ratio
+        )
 
         when (wrapper.subtype) {
             "START" -> {
@@ -319,7 +345,7 @@ class BroadcastLiveViewModel(
                         nickname = stream.nickname,
                         profileImage = stream.profileImage,
                         color = pickColor(current.size),
-                        distanceMeter = distanceMeter,
+                        distanceKm = distanceKm,
                         ratio = ratio,
                         rank = stream.ranking,
                         distanceKmFormatted = String.format("%.2f km", distanceKm),
@@ -328,12 +354,12 @@ class BroadcastLiveViewModel(
                     _uiState.update {
                         it.copy(runners = (current + newRunner).sortedBy { r -> r.rank })
                     }
-                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=${distanceMeter}m, ratio=$ratio")
+                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 }
 
             }
             "RUNNING" -> {
-                Timber.d("STREAM RUNNING runnerId=${stream.runnerId}, distance=${distanceMeter}m, ratio=$ratio")
+                Timber.d("STREAM RUNNING runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 val existing = current.find { it.runnerId == stream.runnerId }
 
                 if (existing == null) {
@@ -344,7 +370,7 @@ class BroadcastLiveViewModel(
                         nickname = stream.nickname,
                         profileImage = stream.profileImage,
                         color = pickColor(current.size),
-                        distanceMeter = distanceMeter,
+                        distanceKm = distanceKm,
                         ratio = ratio,
                         rank = stream.ranking,
                         distanceKmFormatted = String.format("%.2f km", distanceKm),
@@ -353,13 +379,13 @@ class BroadcastLiveViewModel(
                     _uiState.update {
                         it.copy(runners = (current + newRunner).sortedBy { r -> r.rank })
                     }
-                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=${distanceMeter}m, ratio=$ratio")
+                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 } else {
                     // 기존 러너 정보 갱신
                     val updatedRunners = current.map { runner ->
                         if (runner.runnerId == stream.runnerId) {
                             runner.copy(
-                                distanceMeter = distanceMeter,
+                                distanceKm = distanceKm,
                                 ratio = ratio,
                                 rank = stream.ranking,
                                 distanceKmFormatted = String.format("%.2f km", distanceKm),
@@ -372,21 +398,21 @@ class BroadcastLiveViewModel(
                     _uiState.update {
                         it.copy(runners = updatedRunners.sortedBy { r -> r.rank })
                     }
-                    Timber.d("러너 업데이트 완료: runnerId=${stream.runnerId}, distance=${distanceMeter}m, ratio=$ratio")
+                    Timber.d("러너 업데이트 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 }
             }
-            "FINISH" -> { 
-                Timber.d("STREAM FINISH runnerId=${stream.runnerId}")
+            "FINISH" -> {
+                Timber.d("STREAM FINISH runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 // FINISH도 마지막 거리 정보 업데이트
                 val existing = current.find { it.runnerId == stream.runnerId }
                 if (existing != null) {
                     val updatedRunners = current.map { runner ->
                         if (runner.runnerId == stream.runnerId) {
                             runner.copy(
-                                distanceMeter = stream.distance,
-                                ratio = (stream.distance.toFloat() / total).coerceIn(0f, 1f),
+                                distanceKm = distanceKm,
+                                ratio = ratio,
                                 rank = stream.ranking,
-                                distanceKmFormatted = String.format("%.2f km", stream.distance / 1000.0),
+                                distanceKmFormatted = String.format("%.2f km", distanceKm),
                                 paceFormatted = formatPace(stream.pace)
                             )
                         } else {
@@ -396,21 +422,22 @@ class BroadcastLiveViewModel(
                     _uiState.update {
                         it.copy(runners = updatedRunners.sortedBy { r -> r.rank })
                     }
+                    Timber.d("FINISH 업데이트 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 }
             }
             "LEAVE" -> {
-                Timber.d("STREAM LEAVE runnerId=${stream.runnerId}, dist=%.2f", stream.distance)
+                Timber.d("STREAM LEAVE runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
                 val existing = current.find { it.runnerId == stream.runnerId }
-                
+
                 if (existing != null) {
                     // LEAVE 전에 마지막 거리 정보를 먼저 업데이트
                     val updatedRunners = current.map { runner ->
                         if (runner.runnerId == stream.runnerId) {
                             runner.copy(
-                                distanceMeter = stream.distance,
-                                ratio = (stream.distance.toFloat() / total).coerceIn(0f, 1f),
+                                distanceKm = distanceKm,
+                                ratio = ratio,
                                 rank = stream.ranking,
-                                distanceKmFormatted = String.format("%.2f km", stream.distance / 1000.0),
+                                distanceKmFormatted = String.format("%.2f km", distanceKm),
                                 paceFormatted = formatPace(stream.pace)
                             )
                         } else {
@@ -421,12 +448,14 @@ class BroadcastLiveViewModel(
                     _uiState.update {
                         it.copy(runners = updatedRunners.filterNot { r -> r.runnerId == stream.runnerId }.sortedBy { r -> r.rank })
                     }
+                    Timber.d("LEAVE 업데이트 후 제거 완료: runnerId=${stream.runnerId}, 마지막 distance=%.2f km", distanceKm)
                 } else {
                     // 러너가 없으면 그냥 제거 (이미 없음)
                     val currentRunners = _uiState.value.runners
                     _uiState.update {
                         it.copy(runners = currentRunners.filterNot { r -> r.runnerId == stream.runnerId })
                     }
+                    Timber.d("LEAVE: 러너가 이미 없음, 제거 스킵: runnerId=${stream.runnerId}")
                 }
             }
         }
