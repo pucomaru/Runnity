@@ -65,6 +65,29 @@ class ChallengeRepository(
         }
     }
 
+    /**
+     * 운영진 챌린지 목록 조회
+     * 운영진이 만든(최대 참가자 수 100 초과) 챌린지 목록을 조회합니다.
+     *
+     * @param page 페이지 번호 (기본: 0)
+     * @param size 페이지 크기 (기본: 10)
+     * @param sort 정렬 기준 (예: createdAt,desc)
+     * @return ApiResponse<ChallengeListResponse>
+     */
+    suspend fun getAdminChallenges(
+        page: Int = 0,
+        size: Int = 10,
+        sort: List<String>? = null
+    ): ApiResponse<ChallengeListResponse> {
+        return safeApiCall {
+            challengeApiService.getAdminChallenges(
+                page = page,
+                size = size,
+                sort = sort
+            )
+        }
+    }
+
     // ==================== 챌린지 생성 ====================
 
     /**
