@@ -143,18 +143,9 @@ class ExerciseFgService : Service() {
     private fun sendMetricsOnce() {
         val now = System.currentTimeMillis()
         val activeElapsed = if (isRunning) activeElapsedAccumMs + (now - activeStartMs) else activeElapsedAccumMs
-        val dist = latestDistanceM
-        val rawPaceSpKm = if (dist != null && dist > 0.0 && activeElapsed > 0L) {
-            (activeElapsed / 1000.0) / (dist / 1000.0)
-        } else null
-        // 워치 페이스도 2'30"/km ~ 20'00"/km 범위만 정상값으로 사용
-        val paceSpKm = rawPaceSpKm?.takeIf { it.isFinite() && it in 150.0..1200.0 }
         val json = JSONObject()
         json.put("type", "metrics")
         if (latestHrBpm != null) json.put("hr_bpm", latestHrBpm)
-        if (dist != null) json.put("distance_m", dist)
-        if (paceSpKm != null && paceSpKm.isFinite()) json.put("pace_spkm", paceSpKm)
-        if (latestCaloriesKcal != null) json.put("cal_kcal", latestCaloriesKcal)
         json.put("elapsed_ms", activeElapsed)
         val bytes = json.toString().toByteArray()
         Wearable.getNodeClient(this).connectedNodes
@@ -170,9 +161,6 @@ class ExerciseFgService : Service() {
             setPackage(packageName)
             putExtra("elapsed_ms", activeElapsed)
             latestHrBpm?.let { putExtra("hr_bpm", it) }
-            dist?.let { putExtra("distance_m", it) }
-            if (paceSpKm != null && paceSpKm.isFinite()) putExtra("pace_spkm", paceSpKm)
-            latestCaloriesKcal?.let { putExtra("cal_kcal", it) }
         }
         sendBroadcast(intent)
     }
