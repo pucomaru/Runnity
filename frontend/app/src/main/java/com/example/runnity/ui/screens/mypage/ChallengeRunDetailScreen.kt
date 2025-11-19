@@ -261,7 +261,7 @@ fun ChallengeRunDetailContent(
             }
         }
 
-        // 2. 라벨 행 (운동 타입 + 시작 시간)
+        // 2. 라벨 행 (챌린지 이름 + 참여 인원 + 시작 시간)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -269,20 +269,38 @@ fun ChallengeRunDetailContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            val typeLabel = when (data.runType) {
-                "PERSONAL" -> "개인 러닝"
-                "CHALLENGE" -> "챌린지"
-                else -> "러닝"
+            // 왼쪽: 챌린지 이름 + 참여 인원
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = challengeDetail?.title ?: "챌린지",
+                    style = Typography.Subtitle,
+                    color = ColorPalette.Light.secondary
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "참여 인원",
+                        tint = ColorPalette.Light.component,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "${challengeDetail?.currentParticipants ?: 0}",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                }
             }
-            Text(
-                text = typeLabel,
-                style = Typography.Subtitle,
-                color = ColorPalette.Light.secondary
-            )
 
             val startText = try {
-                val dateTime = LocalDateTime.parse(data.startAt)
-                dateTime.format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"))
+                val dateTime = LocalDateTime.parse(data.startAt, DateTimeFormatter.ISO_DATE_TIME)
+                dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss"))
             } catch (e: Exception) {
                 data.startAt ?: ""
             }
@@ -302,95 +320,103 @@ fun ChallengeRunDetailContent(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 큰 글씨: 총 거리
+            // 큰 글씨: 최종 순위
             Text(
-                text = "총 km",
+                text = "최종 순위",
                 style = Typography.Subtitle,
                 color = ColorPalette.Light.secondary
             )
             Spacer(modifier = Modifier.height(6.dp))
+
+            // 현재 사용자의 순위 찾기
+            val myRank = challengeDetail?.participants?.find { it.memberId == currentUserId }?.rank
             Text(
-                text = String.format("%.1f", data.distance),
+                text = if (myRank != null) "${myRank}위" else "-",
                 style = Typography.LargeTitle.copy(fontSize = 72.sp),
                 color = ColorPalette.Light.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 1행: 평균 페이스 + 시간
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val half = this.maxWidth / 2
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+            // 1행: 이동거리 + 페이스 + 시간
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        modifier = Modifier.width(half),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "평균 페이스",
-                            style = Typography.Caption,
-                            color = ColorPalette.Light.secondary
-                        )
-                        Text(
-                            formatPace(data.pace.toDouble()),
-                            style = Typography.Title
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.width(half),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "시간",
-                            style = Typography.Caption,
-                            color = ColorPalette.Light.secondary
-                        )
-                        Text(
-                            formatElapsed(data.durationSec.toLong() * 1000),
-                            style = Typography.Title
-                        )
-                    }
+                    Text(
+                        "이동거리",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                    Text(
+                        String.format("%.2fkm", data.distance),
+                        style = Typography.Title
+                    )
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "페이스",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                    Text(
+                        formatPace(data.pace.toDouble()),
+                        style = Typography.Title
+                    )
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "시간",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                    Text(
+                        formatElapsed(data.durationSec.toLong() * 1000),
+                        style = Typography.Title
+                    )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // 2행: 평균 심박수 + 칼로리
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val half = this.maxWidth / 2
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+            // 2행: BPM + 칼로리
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        modifier = Modifier.width(half),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "평균 심박수",
-                            style = Typography.Caption,
-                            color = ColorPalette.Light.secondary
-                        )
-                        Text(
-                            data.bpm.toString(),
-                            style = Typography.Title
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.width(half),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "칼로리",
-                            style = Typography.Caption,
-                            color = ColorPalette.Light.secondary
-                        )
-                        Text(
-                            "${data.calories.toInt()} kcal",
-                            style = Typography.Title
-                        )
-                    }
+                    Text(
+                        "BPM",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                    Text(
+                        data.bpm.toString(),
+                        style = Typography.Title
+                    )
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "칼로리",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
+                    Text(
+                        "${data.calories.toInt()}Kcal",
+                        style = Typography.Title
+                    )
                 }
             }
         }
@@ -411,8 +437,13 @@ fun ChallengeRunDetailContent(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 랭킹 순으로 정렬
-                val sortedParticipants = challengeDetail.participants.sortedBy { it.rank }
+                // 랭킹 순으로 정렬 (COMPLETED 우선, 그 다음 리타이어)
+                val sortedParticipants = challengeDetail.participants.sortedWith(
+                    compareBy(
+                        { it.status != "COMPLETED" }, // COMPLETED가 아닌 것을 뒤로
+                        { it.rank } // 랭킹 순
+                    )
+                )
 
                 if (sortedParticipants.isEmpty()) {
                     Box(
@@ -545,10 +576,15 @@ private fun ChallengeRankingItem(
             }
         }
 
-        // 오른쪽: 페이스 (해당 챌린지에 대한 페이스)
-        val paceToShow = participant.paceSec ?: participant.averagePaceSec
+        // 오른쪽: 페이스 (해당 챌린지에 대한 페이스 또는 리타이어)
+        val paceText = if (participant.status == "COMPLETED") {
+            val paceToShow = participant.paceSec ?: participant.averagePaceSec
+            formatPace(paceToShow.toDouble())
+        } else {
+            "-'--\""
+        }
         Text(
-            text = formatPace(paceToShow.toDouble()),
+            text = paceText,
             style = Typography.Caption,
             color = ColorPalette.Light.secondary
         )
@@ -569,5 +605,5 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }

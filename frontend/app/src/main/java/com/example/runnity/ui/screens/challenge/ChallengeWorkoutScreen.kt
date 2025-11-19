@@ -14,10 +14,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,14 +75,15 @@ import com.kakao.vectormap.label.LabelStyles
 fun ChallengeWorkoutScreen(
     challengeId: String,
     navController: NavController,
-    socketViewModel: ChallengeSocketViewModel
+    socketViewModel: ChallengeSocketViewModel,
+    sessionViewModel: WorkoutSessionViewModel
 ) {
-    val sessionViewModel: WorkoutSessionViewModel = viewModel()
     val challengeViewModel: ChallengeViewModel = viewModel()
     val metrics by sessionViewModel.metrics.collectAsState()
     val currentPace by sessionViewModel.currentPaceSecPerKm.collectAsState()
     val currentLoc by sessionViewModel.currentLocation.collectAsState()
     val phase by sessionViewModel.phase.collectAsState()
+    val websocketState by WebSocketManager.state.collectAsState()
 
     val challengeDetailState by challengeViewModel.challengeDetail.collectAsState()
     val participantsState by socketViewModel.participants.collectAsState()
@@ -84,6 +94,10 @@ fun ChallengeWorkoutScreen(
     // 목표 거리(km) 캐시 및 최종 RECORD 전송 여부 플래그
     var targetKm by remember { mutableStateOf<Double?>(null) }
     var finalRecordSent by remember { mutableStateOf(false) }
+    // 최근 전송 실패한 RECORD/Pace 데이터를 임시로 보관해두었다가
+    // 소켓이 다시 열렸을 때 한 번만 재전송하기 위한 버퍼
+    var pendingRecord by remember { mutableStateOf<String?>(null) }
+    var pendingFinalRecord by remember { mutableStateOf<String?>(null) }
 
     val challengeIdLong = challengeId.toLongOrNull() ?: 0L
 
@@ -151,9 +165,15 @@ fun ChallengeWorkoutScreen(
                 "\"pace\":" + paceToSend + "," +
                 "\"timestamp\":" + System.currentTimeMillis() +
                 "}"
-            WebSocketManager.send(recordJson)
-            // 서버는 내 PARTICIPANT_UPDATE 를 보내지 않으므로, 클라이언트에서 내 참가자 정보도 함께 갱신
+
+            // 랭킹/UI는 전송 성공 여부와 상관없이 항상 최신 내 기록을 반영
             socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
+
+            // 최근 RECORD를 버퍼에 넣어두고, 실제 전송이 성공한 경우에만 버퍼를 비운다.
+            pendingRecord = recordJson
+            if (WebSocketManager.isOpen && WebSocketManager.send(recordJson)) {
+                pendingRecord = null
+            }
         }
     }
 
@@ -170,16 +190,42 @@ fun ChallengeWorkoutScreen(
                     "\"pace\":" + paceToSend + "," +
                     "\"timestamp\":" + System.currentTimeMillis() +
                     "}"
-                WebSocketManager.send(recordJson)
-                finalRecordSent = true
-                // 최종 기록도 랭킹에 반영
+
+                // 최종 기록도 랭킹에는 항상 반영
                 socketViewModel.updateMyStats(distanceKm = distanceKm, paceSecPerKm = paceToSend)
+
+                // 최종 RECORD도 동일하게 OPEN일 때만 송신하고 실패 시 버퍼에 유지
+                pendingFinalRecord = recordJson
+                val sent = WebSocketManager.isOpen && WebSocketManager.send(recordJson)
+                if (sent) {
+                    finalRecordSent = true
+                    pendingFinalRecord = null
+                }
             }
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
             if (distanceKm >= goalKm) {
                 navController.navigate("challenge_result/$challengeId") {
                     popUpTo("challenge_workout/$challengeId") { inclusive = true }
+                }
+            }
+        }
+    }
+
+    // (서버 요구사항: 재접속 이후의 최신 데이터만 필요)
+    // 웹소켓 상태가 Open으로 전환될 때, 버퍼에 남아 있던 최신 RECORD/최종 RECORD를 한 번만 재전송
+    LaunchedEffect(websocketState) {
+        if (websocketState is WebSocketManager.WsState.Open) {
+            pendingRecord?.let { latest ->
+                if (WebSocketManager.send(latest)) {
+                    pendingRecord = null
+                }
+            }
+
+            pendingFinalRecord?.let { latest ->
+                if (WebSocketManager.send(latest)) {
+                    pendingFinalRecord = null
+                    finalRecordSent = true
                 }
             }
         }
@@ -304,79 +350,79 @@ fun ChallengeWorkoutScreen(
 
                         Spacer(modifier = Modifier.height(28.dp))
 
-                        // 메트릭 2x2: 왼쪽 컬럼(이동거리+BPM), 오른쪽 컬럼(칼로리+페이스)
+                        val distanceKm = formatDistanceKm(metrics.distanceMeters)
+                        val calories = formatCalories(metrics.caloriesKcal)
+                        val bpm = metrics.avgHeartRate?.toString() ?: "--"
+                        val paceText = currentPace?.let { formatPace(it) } ?: "-'--\""
+                        val timeText = formatElapsedCompact(metrics.activeElapsedMs)
+
+                        // 1행: 이동거리 + 페이스 + 시간
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            val distanceKm = formatDistanceKm(metrics.distanceMeters)
-                            val calories = formatCalories(metrics.caloriesKcal)
-                            val bpm = metrics.avgHeartRate?.toString() ?: "--"
-                            val paceText = currentPace?.let { formatPace(it) } ?: "--:--/km"
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
-                            ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "이동거리",
-                                    color = ColorPalette.Light.secondary,
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.Center
+                                    "이동거리",
+                                    style = Typography.Caption,
+                                    color = ColorPalette.Light.secondary
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = distanceKm,
-                                    color = ColorPalette.Light.primary,
-                                    style = Typography.Heading,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "BPM",
-                                    color = ColorPalette.Light.secondary,
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = bpm,
-                                    color = ColorPalette.Light.primary,
-                                    style = Typography.Heading,
-                                    textAlign = TextAlign.Center
+                                    distanceKm + "km",
+                                    style = Typography.Title
                                 )
                             }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "페이스",
+                                    style = Typography.Caption,
+                                    color = ColorPalette.Light.secondary
+                                )
+                                Text(
+                                    paceText,
+                                    style = Typography.Title
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "시간",
+                                    style = Typography.Caption,
+                                    color = ColorPalette.Light.secondary
+                                )
+                                Text(
+                                    timeText,
+                                    style = Typography.Title
+                                )
+                            }
+                        }
 
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
-                            ) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 2행: BPM + 칼로리
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "칼로리",
-                                    color = ColorPalette.Light.secondary,
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.Center
+                                    "BPM",
+                                    style = Typography.Caption,
+                                    color = ColorPalette.Light.secondary
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = calories,
-                                    color = ColorPalette.Light.primary,
-                                    style = Typography.Heading,
-                                    textAlign = TextAlign.Center
+                                    bpm,
+                                    style = Typography.Title
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "페이스",
-                                    color = ColorPalette.Light.secondary,
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.Center
+                                    "칼로리",
+                                    style = Typography.Caption,
+                                    color = ColorPalette.Light.secondary
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = paceText,
-                                    color = ColorPalette.Light.primary,
-                                    style = Typography.Heading,
-                                    textAlign = TextAlign.Center
+                                    calories + "Kcal",
+                                    style = Typography.Title
                                 )
                             }
                         }
@@ -487,18 +533,53 @@ fun ChallengeWorkoutScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "실시간 랭킹",
-                        style = Typography.Subtitle,
-                        color = ColorPalette.Light.secondary
-                    )
+                    // 왼쪽: 실시간 랭킹 + 챌린지 이름(목표거리)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "실시간 랭킹",
+                            style = Typography.Subtitle,
+                            color = ColorPalette.Light.secondary
+                        )
 
-                    val elapsedLabel = formatElapsedCompact(metrics.activeElapsedMs)
-                    Text(
-                        text = elapsedLabel,
-                        style = Typography.Caption,
-                        color = ColorPalette.Light.secondary
-                    )
+                        // 챌린지 이름 + 목표 거리
+                        val challengeName = challengeDetailState?.title ?: ""
+                        val distanceLabel = targetKm?.let { km ->
+                            when {
+                                km == 21.0975 -> "하프"
+                                km < 1.0 -> "${(km * 1000).toInt()}m"
+                                else -> "${km.toInt()}km"
+                            }
+                        } ?: ""
+
+                        if (challengeName.isNotEmpty() && distanceLabel.isNotEmpty()) {
+                            Text(
+                                text = "$challengeName($distanceLabel)",
+                                style = Typography.Caption,
+                                color = ColorPalette.Light.secondary
+                            )
+                        }
+                    }
+
+                    // 오른쪽: 인원수
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "참여 인원",
+                            tint = ColorPalette.Light.component,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "${participantsState.size}",
+                            style = Typography.Caption,
+                            color = ColorPalette.Light.secondary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -583,7 +664,7 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }
 
 private fun formatCalories(kcal: Double): String = String.format("%.0f", kcal)
@@ -613,60 +694,139 @@ private fun RankingRow(participant: Participant) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .background(Color.White, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // 왼쪽: 닉네임 (긴 경우 ... 처리)
-        Text(
-            text = participant.nickname,
-            style = Typography.Body,
-            color = ColorPalette.Light.primary,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.weight(3f)
-        )
+        // 왼쪽: 순위 + 프로필 + 닉네임 + 배지
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.weight(1f)
+        ) {
+            // 순위
+            Text(
+                text = if (participant.rank > 0) "${participant.rank}위" else "--",
+                style = Typography.Caption.copy(fontSize = 14.sp),
+                color = when (participant.rank) {
+                    1 -> Color(0xFFFFD700) // 금색
+                    2 -> Color(0xFFC0C0C0) // 은색
+                    3 -> Color(0xFFCD7F32) // 동색
+                    else -> ColorPalette.Light.primary
+                },
+                modifier = Modifier.width(38.dp)
+            )
 
-        // 가운데1: 페이스 (5'43"/km 형태, 길이 가정)
-        val paceText = participant.paceSecPerKm?.takeIf { it > 0.0 }?.let { formatPace(it) } ?: "--:--/km"
-        Text(
-            text = paceText,
-            style = Typography.Caption,
-            color = ColorPalette.Light.secondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(2.5f)
-        )
+            Spacer(modifier = Modifier.width(8.dp))
 
-        // 가운데2: 거리 (최대 21.XXKM 정도 가정)
-        val distanceText = if (participant.distanceKm > 0.0) String.format("%.2fKM", participant.distanceKm) else "0.00KM"
-        Text(
-            text = distanceText,
-            style = Typography.Caption,
-            color = ColorPalette.Light.secondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(2.5f)
-        )
+            // 프로필 이미지
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(ColorPalette.Light.containerBackground)
+                    .border(
+                        width = if (participant.isMe) 2.dp else 1.dp,
+                        color = if (participant.isMe) ColorPalette.Common.accent else ColorPalette.Light.component,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!participant.avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = participant.avatarUrl,
+                        contentDescription = "프로필 이미지",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "프로필",
+                        tint = if (participant.isMe) ColorPalette.Common.accent else ColorPalette.Light.component,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
 
-        // 오른쪽: 랭킹/나/리타이어 배지 (두 자리 수까지 고려)
-        val badgeText = when {
-            participant.isRetired -> "리타이어"
-            participant.isMe -> "나"
-            participant.rank == 1 -> "1위"
-            participant.rank > 0 -> "${participant.rank}위"
-            else -> ""
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // 닉네임 + 나 배지
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = participant.nickname,
+                    style = Typography.Body.copy(fontSize = 14.sp),
+                    color = ColorPalette.Light.primary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+
+                if (participant.isMe) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = ColorPalette.Common.accent,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "나",
+                            style = Typography.Caption.copy(fontSize = 10.sp),
+                            color = Color.White
+                        )
+                    }
+                }
+
+                if (participant.isRetired) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = ColorPalette.Light.secondary,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "리타이어",
+                            style = Typography.Caption.copy(fontSize = 10.sp),
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
-        Text(
-            text = badgeText,
-            style = Typography.Caption,
-            color = when {
-                participant.isMe -> ColorPalette.Common.accent
-                participant.isRetired -> ColorPalette.Light.secondary
-                else -> ColorPalette.Light.secondary
-            },
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1.2f)
-        )
+
+        // 오른쪽: 페이스 + 거리
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 페이스
+            val paceText = participant.paceSecPerKm?.takeIf { it > 0.0 }?.let { formatPace(it) } ?: "-'--\""
+            Text(
+                text = paceText,
+                style = Typography.Caption,
+                color = ColorPalette.Light.secondary,
+                textAlign = TextAlign.End
+            )
+
+            // 거리
+            val distanceText = if (participant.distanceKm > 0.0) String.format("%.2fkm", participant.distanceKm) else "0.00km"
+            Text(
+                text = distanceText,
+                style = Typography.Caption,
+                color = ColorPalette.Light.secondary,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(45.dp)
+            )
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 package com.example.runnity.ui.screens.home
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -8,13 +9,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.clickable
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,26 +72,33 @@ fun HomeScreen(
     val weatherData by viewModel.weather.collectAsState()
     val weatherLoading by viewModel.weatherLoading.collectAsState()
 
+    // 운영진 챌린지 구독
+    val adminChallenges by viewModel.adminChallenges.collectAsState()
+
     val locationLauncher = rememberLocationPermissionLauncher { granted ->
         if (granted) {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            val cancellationToken = CancellationTokenSource().token
+            @SuppressLint("MissingPermission")
+            fun fetchLocation() {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource().token
 
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cancellationToken
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.fetchWeather(location.latitude, location.longitude)
-                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
-                } else {
+                fusedLocationClient.getCurrentLocation(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    cancellationToken
+                ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.fetchWeather(location.latitude, location.longitude)
+                        Timber.d("현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
+                    } else {
+                        viewModel.fetchWeather(37.5665, 126.9780)
+                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                    }
+                }.addOnFailureListener { exception ->
+                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
                     viewModel.fetchWeather(37.5665, 126.9780)
-                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
-            }.addOnFailureListener { exception ->
-                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
-                viewModel.fetchWeather(37.5665, 126.9780)
             }
+            fetchLocation()
         } else {
             viewModel.fetchWeather(37.5665, 126.9780)
             Timber.w("위치 권한 거부 → 서울 기본값 사용")
@@ -100,24 +112,28 @@ fun HomeScreen(
         if (!PermissionUtils.hasLocationPermission(context)) {
             requestLocationPermissions(locationLauncher)
         } else {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            val cancellationToken = CancellationTokenSource().token
+            @SuppressLint("MissingPermission")
+            fun fetchInitialLocation() {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                val cancellationToken = CancellationTokenSource().token
 
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cancellationToken
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
-                    Timber.d("현재 위치: ${location.latitude}, ${location.longitude}")
-                } else {
+                fusedLocationClient.getCurrentLocation(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    cancellationToken
+                ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.fetchWeatherIfNeeded(location.latitude, location.longitude)
+                        Timber.d("현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
+                    } else {
+                        viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
+                        Timber.w("위치 정보 없음 → 서울 기본값 사용")
+                    }
+                }.addOnFailureListener { exception ->
+                    Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
                     viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
-                    Timber.w("위치 정보 없음 → 서울 기본값 사용")
                 }
-            }.addOnFailureListener { exception ->
-                Timber.e(exception, "위치 조회 실패 → 서울 기본값 사용")
-                viewModel.fetchWeatherIfNeeded(37.5665, 126.9780)
             }
+            fetchInitialLocation()
         }
 
         if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)) {
@@ -132,27 +148,6 @@ fun HomeScreen(
         }
     }
 
-    // 추천 챌린지 샘플 데이터
-    val recommendedChallenges = listOf(
-        RecommendedChallengeItem(
-            id = "rec_1",
-            imageUrl = null,
-            title = "러니티 추천 챌린지",
-            description = "대규모 러닝 실시간 경쟁"
-        ),
-        RecommendedChallengeItem(
-            id = "rec_2",
-            imageUrl = null,
-            title = "주말 마라톤",
-            description = "함께 달리는 즐거움"
-        ),
-        RecommendedChallengeItem(
-            id = "rec_3",
-            imageUrl = null,
-            title = "초보 러너 환영",
-            description = "천천히 함께 달려요"
-        )
-    )
 
     // 예약한 챌린지: ViewModel의 실제 데이터 사용
     val reservedChallenges = viewModel.reservedChallenges.collectAsState().value
@@ -164,13 +159,13 @@ fun HomeScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-        // 1. 상단 앱바 (로고 + 알람)
+        // 1. 상단 앱바 (로고)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(ColorPalette.Common.accent)  // 액센트 색상 배경
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 로고 (이미지)
@@ -180,20 +175,6 @@ fun HomeScreen(
                 modifier = Modifier.height(32.dp),
                 contentScale = ContentScale.Fit
             )
-
-            // 알람 아이콘
-            IconButton(
-                onClick = {
-                    // TODO: 알람 페이지로 이동
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Notifications,
-                    contentDescription = "알림",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
         }
 
         // 2. 스크롤 가능한 내용
@@ -260,20 +241,32 @@ fun HomeScreen(
                             navController?.navigate("weather_detail")
                         },
                         onRefresh = {
-                            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                            val cancellationToken = CancellationTokenSource().token
+                            if (PermissionUtils.hasLocationPermission(context)) {
+                                @SuppressLint("MissingPermission")
+                                fun refreshLocation() {
+                                    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                                    val cancellationToken = CancellationTokenSource().token
 
-                            fusedLocationClient.getCurrentLocation(
-                                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                                cancellationToken
-                            ).addOnSuccessListener { location ->
-                                if (location != null) {
-                                    viewModel.fetchWeather(location.latitude, location.longitude)
-                                } else {
-                                    viewModel.fetchWeather(37.5665, 126.9780)
+                                    fusedLocationClient.getCurrentLocation(
+                                        Priority.PRIORITY_HIGH_ACCURACY,
+                                        cancellationToken
+                                    ).addOnSuccessListener { location ->
+                                        if (location != null) {
+                                            viewModel.fetchWeather(location.latitude, location.longitude)
+                                            Timber.d("새로고침 - 현재 위치 (정확도: ${location.accuracy}m): ${location.latitude}, ${location.longitude}")
+                                        } else {
+                                            viewModel.fetchWeather(37.5665, 126.9780)
+                                            Timber.w("새로고침 - 위치 정보 없음")
+                                        }
+                                    }.addOnFailureListener { exception ->
+                                        Timber.e(exception, "새로고침 - 위치 조회 실패")
+                                        viewModel.fetchWeather(37.5665, 126.9780)
+                                    }
                                 }
-                            }.addOnFailureListener {
+                                refreshLocation()
+                            } else {
                                 viewModel.fetchWeather(37.5665, 126.9780)
+                                Timber.w("새로고침 - 위치 권한 없음")
                             }
                         }
                     )
@@ -287,7 +280,7 @@ fun HomeScreen(
             )
 
             RecommendedChallengeCarousel(
-                challenges = recommendedChallenges,
+                challenges = adminChallenges,
                 onChallengeClick = { id ->
                     navController?.navigate("challenge_detail/$id")
                 }
@@ -323,36 +316,82 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                reservedChallenges.forEach { challenge ->
-                    ChallengeCard(
-                        title = challenge.title,
-                        distance = challenge.distance,
-                        startDateTime = challenge.startDateTime,
-                        participants = challenge.participants,
-                        buttonState = challenge.buttonState,
-                        onCardClick = {
-                            // 소켓 방이 활성화되어 "참여하기" 버튼이 뜬 챌린지는
-                            // 카드 전체를 눌러도 상세 조회로 이동하지 않도록 막는다.
-                            if (challenge.buttonState != ChallengeButtonState.Join) {
-                                navController?.navigate("challenge_detail/${challenge.id}")
-                            }
-                        },
-                        onButtonClick = {
-                            val needsLocation = !PermissionUtils.hasLocationPermission(context)
-                            val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
-                            if (needsLocation || needsNotification) {
-                                if (needsLocation) {
-                                    requestLocationPermissions(locationLauncher)
-                                } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
-                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                if (reservedChallenges.isEmpty()) {
+                    // 예약한 챌린지가 없을 때
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "예약한 챌린지가 없습니다",
+                            style = com.example.runnity.theme.Typography.Body,
+                            color = ColorPalette.Light.primary
+                        )
+                        Text(
+                            text = "새로운 챌린지를 예약해보세요!",
+                            style = com.example.runnity.theme.Typography.Caption,
+                            color = ColorPalette.Light.secondary,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .shadow(4.dp, RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ColorPalette.Common.accent)
+                                .clickable {
+                                    navController?.navigate("challenge") {
+                                        navController.graph.findStartDestination().id.let { startId ->
+                                            popUpTo(startId) { saveState = true }
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            } else {
-                                viewModel.joinChallengeAndConnect(challenge.id) {
-                                    navController?.navigate("challenge_waiting/${challenge.id}")
-                                }
-                            }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "챌린지 둘러보기",
+                                style = com.example.runnity.theme.Typography.Caption,
+                                color = Color.White
+                            )
                         }
-                    )
+                    }
+                } else {
+                    reservedChallenges.forEach { challenge ->
+                        ChallengeCard(
+                            title = challenge.title,
+                            distance = challenge.distance,
+                            startDateTime = challenge.startDateTime,
+                            participants = challenge.participants,
+                            buttonState = challenge.buttonState,
+                            onCardClick = {
+                                // 소켓 방이 활성화되어 "참여하기" 버튼이 뜬 챌린지는
+                                // 카드 전체를 눌러도 상세 조회로 이동하지 않도록 막는다.
+                                if (challenge.buttonState != ChallengeButtonState.Join) {
+                                    navController?.navigate("challenge_detail/${challenge.id}")
+                                }
+                            },
+                            onButtonClick = {
+                                val needsLocation = !PermissionUtils.hasLocationPermission(context)
+                                val needsNotification = Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission(context)
+                                if (needsLocation || needsNotification) {
+                                    if (needsLocation) {
+                                        requestLocationPermissions(locationLauncher)
+                                    } else if (needsNotification && Build.VERSION.SDK_INT >= 33) {
+                                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                } else {
+                                    viewModel.joinChallengeAndConnect(challenge.id) {
+                                        navController?.navigate("challenge_waiting/${challenge.id}")
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             }
 

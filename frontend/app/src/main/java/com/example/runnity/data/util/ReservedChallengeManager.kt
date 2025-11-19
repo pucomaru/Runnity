@@ -141,9 +141,31 @@ object ReservedChallengeManager {
      * 거리 포맷 변환
      */
     private fun formatDistance(raw: String): String {
-        val v = raw.toDoubleOrNull() ?: return raw
-        val iv = v.toInt() // 소수점 버림
-        return "${iv}km"
+        return when (raw) {
+            "ONE" -> "1km"
+            "TWO" -> "2km"
+            "THREE" -> "3km"
+            "FOUR" -> "4km"
+            "FIVE" -> "5km"
+            "SIX" -> "6km"
+            "SEVEN" -> "7km"
+            "EIGHT" -> "8km"
+            "NINE" -> "9km"
+            "TEN" -> "10km"
+            "FIFTEEN" -> "15km"
+            "HALF" -> "하프"
+            "M100", "0.1" -> "100m"
+            "M500", "0.5" -> "500m"
+            else -> {
+                val v = raw.toDoubleOrNull()
+                when {
+                    v == 0.1 -> "100m"
+                    v == 0.5 -> "500m"
+                    v != null && v >= 1.0 -> "${v.toInt()}km"
+                    else -> "${raw}km"
+                }
+            }
+        }
     }
 
     /**
