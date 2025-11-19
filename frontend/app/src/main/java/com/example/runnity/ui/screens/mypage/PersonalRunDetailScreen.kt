@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -61,6 +63,7 @@ import com.kakao.vectormap.route.RouteLine
 import com.kakao.vectormap.route.RouteLineStyles
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import timber.log.Timber
 
 /**
  * 개인 운동 기록 상세 화면
@@ -148,16 +151,24 @@ fun RunDetailContent(data: RunRecordDetailResponse) {
     val route = try {
         if (!data.route.isNullOrBlank()) {
             val type = object : TypeToken<List<GeoPoint>>() {}.type
-            Gson().fromJson<List<GeoPoint>>(data.route, type)
+            val parsed = Gson().fromJson<List<GeoPoint>>(data.route, type)
+            Timber.d("[PersonalRunDetail] route parsed: ${parsed.size} points")
+            parsed
         } else {
+            Timber.d("[PersonalRunDetail] route is null or blank")
             emptyList()
         }
     } catch (e: Exception) {
+        Timber.e(e, "[PersonalRunDetail] route parsing error")
         emptyList()
     }
 
-    // 지도 + 요약 (반응형)
-    Column(modifier = Modifier.fillMaxSize()) {
+    // 지도 + 요약 (스크롤 가능)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
         // 상단: 지도 (고정 높이)
         Box(
             modifier = Modifier
@@ -171,11 +182,16 @@ fun RunDetailContent(data: RunRecordDetailResponse) {
                         mapView = this
                         start(
                             object : MapLifeCycleCallback() {
-                                override fun onMapDestroy() {}
-                                override fun onMapError(error: Exception) {}
+                                override fun onMapDestroy() {
+                                    Timber.d("[PersonalRunDetail] onMapDestroy")
+                                }
+                                override fun onMapError(error: Exception) {
+                                    Timber.e(error, "[PersonalRunDetail] onMapError: ${error.message}")
+                                }
                             },
                             object : KakaoMapReadyCallback() {
                                 override fun onMapReady(map: KakaoMap) {
+                                    Timber.d("[PersonalRunDetail] onMapReady")
                                     kakaoMap = map
                                     markerLayer = map.getLabelManager()?.getLayer()
                                     if (markerStyles == null) {
