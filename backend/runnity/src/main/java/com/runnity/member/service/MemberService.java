@@ -343,4 +343,21 @@ public class MemberService {
             throw new RuntimeException("Logout failed", e);
         }
     }
+
+    /**
+     * 테스트용 로그인 - memberId로 직접 토큰 발급
+     * 서버 부하 테스트를 위한 인증 건너뛰기 용도
+     */
+    @Transactional(readOnly = true)
+    public LoginResponseDto testLogin(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("MEMBER_NOT_FOUND"));
+
+        String accessToken = jwtTokenProvider.createAccessToken(member);
+        String refreshToken = jwtTokenProvider.createRefreshToken(member.getMemberId());
+
+        boolean needAdditionalInfo = member.getNickname() == null || member.getNickname().isBlank();
+
+        return new LoginResponseDto(accessToken, refreshToken, false, needAdditionalInfo);
+    }
 }
