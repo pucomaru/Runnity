@@ -47,6 +47,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.runnity.ui.screens.broadcast.BroadcastFilterScreen
 import com.example.runnity.ui.screens.broadcast.BroadcastLiveScreen
+import com.example.runnity.ui.screens.broadcast.BroadcastLiveViewModel
 import com.example.runnity.ui.screens.broadcast.BroadcastScreen
 import com.example.runnity.ui.screens.broadcast.BroadcastViewModel
 import com.example.runnity.ui.screens.workout.WorkoutPersonalScreen
@@ -254,7 +255,7 @@ fun MainTabScreen(
                         sessionViewModel = sessionViewModel
                     )
                 }
-                
+
                 // 챌린지 결과 화면
                 composable("challenge_result/{id}") { backStackEntry ->
                     val challengeId = backStackEntry.arguments?.getString("id")?.toIntOrNull() ?: 0
@@ -316,9 +317,19 @@ fun MainTabScreen(
                     // 중계 라이브 화면
                     composable("broadcast_live/{id}") { backStackEntry ->
                         val challengeId = backStackEntry.arguments?.getString("id") ?: ""
+                        val parentEntry = remember(backStackEntry) {
+                            navController.getBackStackEntry("broadcast_graph")
+                        }
+                        val broadcastViewModel: BroadcastViewModel = viewModel(parentEntry)
+
+                        // 🔥 2. 라이브 화면의 자체 ViewModel
+                        val liveViewModel: BroadcastLiveViewModel = viewModel()
+
                         BroadcastLiveScreen(
                             challengeId = challengeId,
-                            navController = navController
+                            navController = navController,
+                            broadcastViewModel = broadcastViewModel,
+                            liveViewModel = liveViewModel
                         )
                     }
                 }

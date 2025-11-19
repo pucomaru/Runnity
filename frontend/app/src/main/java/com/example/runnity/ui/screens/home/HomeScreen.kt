@@ -402,7 +402,7 @@ fun HomeScreen(
         // FloatingActionButton (중계방 보기)
         FloatingActionButton(
             onClick = {
-                 navController?.navigate("broadcast_graph")
+                 navController?.navigate("broadcast_view")
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
