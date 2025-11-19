@@ -104,7 +104,29 @@ fun BoxScope.MarathonRunnerMarker(
     val x = with(density) { (xPx - w / 2).toDp() }
     val y = with(density) { (yPx - h / 2).toDp() }
 
-    // 말풍선 (선택되었을 때만 표시)
+    // 닉네임 라벨 (항상 표시, 점 옆에 배치)
+    // 점의 위치에 따라 닉네임 위치 조정 (점 위쪽에 표시)
+    Box(
+        modifier = Modifier
+            .align(Alignment.Center)
+            .offset(x = x, y = y - 25.dp)  // 점 위에 닉네임 표시
+            .zIndex(6f)
+    ) {
+        // 배경이 있는 닉네임 텍스트
+        Box(
+            modifier = Modifier
+        ) {
+            Text(
+                text = runner.nickname,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Black,
+                maxLines = 1
+            )
+        }
+    }
+
+    // 말풍선 (선택되었을 때만 표시 - 상세 정보)
     if (isSelected) {
         Card(
             modifier = Modifier

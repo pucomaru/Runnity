@@ -336,6 +336,8 @@ class BroadcastLiveViewModel(
                 }
             }
         )
+        
+        Timber.d("토픽 구독 완료: $topic (subscription=${subscription != null})")
     }
 
     private fun enqueueSocketPayload(json: String) {
