@@ -75,6 +75,10 @@ class BroadcastLiveViewModel(
 
     private var pingJob = viewModelScope.launch { } // 초기 dummy, 실제는 startPingLoop에서 교체
 
+    // WebSocket 이벤트 버퍼 및 처리 루프 Job
+    private val eventBuffer = mutableListOf<WebSocketWrapper>()
+    private var eventLoopJob = viewModelScope.launch { } // 초기 dummy, 실제는 startEventLoop에서 교체
+
     private var tts: TextToSpeech? = null
 
     init {
@@ -184,6 +188,7 @@ class BroadcastLiveViewModel(
                     reconnectAttempts = 0
                     subscribeToTopic(client, topic)
                     startPingLoop(client)
+                    startEventLoop()
                     _uiState.update { it.copy(isLoading = false) }
                 }
                 LifecycleEvent.Type.ERROR -> {
@@ -219,6 +224,43 @@ class BroadcastLiveViewModel(
         pingJob.cancel()
     }
 
+    private fun startEventLoop() {
+        if (eventLoopJob.isActive) return
+
+        eventLoopJob = viewModelScope.launch(Dispatchers.Default) {
+            val bufferMs = 250L
+            while (true) {
+                val now = System.currentTimeMillis()
+                val readyEvents = mutableListOf<WebSocketWrapper>()
+
+                synchronized(eventBuffer) {
+                    if (eventBuffer.isNotEmpty()) {
+                        val (ready, pending) = eventBuffer.partition { now - bufferMs >= it.timestamp }
+
+                        if (ready.isNotEmpty()) {
+                            val sortedReady = ready.sortedBy { it.timestamp }
+                            readyEvents.addAll(sortedReady)
+                        }
+
+                        eventBuffer.clear()
+                        eventBuffer.addAll(pending)
+                    }
+                }
+
+                for (event in readyEvents) {
+                    when (event.type) {
+                        "STREAM" -> handleStreamMessage(event)
+                        "LLM"    -> handleLlmMessage(event)
+                        else      -> Timber.d("알 수 없는 type=${event.type}")
+                    }
+                }
+
+                delay(50L)
+            }
+        }
+    }
+
+
     private fun attemptReconnect(wsUrl: String, topic: String, challengeId: Long) {
         if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++
@@ -247,7 +289,7 @@ class BroadcastLiveViewModel(
                 val payload = msg.payload
                 Timber.d("📡 수신한 메시지: $payload")
                 viewModelScope.launch(Dispatchers.Default) {
-                    handleSocketPayload(payload)
+                    enqueueSocketPayload(payload)
                 }
             },
             { error ->
@@ -257,6 +299,18 @@ class BroadcastLiveViewModel(
                 }
             }
         )
+    }
+
+    private fun enqueueSocketPayload(json: String) {
+        try {
+            val wrapper = gson.fromJson(json, WebSocketWrapper::class.java)
+            synchronized(eventBuffer) {
+                eventBuffer.add(wrapper)
+                eventBuffer.sortBy { it.timestamp }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "enqueueSocketPayload 파싱 실패")
+        }
     }
 
     private fun handleSocketPayload(json: String) {
@@ -311,7 +365,7 @@ class BroadcastLiveViewModel(
         // totaldistanceKm은 실제로 meter 단위이므로 km로 변환
         val totalMeter = _uiState.value.totaldistanceKm.takeIf { it > 0 } ?: 1
         val totalKm = totalMeter / 1000.0  // meter를 km로 변환
-        
+
         val current = _uiState.value.runners
         val existing = current.find { it.runnerId == stream.runnerId }
         val color = existing?.color ?: pickColor(current.size)
@@ -326,7 +380,7 @@ class BroadcastLiveViewModel(
 
         // ratio 계산: 현재 거리(km) / 전체 거리(km) - 단위를 맞춰서 계산
         val ratio = (distanceKm.toFloat() / totalKm.toFloat()).coerceIn(0f, 1f)
-        
+
         Timber.d(
             "[BroadcastWS][Ratio Calc] distanceKm=%.2f, totalKm=%.2f, ratio=%.4f",
             distanceKm,
@@ -500,6 +554,7 @@ class BroadcastLiveViewModel(
         lifecycleSub = null
         stompClient = null
         stopPingLoop()
+        eventLoopJob.cancel()
     }
 
     private fun formatPace(totalSeconds: Double): String {
