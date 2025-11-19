@@ -1,6 +1,7 @@
 package com.example.runnity.ui.screens.broadcast
 
 import android.app.Application
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
@@ -93,11 +94,47 @@ class BroadcastLiveViewModel(
                 _uiState.update { it.copy(errorMessage = "음성 안내를 지원하지 않는 기기입니다.") }
             } else {
                 Timber.d("TTS 엔진 초기화 성공")
+                configureTtsVoice()
             }
         } else {
             Timber.e("TTS 초기화 실패")
         }
     }
+
+    /**
+     * TTS 음성 설정
+     * "ko-kr-x-kod-network" 음성 모델을 직접 사용합니다.
+     */
+    private fun configureTtsVoice() {
+        val ttsInstance = tts ?: return
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                // Android 5.0 이상: getVoices() 사용
+                val voices = ttsInstance.voices
+                val targetVoice = voices?.find { voice ->
+                    voice.name.contains("ko-kr-x-kod-network", ignoreCase = true)
+                }
+
+                if (targetVoice != null) {
+                    val setVoiceResult = ttsInstance.setVoice(targetVoice)
+                    if (setVoiceResult == TextToSpeech.SUCCESS) {
+                        Timber.d("TTS 음성 설정 성공: ${targetVoice.name} (${targetVoice.locale})")
+                    } else {
+                        Timber.w("TTS 음성 설정 실패: ${targetVoice.name}")
+                    }
+                } else {
+                    Timber.w("ko-kr-x-kod-network 음성을 찾을 수 없습니다. 기본 음성을 사용합니다.")
+                }
+            } else {
+                // Android 5.0 미만: 기본 음성만 사용 가능
+                Timber.d("Android 5.0 미만 버전에서는 기본 음성만 사용 가능합니다.")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "TTS 음성 설정 중 오류 발생")
+        }
+    }
+
 
     // 러너 선택 (말풍선용)
     fun selectRunner(runnerId: Long?) {
