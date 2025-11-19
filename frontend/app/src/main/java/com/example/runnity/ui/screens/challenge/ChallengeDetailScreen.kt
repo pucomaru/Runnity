@@ -63,6 +63,18 @@ fun ChallengeDetailScreen(
         }
     }
 
+    // 에러 다이얼로그 상태
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    // 에러 이벤트 구독 (다이얼로그 표시)
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { message ->
+            errorMessage = message
+            showErrorDialog = true
+        }
+    }
+
     // 챌린지 상세 정보 관찰
     val challengeDetail by viewModel.challengeDetail.collectAsState()
 
@@ -80,6 +92,28 @@ fun ChallengeDetailScreen(
             contentAlignment = Alignment.Center
         ) {
             Text("챌린지 정보를 불러오는 중...")
+        }
+
+        // 에러 다이얼로그 (로딩 중에도 표시)
+        if (showErrorDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showErrorDialog = false
+                    viewModel.requestRefresh()
+                    navController.popBackStack()
+                },
+                title = { Text("알림") },
+                text = { Text(errorMessage) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showErrorDialog = false
+                        viewModel.requestRefresh()
+                        navController.popBackStack()
+                    }) {
+                        Text("확인")
+                    }
+                }
+            )
         }
         return
     }
@@ -322,7 +356,15 @@ fun ChallengeDetailScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.cancelChallenge(challengeIdLong)
+                        // 현재 참가자 수가 1명이면 (나만 있으면) 취소 후 뒤로 나감
+                        val isLastMember = challengeDetail?.currentParticipants == 1
+                        viewModel.cancelChallenge(challengeIdLong, isLastMember) {
+                            if (isLastMember) {
+                                navController.popBackStack()
+                            } else {
+                                viewModel.loadChallengeDetail(challengeIdLong)
+                            }
+                        }
                         showCancelReserveDialog = false
                     }
                 ) {
@@ -332,6 +374,20 @@ fun ChallengeDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showCancelReserveDialog = false }) {
                     Text("닫기")
+                }
+            }
+        )
+    }
+
+    // 에러 다이얼로그
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("알림") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("확인")
                 }
             }
         )
