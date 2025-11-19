@@ -3,12 +3,36 @@ import random
 import requests
 from app.models.highlight_event import HighlightEvent
 from app.utils.logger import logger
+import re
 
 # ============================================
 # ENV & URL
 # ============================================
 GMS_API_KEY = os.getenv("GMS_API_KEY")
 GMS_CHAT_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions"
+
+# 페이스 변환 함수
+def format_pace(seconds: float) -> str:
+    if not seconds or seconds <= 0:
+        return "0'00\""
+    m = int(seconds // 60)
+    s = int(seconds % 60)
+    return f"{m}'{s:02d}\""
+
+def remove_emoji(text: str) -> str:
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags
+        "\U00002700-\U000027BF"  # dingbats
+        "\U0001F900-\U0001F9FF"  # supplemental symbols
+        "\U0001FA70-\U0001FAFF"  # extended symbols
+        "]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.sub("", text)
 
 
 # ============================================
@@ -46,7 +70,7 @@ def _generate_with_llm(event: HighlightEvent) -> str:
     target = event.targetNickname or "상대"
     rank = event.rank
     dist = event.totalDistance
-    pace = event.pace
+    pace = format_pace(event.pace)
     timestamp = event.timestamp
 
     # System Prompt (GMS는 role=developer 쓰는게 안전)
@@ -65,7 +89,7 @@ def _generate_with_llm(event: HighlightEvent) -> str:
 - 대상자: {target}
 - 현재 순위: {rank}
 - 누적 거리: {dist} km
-- 현재 페이스: {pace} 분/km
+- 현재 페이스: {pace}
 - 발생 시각: {timestamp}
 
 [요구사항]
@@ -74,6 +98,7 @@ def _generate_with_llm(event: HighlightEvent) -> str:
 3) MZ 스타일 + 밈 약간
 4) 문장 끝은 느낌표 또는 마침표
 5) 중계 톤으로 자연스럽고 현장감 있게
+6) 절대 이모지(emoji)를 사용하지 말 것
 """
 
     payload = {
@@ -111,6 +136,8 @@ def _generate_with_llm(event: HighlightEvent) -> str:
     if not text:
         raise Exception(f"GMS returned empty or invalid content: {data}")
 
+    # 이모지 제거
+    text = remove_emoji(text)
     return text
 
 
