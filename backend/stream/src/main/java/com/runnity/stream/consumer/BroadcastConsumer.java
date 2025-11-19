@@ -35,16 +35,17 @@ public class BroadcastConsumer {
 
             switch (event.toLowerCase()) {
 
-                // === 1) 방송 상태 이벤트 ===
-                case "ready" -> broadcastStateService.handleReady(msg.getChallengeId());
-                case "running" -> broadcastStateService.handleRunning(msg.getChallengeId());
-                case "done" -> broadcastStateService.handleDone(msg.getChallengeId());
+//                // === 1) 방송 상태 이벤트 ===
+//                case "ready" -> broadcastStateService.handleReady(msg.getChallengeId());
+//                case "running" -> broadcastStateService.handleRunning(msg.getChallengeId());
+//                case "done" -> broadcastStateService.handleDone(msg.getChallengeId());
 
-                // === 2) 실시간 상태 / 러너 이벤트 ===
-                case "start", "finish", "leave" -> broadcastStreamService.handleEvent(msg);
+                case "start" -> broadcastStreamService.handleStart(msg);
+                case "running" -> broadcastStreamService.handleEvent(msg);
+                case "finish" -> broadcastStreamService.handleEvent(msg);
+                case "leave" -> broadcastStreamService.handleEvent(msg);
 
-                // === 3) 일반 running 프레임 (주의: READY/RUNNING 구분 필요)
-                default -> broadcastStreamService.handleEvent(msg);
+                default -> log.warn("Unknown eventType: {}", event);
             }
 
         } catch (Exception e) {
