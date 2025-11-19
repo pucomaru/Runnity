@@ -17,8 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.runnity.data.datalayer.sendSessionControl
 import com.example.runnity.data.util.UserProfileManager
 import com.example.runnity.socket.WebSocketManager
 import com.example.runnity.theme.ColorPalette
@@ -38,6 +40,7 @@ fun ChallengeWaitingScreen(
     socketViewModel: ChallengeSocketViewModel
 ) {
     val challengeIdLong = challengeId.toLongOrNull() ?: 0L
+    val context = LocalContext.current
 
     // 상세 정보 및 대기방 참가자 정보 초기화
     LaunchedEffect(challengeIdLong) {
@@ -85,10 +88,14 @@ fun ChallengeWaitingScreen(
             when {
                 secondsUntilStart > 5 -> {
                     kotlinx.coroutines.delay((secondsUntilStart - 5) * 1000)
+                    sendSessionControl(context, "prepare")
+                    sendSessionControl(context, "countdown", seconds = 5)
                     navController.navigate("challenge_countdown/$challengeId")
                 }
                 secondsUntilStart in 1..5 -> {
                     // 이미 5초 이내라면 바로 카운트다운으로 이동
+                    sendSessionControl(context, "prepare")
+                    sendSessionControl(context, "countdown", seconds = 5)
                     navController.navigate("challenge_countdown/$challengeId")
                 }
                 // 0 이하인 경우는 이미 시작 시간이 지난 상태이므로 아무 것도 하지 않음
