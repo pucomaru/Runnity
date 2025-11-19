@@ -76,13 +76,13 @@ fun RankingItem(
         // 거리
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = String.format("%.2f km", runner.distanceMeter / 1000f),
+                text = runner.distanceKmFormatted,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
             Text(
-                text = "페이스: ${runner.pace}",
+                text = "페이스: ${runner.paceFormatted}",
                 fontSize = 11.sp,
                 color = Color.Gray
             )

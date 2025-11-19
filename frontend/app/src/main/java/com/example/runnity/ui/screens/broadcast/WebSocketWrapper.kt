@@ -16,7 +16,7 @@ data class StreamPayload(
     val runnerId: Long,
     val nickname: String,
     val profileImage: String?,
-    val distance: Double,   // 누적 거리(m)
+    val distance: Double,   // 누적 거리(km) - 서버에서 km 단위로 전송됨
     val pace: Double,       // 1km당 속도 (서버 기준)
     val ranking: Int
 )

@@ -126,12 +126,12 @@ fun BoxScope.MarathonRunnerMarker(
                     color = Color.Black
                 )
                 Text(
-                    text = String.format("%.2f km", runner.distanceMeter / 1000f),
+                    text = runner.distanceKmFormatted,
                     fontSize = 11.sp,
                     color = Color.Gray
                 )
                 Text(
-                    text = "페이스: ${runner.pace}",
+                    text = "페이스: ${runner.paceFormatted}",
                     fontSize = 10.sp,
                     color = Color.Gray
                 )

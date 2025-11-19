@@ -2,24 +2,37 @@ package com.example.runnity.ui.screens.broadcast
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.runnity.data.repository.BroadcastRepository
 import com.example.runnity.data.util.DistanceUtils
 import com.example.runnity.ui.components.LiveBadge
 import com.example.runnity.ui.components.PrimaryButton
@@ -72,27 +85,24 @@ fun BroadcastLiveScreen(
         leaveAction()
     }
 
+    // 로딩 상태 표시
+    if (uiState.isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    }
 
-
-//
-//    // 로딩 상태 표시
-//    if (uiState.isLoading) {
-//        Box(
-//            modifier = Modifier.fillMaxSize(),
-//            contentAlignment = Alignment.Center
-//        ) {
-//            CircularProgressIndicator()
-//        }
-//    }
-//
-//    // 에러 메시지 표시
-//    uiState.errorMessage?.let { error ->
-//        Snackbar(
-//            modifier = Modifier.padding(16.dp)
-//        ) {
-//            Text(text = error)
-//        }
-//    }
+    // 에러 메시지 표시
+    uiState.errorMessage?.let { error ->
+        Snackbar(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(text = error)
+        }
+    }
 
 
     Scaffold { paddingValues ->
@@ -109,21 +119,6 @@ fun BroadcastLiveScreen(
     }
 }
 
-//    BroadcastLiveContent(
-//        title = uiState.title,
-//        viewerCount = uiState.viewerCount,
-//        totalDistanceMeter = uiState.totalDistanceMeter,
-//        runners = uiState.runners,
-//        selectedRunnerId = uiState.selectedRunnerId,
-//        onRunnerClick = { runnerId -> viewModel.selectRunner(runnerId) },
-//        onLeaveClick = {
-//            viewModel.disconnectStomp()
-//            navController.navigateUp()
-//        },
-//        navController = navController,
-//        modifier = modifier
-//    )
-//}
 /**
  * 브로드캐스트 라이브 화면 컨텐츠
  */
@@ -175,7 +170,7 @@ fun BroadcastLiveContent(
                 )
 
                 Text(
-                    text = DistanceUtils.meterToKmString(uiState.totalDistanceMeter),
+                    text = uiState.distance,
                     color = Color(0xFF666666),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
