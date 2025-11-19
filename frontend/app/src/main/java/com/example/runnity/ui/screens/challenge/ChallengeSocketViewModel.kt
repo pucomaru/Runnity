@@ -331,13 +331,31 @@ class ChallengeSocketViewModel : ViewModel() {
                                 val current = _participants.value
                                 val updated = current.map { p ->
                                     if (p.id == left.userId.toString()) {
-                                        // 이미 완주한 참가자는 USER_LEFT 가 와도 리타이어 처리하지 않는다.
-                                        val isFinished = p.finishOrder != null || (goalKm != null && p.distanceKm >= (goalKm ?: 0.0))
-                                        if (isFinished) {
-                                            p
+                                        val reason = left.reason
+                                        val isFinishReason = reason == "FINISH"
+
+                                        // 거리/finishOrder 기준으로 이미 완주자로 알고 있는지 판단
+                                        val goal = goalKm
+                                        val reachedByDistance = goal != null && p.distanceKm >= goal
+                                        val existingOrder = finishOrderById[p.id]
+                                        val isFinishedByState = existingOrder != null || reachedByDistance
+
+                                        if (isFinishReason) {
+                                            // 서버가 FINISH 이유로 USER_LEFT 를 보냈다면,
+                                            // 아직 finishOrder 가 없다 하더라도 여기서 부여하고 리타이어 처리하지 않는다.
+                                            val order = existingOrder ?: nextFinishOrder++
+                                            finishOrderById[p.id] = order
+                                            p.copy(finishOrder = order, isRetired = false)
+                                        } else if (isFinishedByState) {
+                                            // 이미 완주자로 알고 있는 참가자는, 이유가 FINISH 가 아니더라도 랭킹에 남긴다.
+                                            p.copy(isRetired = false)
                                         } else {
-                                            // 챌린지 도중 퇴장한 참가자는 리스트에서 제거하지 않고 리타이어 상태로 표시
-                                            p.copy(isRetired = true)
+                                            // 아직 완주 전이고, 특정 이유에 따라 리타이어 처리
+                                            val shouldRetire = when (reason) {
+                                                "QUIT", "TIMEOUT", "KICKED", "EXPIRED" -> true
+                                                else -> true
+                                            }
+                                            if (shouldRetire) p.copy(isRetired = true) else p
                                         }
                                     } else p
                                 }
@@ -350,10 +368,21 @@ class ChallengeSocketViewModel : ViewModel() {
                             val current = _participants.value
                             val updatedRaw = current.map { p ->
                                 if (p.id == update.userId.toString()) {
-                                    p.copy(
-                                        distanceKm = update.distance,
-                                        paceSecPerKm = update.pace
-                                    )
+                                    // USER_LEFT 이후에 온 업데이트라도, 거리 기준으로 목표를 넘으면 완주자로 복구
+                                    val goal = goalKm
+                                    val shouldReviveAsFinisher = goal != null && update.distance >= goal
+                                    if (shouldReviveAsFinisher) {
+                                        p.copy(
+                                            distanceKm = update.distance,
+                                            paceSecPerKm = update.pace,
+                                            isRetired = false
+                                        )
+                                    } else {
+                                        p.copy(
+                                            distanceKm = update.distance,
+                                            paceSecPerKm = update.pace
+                                        )
+                                    }
                                 } else p
                             }
                             val withFinish = applyFinishOrder(updatedRaw)
