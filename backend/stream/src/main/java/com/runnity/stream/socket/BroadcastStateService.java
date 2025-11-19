@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+
+//중계방의 상태 관리
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -18,8 +20,8 @@ public class BroadcastStateService {
     }
 
     public void handleRunning(Long challengeId) {
-        redisUtil.addActive(challengeId);
-        log.info("[RUNNING] 중계방 유지 {}", challengeId);
+//        redisUtil.addActive(challengeId);
+//        log.info("[RUNNING] 중계방 유지 {}", challengeId);
     }
 
     public void handleDone(Long challengeId) {
