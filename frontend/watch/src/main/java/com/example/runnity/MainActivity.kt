@@ -7,14 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,7 +22,7 @@ import android.util.Log
 import android.widget.Toast
 import com.example.runnity.theme.RunnityTheme
 import com.example.runnity.health.ExerciseFgService
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
@@ -68,7 +65,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RunnityTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ControlPanel(modifier = Modifier.padding(innerPadding))
+                    WatchHome(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
@@ -76,53 +73,17 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ControlPanel(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    Column(modifier = modifier.padding(16.dp)) {
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                Log.d("MainActivity", "Start button clicked")
-                Toast.makeText(context, "Start clicked", Toast.LENGTH_SHORT).show()
-                ContextCompat.startForegroundService(
-                    context,
-                    Intent(context, ExerciseFgService::class.java).apply {
-                        action = "com.example.runnity.action.START"
-                    }
-                )
-            }
-        ) { Text("Start Service") }
-
-        Spacer(Modifier.height(12.dp))
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                Log.d("MainActivity", "Show Countdown clicked")
-                Toast.makeText(context, "Countdown 3s", Toast.LENGTH_SHORT).show()
-                context.startActivity(
-                    Intent(context, com.example.runnity.ui.WatchCountdownActivity::class.java).apply {
-                        putExtra("seconds", 3)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            }
-        ) { Text("Show Countdown (3s)") }
-
-        Spacer(Modifier.height(12.dp))
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                Log.d("MainActivity", "Stop button clicked")
-                Toast.makeText(context, "Stop clicked", Toast.LENGTH_SHORT).show()
-                context.startService(
-                    Intent(context, ExerciseFgService::class.java).apply {
-                        action = "com.example.runnity.action.STOP"
-                    }
-                )
-            }
-        ) { Text("Stop Service") }
+fun WatchHome(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Runnity 앱을 켜주세요!",
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -130,6 +91,6 @@ fun ControlPanel(modifier: Modifier = Modifier) {
 @Composable
 fun ControlPanelPreview() {
     RunnityTheme {
-        ControlPanel()
+        WatchHome()
     }
 }

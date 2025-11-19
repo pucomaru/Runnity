@@ -112,7 +112,8 @@ class WorkoutSessionViewModel : ViewModel() {
     // 워치 메트릭 우선 적용을 위한 최근 수신 시각
     private var lastWatchMetricsAt: Long = 0L
     private fun isWatchPrimaryActive(now: Long = System.currentTimeMillis()): Boolean =
-        (now - lastWatchMetricsAt) <= 4000L
+        // 워치가 실제 거리(distance)를 제공하는 경우에만 "워치 우선"으로 간주
+        hasWatchDistancePrimary && (now - lastWatchMetricsAt) <= 4000L
 
     // 워치로부터 메트릭을 수신하여 우선 반영
     fun ingestWatchMetrics(hrBpm: Int?, distanceM: Double?, elapsedMs: Long?, paceSpKm: Double?, caloriesKcal: Double?) {
@@ -120,7 +121,9 @@ class WorkoutSessionViewModel : ViewModel() {
         lastWatchMetricsAt = now
         // 시간은 내부 ticker가 관리하지만, 활동/총 경과는 유지
         val cur = _metrics.value
-        val newDistance = distanceM ?: cur.distanceMeters
+        // 워치가 0.0m 또는 null 을 보내는 경우에는 기존 거리를 유지하고,
+        // 양수 거리(>0)가 들어왔을 때만 워치 거리를 우선 반영한다.
+        val newDistance = distanceM?.takeIf { it > 0.0 } ?: cur.distanceMeters
         val newCalories = caloriesKcal ?: cur.caloriesKcal
         val safePace = paceSpKm
             // 워치 페이스는 2'30"/km ~ 20'00"/km 사이만 정상값으로 인정
@@ -135,7 +138,8 @@ class WorkoutSessionViewModel : ViewModel() {
         )
         if (safePace != null) _currentPaceSecPerKm.value = safePace
         if (hrBpm != null) lastInstantHr = hrBpm
-        if (distanceM != null) hasWatchDistancePrimary = true
+        // 워치가 실제 양수 거리 값을 한 번이라도 제공했을 때만 "워치 거리 우선"으로 전환
+        if (distanceM != null && distanceM > 0.0) hasWatchDistancePrimary = true
     }
 
     // 목표 관련 상태

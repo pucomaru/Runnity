@@ -70,25 +70,42 @@ fun WorkoutScreen(modifier: Modifier = Modifier) {
     var distanceKm by remember { mutableStateOf(0.0) }
     var paceSecPerKm by remember { mutableStateOf<Int?>(null) }
     var hrBpm by remember { mutableStateOf<Int?>(null) }
+    var rank by remember { mutableStateOf<Int?>(null) }
 
-    // Receive metrics from ExerciseFgService local broadcast
+    // Receive metrics/rank/finish signals from ExerciseFgService local broadcast
     LaunchedEffect(Unit) {
-        val filter = IntentFilter("com.example.runnity.action.METRICS")
+        val filter = IntentFilter().apply {
+            addAction("com.example.runnity.action.METRICS")
+            addAction("com.example.runnity.action.RANK")
+            addAction("com.example.runnity.action.FINISH_UI")
+        }
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 intent ?: return
-                val elapsed = intent.getLongExtra("elapsed_ms", -1L)
-                if (elapsed >= 0) elapsedSec = (elapsed / 1000L).toInt()
-                if (intent.hasExtra("distance_m")) {
-                    val dm = intent.getDoubleExtra("distance_m", 0.0)
-                    distanceKm = dm / 1000.0
-                }
-                if (intent.hasExtra("pace_spkm")) {
-                    val p = intent.getDoubleExtra("pace_spkm", Double.NaN)
-                    if (p.isFinite() && p > 0) paceSecPerKm = kotlin.math.round(p).toInt() else paceSecPerKm = null
-                }
-                if (intent.hasExtra("hr_bpm")) {
-                    hrBpm = intent.getIntExtra("hr_bpm", 0)
+                when (intent.action) {
+                    "com.example.runnity.action.METRICS" -> {
+                        val elapsed = intent.getLongExtra("elapsed_ms", -1L)
+                        if (elapsed >= 0) elapsedSec = (elapsed / 1000L).toInt()
+                        if (intent.hasExtra("distance_m")) {
+                            val dm = intent.getDoubleExtra("distance_m", 0.0)
+                            distanceKm = dm / 1000.0
+                        }
+                        if (intent.hasExtra("pace_spkm")) {
+                            val p = intent.getDoubleExtra("pace_spkm", Double.NaN)
+                            if (p.isFinite() && p > 0) paceSecPerKm = kotlin.math.round(p).toInt() else paceSecPerKm = null
+                        }
+                        if (intent.hasExtra("hr_bpm")) {
+                            hrBpm = intent.getIntExtra("hr_bpm", 0)
+                        }
+                    }
+                    "com.example.runnity.action.RANK" -> {
+                        val r = intent.getIntExtra("rank", -1)
+                        rank = r.takeIf { it > 0 }
+                    }
+                    "com.example.runnity.action.FINISH_UI" -> {
+                        // 서비스에서 운동 종료를 알리면 워치 운동 화면을 닫고 홈/런처로 복귀
+                        activity?.finish()
+                    }
                 }
             }
         }
@@ -133,32 +150,72 @@ fun WorkoutScreen(modifier: Modifier = Modifier) {
             val m = (elapsedSec % 3600) / 60
             val s = elapsedSec % 60
             val timeText = if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
-            Text(
-                text = timeText,
-                color = Color.White,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = pretendard
-            )
+            val p = paceSecPerKm
+            val paceText = if (p != null && p > 0) String.format("%d'%02d\"/km", p / 60, p % 60) else "--:--/km"
 
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("페이스", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
-                    val p = paceSecPerKm
-                    val paceText = if (p != null && p > 0) String.format("%d'%02d\"/km", p/60, p%60) else "--:--/km"
-                    Text(paceText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("거리", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
-                    Text(String.format("%.2f km", distanceKm), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
-                }
-            }
+            if (rank == null) {
+                // 개인 운동 모드: 시간 크게 + 아래에 페이스/거리/심박 (기존 레이아웃)
+                Text(
+                    text = timeText,
+                    color = Color.White,
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = pretendard
+                )
 
-            Spacer(Modifier.height(10.dp))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("심박", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
-                Text(hrBpm?.let { "$it bpm" } ?: "-- bpm", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("페이스", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                        Text(paceText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("거리", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                        Text(String.format("%.2f km", distanceKm), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("심박", color = Color.White, fontSize = 12.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                    Text(hrBpm?.let { "$it bpm" } ?: "-- bpm", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                }
+            } else {
+                // 챌린지 모드: 순위 크게 + 아래에 거리/페이스/시간/심박 (컴팩트 레이아웃)
+                val rankText = "${rank}위"
+                Text(
+                    text = rankText,
+                    color = Color.White,
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = pretendard
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("거리", color = Color.White, fontSize = 10.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                        Text(String.format("%.2f km", distanceKm), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("페이스", color = Color.White, fontSize = 10.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                        Text(paceSecPerKm?.let { String.format("%d'%02d\"", it / 60, it % 60) } ?: "--'--\"", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("시간", color = Color.White, fontSize = 10.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                        Text(timeText, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("심박", color = Color.White, fontSize = 10.sp, fontFamily = pretendard, fontWeight = FontWeight.Medium)
+                    Text(hrBpm?.let { "$it bpm" } ?: "-- bpm", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = pretendard)
+                }
             }
 
             Spacer(Modifier.height(16.dp))

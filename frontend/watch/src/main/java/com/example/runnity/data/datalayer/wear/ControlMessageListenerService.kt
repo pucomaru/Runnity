@@ -70,6 +70,17 @@ class ControlMessageListenerService : WearableListenerService() {
                     }
                 )
             }
+            "rank" -> {
+                // 폰에서 보낸 현재 순위 정보를 워치 내부 브로드캐스트로 전달
+                val rank = json.optInt("seconds", -1)
+                if (rank > 0) {
+                    val intent = Intent("com.example.runnity.action.RANK").apply {
+                        setPackage(packageName)
+                        putExtra("rank", rank)
+                    }
+                    sendBroadcast(intent)
+                }
+            }
             else -> Log.w(TAG, "unknown type=${json.optString("type")}")
         }
     }

@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,6 +55,7 @@ import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.PrimaryButton
 import com.example.runnity.ui.components.TabBar
 import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.datalayer.sendSessionControl
 import com.example.runnity.data.datalayer.SessionMetricsBus
 import com.example.runnity.ui.screens.workout.WorkoutLocationTracker
 import com.example.runnity.ui.screens.workout.WorkoutPhase
@@ -88,7 +90,7 @@ fun ChallengeWorkoutScreen(
     val challengeDetailState by challengeViewModel.challengeDetail.collectAsState()
     val participantsState by socketViewModel.participants.collectAsState()
 
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val tracker = remember(context) { WorkoutLocationTracker(context) }
 
     // 목표 거리(km) 캐시 및 최종 RECORD 전송 여부 플래그
@@ -205,6 +207,8 @@ fun ChallengeWorkoutScreen(
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
             if (distanceKm >= goalKm) {
+                // 워치 운동 세션도 함께 종료하여 워치가 홈 화면으로 돌아가도록 stop 제어 전송
+                sendSessionControl(context, "stop")
                 navController.navigate("challenge_result/$challengeId") {
                     popUpTo("challenge_workout/$challengeId") { inclusive = true }
                 }
@@ -594,6 +598,14 @@ fun ChallengeWorkoutScreen(
                         participantsState.size,
                         rankingRows.size
                     )
+
+                    // 내 현재 순위를 워치로 전달 (챌린지 워치 UI 상단에 표시용)
+                    val me = participantsState.firstOrNull { it.isMe }
+                    val rank = me?.rank
+                    if (rank != null && rank > 0) {
+                        // 기존 컨트롤 채널(/session/control)을 재사용하여 type=rank, seconds=rank 로 전송
+                        sendSessionControl(context, "rank", seconds = rank)
+                    }
                 }
 
                 Column(
@@ -610,6 +622,8 @@ fun ChallengeWorkoutScreen(
             PrimaryButton(
                 text = "챌린지 나가기",
                 onClick = {
+                    // 워치 연동 중이면 워치 운동 세션도 함께 종료
+                    sendSessionControl(context, "stop")
                     val quitJson = "{" +
                         "\"type\":\"QUIT\"," +
                         "\"timestamp\":" + System.currentTimeMillis() +

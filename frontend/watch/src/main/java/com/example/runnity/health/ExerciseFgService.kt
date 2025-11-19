@@ -204,6 +204,15 @@ class ExerciseFgService : Service() {
                 activeStartMs = 0L
                 isRunning = false
 
+                // 워치 UI 상태(특히 순위 표시)를 새로운 세션 기준으로 초기화
+                runCatching {
+                    val resetRankIntent = Intent("com.example.runnity.action.RANK").apply {
+                        setPackage(packageName)
+                        putExtra("rank", -1)
+                    }
+                    sendBroadcast(resetRankIntent)
+                }
+
                 // 준비/진행 중 센서(HR, 위치 등) 가용성 변경 알림
                 ensureExerciseClient()
                 startRunningSession()
@@ -272,6 +281,13 @@ class ExerciseFgService : Service() {
                 latestHrBpm = null
                 latestDistanceM = null
                 latestCaloriesKcal = null
+                // 워치 운동 화면 종료 신호 전송 (홈/런처로 돌아가도록)
+                runCatching {
+                    val finishIntent = Intent(ACTION_FINISH_UI).apply {
+                        setPackage(packageName)
+                    }
+                    sendBroadcast(finishIntent)
+                }
                 stopSelf()
             }
         }
