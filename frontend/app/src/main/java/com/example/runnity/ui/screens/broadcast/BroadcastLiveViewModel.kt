@@ -3,6 +3,7 @@ package com.example.runnity.ui.screens.broadcast
 import android.app.Application
 import android.os.Build
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -81,6 +82,9 @@ class BroadcastLiveViewModel(
     private var eventLoopJob = viewModelScope.launch { } // 초기 dummy, 실제는 startEventLoop에서 교체
 
     private var tts: TextToSpeech? = null
+    private val ttsQueue = ArrayDeque<String>()
+    @Volatile
+    private var isTtsSpeaking: Boolean = false
 
     init {
         tts = TextToSpeech(application.applicationContext, this)
@@ -95,6 +99,21 @@ class BroadcastLiveViewModel(
             } else {
                 Timber.d("TTS 엔진 초기화 성공")
                 configureTtsVoice()
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        isTtsSpeaking = true
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        isTtsSpeaking = false
+                        playNextFromQueue()
+                    }
+
+                    override fun onError(utteranceId: String?) {
+                        isTtsSpeaking = false
+                        playNextFromQueue()
+                    }
+                })
             }
         } else {
             Timber.e("TTS 초기화 실패")
@@ -559,7 +578,29 @@ class BroadcastLiveViewModel(
         val llm = gson.fromJson(payloadObj, LlmPayload::class.java)
         Timber.d("LLM ${wrapper.subtype} commentary=${llm.commentary}")
         _uiState.update { it.copy(highlightCommentary = llm.commentary) }
-        speakOut(llm.commentary)
+        enqueueTts(llm.commentary)
+    }
+
+    private fun enqueueTts(text: String) {
+        synchronized(ttsQueue) {
+            ttsQueue.addLast(text)
+            if (!isTtsSpeaking) {
+                playNextFromQueue()
+            }
+        }
+    }
+
+    private fun playNextFromQueue() {
+        val nextText: String? = synchronized(ttsQueue) {
+            if (ttsQueue.isNotEmpty() && !isTtsSpeaking) {
+                ttsQueue.removeFirst()
+            } else {
+                null
+            }
+        }
+        if (nextText != null) {
+            speakOut(nextText)
+        }
     }
 
     private fun speakOut(text: String) {
@@ -567,7 +608,8 @@ class BroadcastLiveViewModel(
             Timber.e("TTS가 초기화되지 않았습니다.")
             return
         }
-        val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "runnity_tts")
+        val utteranceId = "runnity_tts_${System.currentTimeMillis()}"
+        val result = tts?.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
         if (result == TextToSpeech.ERROR) {
             Timber.e("TTS speak() 호출 실패. TTS 엔진에 문제가 있을 수 있습니다.")
         } else {
