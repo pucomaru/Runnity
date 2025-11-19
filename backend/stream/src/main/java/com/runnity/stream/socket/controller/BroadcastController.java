@@ -83,9 +83,9 @@ public class BroadcastController {
 
         // distance 필터
         if (distanceCodes != null && !distanceCodes.isEmpty()) {
-            result = result.stream()
+            result = new ArrayList<>(result.stream()
                     .filter(r -> distanceCodes.contains(r.getDistance()))
-                    .toList();
+                    .toList());
         }
 
         // 정렬
