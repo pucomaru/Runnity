@@ -63,18 +63,27 @@ class MyPageViewModel(
                 UserProfileManager.profile.collect { profile ->
                     Timber.d("MyPage: 프로필 갱신 - nickname=${profile?.nickname}, email=${profile?.email}")
 
+                    // 평균 페이스 포맷팅
+                    val formattedPace = profile?.averagePace?.let { paceSec ->
+                        val minutes = paceSec / 60
+                        val seconds = paceSec % 60
+                        String.format("%d'%02d\"", minutes, seconds)
+                    } ?: "0'00\""
+
                     val currentState = _uiState.value
                     _uiState.value = when (currentState) {
                         is MyPageUiState.Success -> currentState.copy(
                             userProfile = UserProfile(
                                 nickname = profile?.nickname ?: "닉네임 없음",
-                                profileImageUrl = profile?.profileImageUrl
+                                profileImageUrl = profile?.profileImageUrl,
+                                averagePace = formattedPace
                             )
                         )
                         else -> MyPageUiState.Success(
                             userProfile = UserProfile(
                                 nickname = profile?.nickname ?: "닉네임 없음",
-                                profileImageUrl = profile?.profileImageUrl
+                                profileImageUrl = profile?.profileImageUrl,
+                                averagePace = formattedPace
                             ),
                             stats = RunningStats(0.0, 0, "0'00\"", "0:00"),
                             graphData = emptyList(),
@@ -520,7 +529,8 @@ enum class PeriodType {
  */
 data class UserProfile(
     val nickname: String,
-    val profileImageUrl: String?
+    val profileImageUrl: String?,
+    val averagePace: String // "6'33\"" 형식
 )
 
 /**

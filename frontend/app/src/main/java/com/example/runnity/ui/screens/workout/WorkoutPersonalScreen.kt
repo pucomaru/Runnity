@@ -415,7 +415,7 @@ fun WorkoutPersonalScreen(
         ) {
             // 공통 메트릭 (2x2)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                val paceText = currentPace?.let { formatPace(it) } ?: "--:--/km"
+                val paceText = currentPace?.let { formatPace(it) } ?: "-'--\""
                 MetricItem(label = "페이스", value = paceText)
                 val secondValue = if (isGoalTime) formatDistanceKm(metrics.distanceMeters) else formatElapsed(metrics.activeElapsedMs)
                 MetricItem(label = if (isGoalTime) "킬로미터" else "시간", value = secondValue)
@@ -526,7 +526,7 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }
 
 // 칼로리 포맷팅

@@ -299,8 +299,8 @@ fun ChallengeRunDetailContent(
             }
 
             val startText = try {
-                val dateTime = LocalDateTime.parse(data.startAt)
-                dateTime.format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"))
+                val dateTime = LocalDateTime.parse(data.startAt, DateTimeFormatter.ISO_DATE_TIME)
+                dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss"))
             } catch (e: Exception) {
                 data.startAt ?: ""
             }
@@ -352,7 +352,7 @@ fun ChallengeRunDetailContent(
                         color = ColorPalette.Light.secondary
                     )
                     Text(
-                        String.format("%.0fkm", data.distance),
+                        String.format("%.2fkm", data.distance),
                         style = Typography.Title
                     )
                 }
@@ -581,7 +581,7 @@ private fun ChallengeRankingItem(
             val paceToShow = participant.paceSec ?: participant.averagePaceSec
             formatPace(paceToShow.toDouble())
         } else {
-            "-'--\"/km"
+            "-'--\""
         }
         Text(
             text = paceText,
@@ -605,5 +605,5 @@ private fun formatPace(secPerKm: Double): String {
     val total = secPerKm.toInt()
     val m = total / 60
     val s = total % 60
-    return String.format("%d'%02d\"/km", m, s)
+    return String.format("%d'%02d\"", m, s)
 }

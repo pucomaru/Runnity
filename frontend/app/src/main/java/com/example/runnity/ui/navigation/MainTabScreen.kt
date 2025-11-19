@@ -178,9 +178,22 @@ fun MainTabScreen(
                 }
 
                 // 날씨 상세 화면 (네비바 없음)
-                composable("weather_detail") {
+                composable(
+                    "weather_detail",
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None }
+                ) { backStackEntry ->
+                    // home_graph 레벨에서 공유되는 HomeViewModel 사용
+                    val homeViewModel: com.example.runnity.ui.screens.home.HomeViewModel =
+                        androidx.lifecycle.viewmodel.compose.viewModel(
+                            viewModelStoreOwner = remember(backStackEntry) {
+                                navController.getBackStackEntry(BottomNavItem.Home.graphRoute)
+                            }
+                        )
+
                     WeatherDetailScreen(
-                        navController = navController
+                        navController = navController,
+                        homeViewModel = homeViewModel
                     )
                 }
 

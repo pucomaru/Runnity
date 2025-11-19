@@ -41,7 +41,6 @@ import com.example.runnity.ui.components.PrimaryButton
 @Composable
 fun ProfileSection(
     userProfile: UserProfile,
-    averagePace: String,
     onEditClick: () -> Unit
 ) {
     Row(
@@ -84,7 +83,7 @@ fun ProfileSection(
                 color = ColorPalette.Light.primary
             )
             Text(
-                text = "평균 페이스 $averagePace",
+                text = "평균 페이스 ${userProfile.averagePace}",
                 style = Typography.Caption,
                 color = ColorPalette.Light.secondary
             )
@@ -204,9 +203,9 @@ fun StatsSection(stats: RunningStats) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        // 총 거리 (소수점 첫째 자리까지)
+        // 총 거리 (소수점 둘째 자리까지)
         Text(
-            text = String.format("%.1f Km", stats.totalDistance),
+            text = String.format("%.2f Km", stats.totalDistance),
             style = Typography.LargeTitle,
             color = ColorPalette.Light.primary,
             modifier = Modifier.fillMaxWidth()
@@ -427,7 +426,7 @@ private fun RunningRecordItem(
             ) {
                 // 거리
                 Text(
-                    text = "${record.distance} km",
+                    text = String.format("%.2f km", record.distance),
                     style = Typography.Subheading,
                     color = ColorPalette.Light.primary
                 )
