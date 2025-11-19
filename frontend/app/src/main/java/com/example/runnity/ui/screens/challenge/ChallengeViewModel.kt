@@ -7,7 +7,9 @@ import com.example.runnity.data.repository.ChallengeRepository
 import com.example.runnity.data.model.response.ChallengeListItem
 import com.example.runnity.data.model.response.ChallengeDetailResponse
 import com.example.runnity.data.util.ReservedChallengeManager
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -62,6 +64,31 @@ class ChallengeViewModel(
 
     private val _visibilityFilter = MutableStateFlow<String?>(null)
     val visibilityFilter: StateFlow<String?> = _visibilityFilter.asStateFlow()
+
+    // 에러 이벤트 (Toast 표시용)
+    private val _errorEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val errorEvents: SharedFlow<String> = _errorEvents
+
+    // 새로고침 대기 상태
+    private val _pendingRefresh = MutableStateFlow(false)
+    val pendingRefresh: StateFlow<Boolean> = _pendingRefresh.asStateFlow()
+
+    /**
+     * 새로고침 요청
+     */
+    fun requestRefresh() {
+        _pendingRefresh.value = true
+    }
+
+    /**
+     * 대기 중인 새로고침 실행
+     */
+    fun consumePendingRefresh() {
+        if (_pendingRefresh.value) {
+            _pendingRefresh.value = false
+            refreshChallenges()
+        }
+    }
 
     init {
         loadChallenges()
@@ -137,9 +164,11 @@ class ChallengeViewModel(
                 }
                 is ApiResponse.Error -> {
                     Timber.e("챌린지 상세 조회 실패: ${response.message}")
+                    _errorEvents.tryEmit(response.message)
                 }
                 is ApiResponse.NetworkError -> {
                     Timber.e("챌린지 상세 조회 실패: 네트워크 오류")
+                    _errorEvents.tryEmit("네트워크 연결을 확인해주세요")
                 }
             }
         }
@@ -160,7 +189,8 @@ class ChallengeViewModel(
     }
 
     fun searchChallenges() {
-        loadChallenges(keyword = _searchQuery.value)
+        // 검색 시에는 visibility를 ALL로 설정하여 전체 챌린지에서 검색
+        loadChallenges(keyword = _searchQuery.value, visibility = "ALL")
     }
 
     /**
@@ -224,9 +254,11 @@ class ChallengeViewModel(
                 }
                 is ApiResponse.Error -> {
                     Timber.e("챌린지 참가 실패: ${response.message}")
+                    _errorEvents.tryEmit(response.message)
                 }
                 is ApiResponse.NetworkError -> {
                     Timber.e("챌린지 참가 실패: 네트워크 오류")
+                    _errorEvents.tryEmit("네트워크 연결을 확인해주세요")
                 }
             }
         }
@@ -234,24 +266,34 @@ class ChallengeViewModel(
 
     /**
      * 챌린지 참가 취소
+     * @param isLastMember 마지막 멤버인지 여부 (true면 챌린지가 삭제됨)
      */
-    fun cancelChallenge(challengeId: Long) {
+    fun cancelChallenge(challengeId: Long, isLastMember: Boolean = false, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             when (val response = repository.cancelChallenge(challengeId)) {
                 is ApiResponse.Success -> {
-                    Timber.d("챌린지 참가 취소 성공: $challengeId")
+                    Timber.d("챌린지 참가 취소 성공: $challengeId, isLastMember: $isLastMember")
                     // 예약한 챌린지 목록 갱신 (전역)
                     ReservedChallengeManager.refresh()
-                    // 챌린지 목록 새로고침
-                    refreshChallenges()
-                    // 상세 정보 새로고침
-                    loadChallengeDetail(challengeId)
+
+                    if (isLastMember) {
+                        // 마지막 멤버인 경우 서버에서 새 목록 가져오기 (삭제된 챌린지 반영)
+                        Timber.d("마지막 멤버 - 목록 새로고침")
+                        refreshChallenges()
+                    } else {
+                        // 다른 멤버가 있으면 목록 새로고침
+                        refreshChallenges()
+                    }
+                    // 성공 콜백 호출
+                    onSuccess()
                 }
                 is ApiResponse.Error -> {
                     Timber.e("챌린지 참가 취소 실패: ${response.message}")
+                    _errorEvents.tryEmit(response.message)
                 }
                 is ApiResponse.NetworkError -> {
                     Timber.e("챌린지 참가 취소 실패: 네트워크 오류")
+                    _errorEvents.tryEmit("네트워크 연결을 확인해주세요")
                 }
             }
         }

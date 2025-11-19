@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -63,6 +64,7 @@ fun ChallengeCard(
     title: String,                             // 제목
     startDateTime: String,                     // 시작 일시
     participants: String,                      // 참여 인원
+    isPrivate: Boolean = false,                // 비밀방 여부
     buttonState: ChallengeButtonState = ChallengeButtonState.None,  // 버튼 상태
     onCardClick: () -> Unit = {},              // 카드 클릭
     onButtonClick: () -> Unit = {},            // 버튼 클릭
@@ -122,7 +124,7 @@ fun ChallengeCard(
                     )
                 }
 
-                // 참여 인원 (아이콘 + 텍스트)
+                // 참여 인원 (아이콘 + 텍스트 + 자물쇠)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -138,6 +140,14 @@ fun ChallengeCard(
                         style = Typography.Caption,
                         color = ColorPalette.Light.secondary
                     )
+                    if (isPrivate) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "비밀방",
+                            tint = ColorPalette.Light.component,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
             }
 

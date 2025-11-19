@@ -27,6 +27,7 @@ data class ChallengeListItem(
     val title: String,
     val startDateTime: String,
     val participants: String,
+    val isPrivate: Boolean = false,
     val buttonState: ChallengeButtonState = ChallengeButtonState.None
 )
 
