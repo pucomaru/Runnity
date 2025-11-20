@@ -1,0 +1,11 @@
+venv/
+*/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.vscode/
+.idea/
+google-tts-key.json

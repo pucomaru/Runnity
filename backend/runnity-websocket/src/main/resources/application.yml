@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: runnity-websocket-server
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:runnity}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: ${DB_USER:ssafy}
+    password: ${DB_PASSWORD:ssafy1234}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      idle-timeout: 60000
+      connection-timeout: 30000
+      pool-name: RunnityHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        show_sql: true
+    open-in-view: false
+
+  data:
+    redis:
+      cache:
+        host: ${REDIS_CACHE_HOST:localhost}
+        port: ${REDIS_CACHE_PORT:6379}
+      pubsub:
+        host: ${REDIS_PUBSUB_HOST:localhost}
+        port: ${REDIS_PUBSUB_PORT:6380}
+      timeout: 2000
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:29092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  address: 0.0.0.0
+  port: ${WEBSOCKET_SERVER_PORT:8081}
+
+websocket:
+  server-id: ${WEBSOCKET_SERVER_ID:13.125.163.87}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://runnity.p-e.kr}
+  health:
+    server-url: ${WEBSOCKET_SERVER_URL:wss://runnity.p-e.kr/ws/13.125.163.87}
+    heartbeat-ttl: ${WEBSOCKET_HEARTBEAT_TTL:30}
+    heartbeat-interval-millis: ${WEBSOCKET_HEARTBEAT_INTERVAL_MILLIS:5000}
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG
+    com.runnity: DEBUG

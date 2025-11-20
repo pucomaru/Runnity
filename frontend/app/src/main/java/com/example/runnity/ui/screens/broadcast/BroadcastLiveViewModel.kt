@@ -1,0 +1,682 @@
+package com.example.runnity.ui.screens.broadcast
+
+import android.app.Application
+import android.os.Build
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import com.example.runnity.data.model.common.ApiResponse
+import com.example.runnity.data.repository.BroadcastRepository
+import com.example.runnity.data.util.TokenManager
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import io.reactivex.disposables.Disposable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import timber.log.Timber
+import ua.naiksoftware.stomp.Stomp
+import ua.naiksoftware.stomp.dto.LifecycleEvent
+import ua.naiksoftware.stomp.dto.StompHeader
+import java.util.Locale
+
+class BroadcastLiveViewModel(
+    application: Application
+) : AndroidViewModel(application), TextToSpeech.OnInitListener {
+
+    private val gson = Gson()
+    private val tokenProvider: () -> String? = { TokenManager.getAccessToken() }
+    private val repository = BroadcastRepository()
+
+    data class LiveUi(
+        val title: String = "",
+        val viewerCount: Int = 0,
+        val participantCount: Int = 0,
+        val distance: String = "",
+        val totaldistanceKm: Int = 0,
+        val hlsUrl: String = "",
+        val runners: List<RunnerUi> = emptyList(),
+        val selectedRunnerId: Long? = null,
+        val highlightCommentary: String? = null,
+        val isLoading: Boolean = false,
+        val errorMessage: String? = null
+    )
+
+    data class RunnerUi(
+        val runnerId: Long,
+        val nickname: String,
+        val profileImage: String? = null,
+        val color: Color,
+        val distanceKm: Double,  // Double로 변경
+        val ratio: Float,
+        val rank: Int,
+        val distanceKmFormatted: String,
+        val paceFormatted: String
+    )
+
+    private val _uiState = MutableStateFlow(LiveUi())
+    val uiState: StateFlow<LiveUi> = _uiState.asStateFlow()
+
+    private var _player: ExoPlayer? = null
+    val player: ExoPlayer
+        get() = _player ?: ExoPlayer.Builder(getApplication()).build().also { _player = it }
+
+    private var stompClient: ua.naiksoftware.stomp.StompClient? = null
+    private var subscription: Disposable? = null
+    private var lifecycleSub: Disposable? = null
+    private var reconnectAttempts = 0
+    private val maxReconnectAttempts = 3
+
+    private var pingJob = viewModelScope.launch { } // 초기 dummy, 실제는 startPingLoop에서 교체
+
+    // WebSocket 이벤트 버퍼 및 처리 루프 Job
+    private val eventBuffer = mutableListOf<WebSocketWrapper>()
+    private var eventLoopJob = viewModelScope.launch { } // 초기 dummy, 실제는 startEventLoop에서 교체
+
+    private var tts: TextToSpeech? = null
+    private val ttsQueue = ArrayDeque<String>()
+    @Volatile
+    private var isTtsSpeaking: Boolean = false
+
+    init {
+        tts = TextToSpeech(application.applicationContext, this)
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale.KOREAN)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Timber.e("TTS: 한국어를 지원하지 않습니다.")
+                _uiState.update { it.copy(errorMessage = "음성 안내를 지원하지 않는 기기입니다.") }
+            } else {
+                Timber.d("TTS 엔진 초기화 성공")
+                configureTtsVoice()
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        isTtsSpeaking = true
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        isTtsSpeaking = false
+                        playNextFromQueue()
+                    }
+
+                    override fun onError(utteranceId: String?) {
+                        isTtsSpeaking = false
+                        playNextFromQueue()
+                    }
+                })
+            }
+        } else {
+            Timber.e("TTS 초기화 실패")
+        }
+    }
+
+    /**
+     * TTS 음성 설정
+     * "ko-kr-x-kod-network" 음성 모델을 직접 사용합니다.
+     */
+    private fun configureTtsVoice() {
+        val ttsInstance = tts ?: return
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                // Android 5.0 이상: getVoices() 사용
+                val voices = ttsInstance.voices
+                val targetVoice = voices?.find { voice ->
+                    voice.name.contains("ko-kr-x-kod-network", ignoreCase = true)
+                }
+
+                if (targetVoice != null) {
+                    val setVoiceResult = ttsInstance.setVoice(targetVoice)
+                    if (setVoiceResult == TextToSpeech.SUCCESS) {
+                        Timber.d("TTS 음성 설정 성공: ${targetVoice.name} (${targetVoice.locale})")
+                    } else {
+                        Timber.w("TTS 음성 설정 실패: ${targetVoice.name}")
+                    }
+                } else {
+                    Timber.w("ko-kr-x-kod-network 음성을 찾을 수 없습니다. 기본 음성을 사용합니다.")
+                }
+            } else {
+                // Android 5.0 미만: 기본 음성만 사용 가능
+                Timber.d("Android 5.0 미만 버전에서는 기본 음성만 사용 가능합니다.")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "TTS 음성 설정 중 오류 발생")
+        }
+    }
+
+
+    // 러너 선택 (말풍선용)
+    fun selectRunner(runnerId: Long?) {
+        _uiState.update { it.copy(selectedRunnerId = runnerId) }
+    }
+
+    // HLS 플레이어
+    fun preparePlayer(url: String?) {
+        if (!url.isNullOrBlank()) {
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+            player.playWhenReady = true
+        }
+    }
+
+    fun releasePlayer() {
+        _player?.release()
+        _player = null
+    }
+
+    fun initializeFrom(item: com.example.runnity.data.model.response.BroadcastListItem) {
+        _uiState.update {
+            it.copy(
+                title = item.title,
+                viewerCount = item.viewerCount,
+                participantCount = item.participantCount,
+                distance = com.example.runnity.data.util.DistanceUtils.codeToLabel(item.distance),
+                totaldistanceKm = com.example.runnity.data.util.DistanceUtils.codeToMeter(item.distance)
+            )
+        }
+    }
+
+    /**
+     * 1. /api/v1/broadcast/join → wsUrl, topic
+     * 2. wsUrl 로 STOMP 연결
+     * 3. topic 구독 → STREAM / LLM 수신
+     */
+    fun joinAndConnect(challengeId: Long) {
+        if (_uiState.value.isLoading || stompClient?.isConnected == true) {
+            Timber.d("이미 연결 중이거나 연결된 상태입니다.")
+            return
+        }
+
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        reconnectAttempts = 0
+
+        viewModelScope.launch {
+            when (val response = repository.joinBroadcast(challengeId)) {
+                is ApiResponse.Success -> {
+                    val join = response.data
+                    Timber.d("중계방 입장 성공: wsUrl=${join.wsUrl}, topic=${join.topic}")
+
+                    _uiState.update { it.copy(hlsUrl = join.wsUrl) }
+                    connectStomp(join.wsUrl, join.topic, challengeId)
+                }
+                is ApiResponse.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "중계방 입장에 실패했습니다: ${response.message}"
+                        )
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private fun connectStomp(wsUrl: String, topic: String, challengeId: Long) {
+        Timber.d("STOMP 연결 시도: $wsUrl")
+        disconnectStomp()
+
+        val client = Stomp.over(Stomp.ConnectionProvider.OKHTTP, wsUrl)
+        stompClient = client
+
+        val headers = listOf(
+            StompHeader("Authorization", "Bearer ${tokenProvider() ?: ""}"),
+            StompHeader("challengeId", challengeId.toString()),
+            StompHeader("accept-version", "1.1,1.2"),
+            StompHeader("heart-beat", "0,0")
+        )
+
+        lifecycleSub = client.lifecycle().subscribe { event ->
+            Timber.d("STOMP Lifecycle: ${event.type}")
+            when (event.type) {
+                LifecycleEvent.Type.OPENED -> {
+                    Timber.d("STOMP 연결 성공, 토픽 구독 시작")
+                    reconnectAttempts = 0
+                    subscribeToTopic(client, topic)
+                    startPingLoop(client)
+                    startEventLoop()
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+                LifecycleEvent.Type.ERROR -> {
+                    Timber.e(event.exception, "STOMP 연결 에러")
+                    attemptReconnect(wsUrl, topic, challengeId)
+                }
+                LifecycleEvent.Type.CLOSED -> {
+                    Timber.d("STOMP 연결 종료")
+                    stopPingLoop()
+                }
+                else -> {}
+            }
+        }
+
+        client.connect(headers)
+    }
+
+    private fun startPingLoop(client: ua.naiksoftware.stomp.StompClient) {
+        stopPingLoop()
+        pingJob = viewModelScope.launch {
+            while (true) {
+                delay(30_000L)
+                try {
+                    client.send("/app/ping", "PING").subscribe()
+                } catch (e: Exception) {
+                    Timber.e(e, "STOMP 핑 전송 실패")
+                }
+            }
+        }
+    }
+
+    private fun stopPingLoop() {
+        pingJob.cancel()
+    }
+
+    private fun startEventLoop() {
+        if (eventLoopJob.isActive) return
+
+        eventLoopJob = viewModelScope.launch(Dispatchers.Default) {
+            val bufferMs = 250L
+            while (true) {
+                val now = System.currentTimeMillis()
+                val readyEvents = mutableListOf<WebSocketWrapper>()
+
+                synchronized(eventBuffer) {
+                    if (eventBuffer.isNotEmpty()) {
+                        val (ready, pending) = eventBuffer.partition { now - bufferMs >= it.timestamp }
+
+                        if (ready.isNotEmpty()) {
+                            val sortedReady = ready.sortedBy { it.timestamp }
+                            readyEvents.addAll(sortedReady)
+                        }
+
+                        eventBuffer.clear()
+                        eventBuffer.addAll(pending)
+                    }
+                }
+
+                for (event in readyEvents) {
+                    when (event.type) {
+                        "STREAM" -> handleStreamMessage(event)
+                        "LLM"    -> handleLlmMessage(event)
+                        else      -> Timber.d("알 수 없는 type=${event.type}")
+                    }
+                }
+
+                delay(50L)
+            }
+        }
+    }
+
+
+    private fun attemptReconnect(wsUrl: String, topic: String, challengeId: Long) {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++
+            viewModelScope.launch {
+                delay(2000L * reconnectAttempts)
+                Timber.d("재연결 시도... ($reconnectAttempts/$maxReconnectAttempts)")
+                connectStomp(wsUrl, topic, challengeId)
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    errorMessage = "WebSocket 연결에 실패했습니다."
+                )
+            }
+        }
+    }
+
+    private fun subscribeToTopic(client: ua.naiksoftware.stomp.StompClient, topic: String) {
+        Timber.d("토픽 구독 시작: $topic")
+
+        subscription?.dispose()
+
+        subscription = client.topic(topic).subscribe(
+            { msg ->
+                val payload = msg.payload
+                Timber.d("📡 수신한 메시지: $payload")
+                viewModelScope.launch(Dispatchers.Default) {
+                    enqueueSocketPayload(payload)
+                }
+            },
+            { error ->
+                Timber.e(error, "STOMP 구독 에러: ${error.message}")
+                _uiState.update {
+                    it.copy(errorMessage = "실시간 데이터 수신 실패: ${error.localizedMessage}")
+                }
+            }
+        )
+        
+        Timber.d("토픽 구독 완료: $topic (subscription=${subscription != null})")
+    }
+
+    private fun enqueueSocketPayload(json: String) {
+        try {
+            val wrapper = gson.fromJson(json, WebSocketWrapper::class.java)
+            synchronized(eventBuffer) {
+                eventBuffer.add(wrapper)
+                eventBuffer.sortBy { it.timestamp }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "enqueueSocketPayload 파싱 실패")
+        }
+    }
+
+    private fun handleSocketPayload(json: String) {
+        try {
+            val wrapper = gson.fromJson(json, WebSocketWrapper::class.java)
+
+            Timber.d(
+                "[BroadcastWS] raw wrapper: type=%s, subtype=%s, challengeId=%d, payload=%s",
+                wrapper.type,
+                wrapper.subtype,
+                wrapper.challengeId,
+                wrapper.payload?.toString()
+            )
+
+            when (wrapper.type) {
+                "STREAM" -> handleStreamMessage(wrapper)
+                "LLM"    -> handleLlmMessage(wrapper)
+                else     -> Timber.d("알 수 없는 type=${wrapper.type}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "WebSocketWrapper 파싱 실패")
+        }
+    }
+
+    /**
+     * STREAM: distance / pace 는 서버가 계산해서 줌
+     * → ranking은 클라이언트에서 distanceKm 기준으로 계산
+     *
+     * 주의: 서버에서 distance는 km 단위로 전송됨 (예: 0.1 = 100m)
+     */
+    
+    /**
+     * distanceKm 기준으로 순위를 재계산하는 헬퍼 함수
+     * 거리가 큰 순서대로 1등, 2등, 3등... 순위 부여
+     * 동일 거리는 같은 순위 (예: 5.0km=1등, 4.5km=2등, 4.5km=2등, 4.0km=4등)
+     */
+    private fun calculateRanks(runners: List<RunnerUi>): List<RunnerUi> {
+        if (runners.isEmpty()) return runners
+        
+        // distanceKm 기준 내림차순 정렬
+        val sorted = runners.sortedByDescending { it.distanceKm }
+        
+        // 순위 계산 (동일 거리는 같은 순위)
+        var currentRank = 1
+        var previousDistance = Double.MAX_VALUE
+        
+        return sorted.mapIndexed { index, runner ->
+            val rank = if (index > 0 && runner.distanceKm == previousDistance) {
+                // 이전 러너와 거리가 같으면 같은 순위 유지
+                currentRank
+            } else {
+                // 새로운 거리면 순위는 index + 1
+                currentRank = index + 1
+                currentRank
+            }
+            previousDistance = runner.distanceKm
+            runner.copy(rank = rank)
+        }
+    }
+    
+    private fun handleStreamMessage(wrapper: WebSocketWrapper) {
+        val payloadObj: JsonObject = wrapper.payload
+        val stream = gson.fromJson(payloadObj, StreamPayload::class.java)
+
+        // 서버에서 distance는 km 단위로 전송됨
+        val distanceKm = stream.distance
+
+        Timber.d(
+            "[BroadcastWS][Parsed StreamPayload] runnerId=%d, nick=%s, distanceKm=%.2f, pace=%.2f, ranking=%d",
+            stream.runnerId,
+            stream.nickname,
+            stream.distance,
+            stream.pace,
+            stream.ranking
+        )
+
+        Timber.d(
+            "[BroadcastWS][STREAM-%s] runnerId=%d, nick=%s, dist=%.2f km, pace=%.2f, rank=%d",
+            wrapper.subtype, stream.runnerId, stream.nickname, distanceKm, stream.pace, stream.ranking
+        )
+
+        // totaldistanceKm은 실제로 meter 단위이므로 km로 변환
+        val totalMeter = _uiState.value.totaldistanceKm.takeIf { it > 0 } ?: 1
+        val totalKm = totalMeter / 1000.0  // meter를 km로 변환
+
+        val current = _uiState.value.runners
+        val existing = current.find { it.runnerId == stream.runnerId }
+        val color = existing?.color ?: pickColor(current.size)
+
+        Timber.d(
+            "[BroadcastWS][UI Base] totalDistanceMeter=%d (%.2f km), currentRunnerCount=%d, distanceKm=%.2f km",
+            totalMeter,
+            totalKm,
+            current.size,
+            distanceKm
+        )
+
+        // ratio 계산: 현재 거리(km) / 전체 거리(km) - 단위를 맞춰서 계산
+        val ratio = (distanceKm.toFloat() / totalKm.toFloat()).coerceIn(0f, 1f)
+
+        Timber.d(
+            "[BroadcastWS][Ratio Calc] distanceKm=%.2f, totalKm=%.2f, ratio=%.4f",
+            distanceKm,
+            totalKm,
+            ratio
+        )
+
+        when (wrapper.subtype) {
+            "START" -> {
+                Timber.d("STREAM START runnerId=${stream.runnerId}")
+                val existing = current.find { it.runnerId == stream.runnerId }
+                // 이미 리스트에 없으면 새로 추가
+                if (existing == null) {
+                    val newRunner = RunnerUi(
+                        runnerId = stream.runnerId,
+                        nickname = stream.nickname,
+                        profileImage = stream.profileImage,
+                        color = pickColor(current.size),
+                        distanceKm = distanceKm,
+                        ratio = ratio,
+                        rank = 0, // 임시값, calculateRanks에서 재계산
+                        distanceKmFormatted = String.format("%.2f km", distanceKm),
+                        paceFormatted = formatPace(stream.pace)
+                    )
+                    val updatedRunners = calculateRanks(current + newRunner)
+                    _uiState.update {
+                        it.copy(runners = updatedRunners)
+                    }
+                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f, rank=${updatedRunners.find { it.runnerId == stream.runnerId }?.rank}", distanceKm, ratio)
+                }
+
+            }
+            "RUNNING" -> {
+                Timber.d("STREAM RUNNING runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
+                val existing = current.find { it.runnerId == stream.runnerId }
+
+                if (existing == null) {
+                    // 러너가 없으면 새로 추가 (START 메시지 없이 RUNNING이 먼저 올 수 있음)
+                    Timber.d("RUNNING 메시지로 새 러너 추가: runnerId=${stream.runnerId}")
+                    val newRunner = RunnerUi(
+                        runnerId = stream.runnerId,
+                        nickname = stream.nickname,
+                        profileImage = stream.profileImage,
+                        color = pickColor(current.size),
+                        distanceKm = distanceKm,
+                        ratio = ratio,
+                        rank = 0, // 임시값, calculateRanks에서 재계산
+                        distanceKmFormatted = String.format("%.2f km", distanceKm),
+                        paceFormatted = formatPace(stream.pace)
+                    )
+                    val updatedRunners = calculateRanks(current + newRunner)
+                    _uiState.update {
+                        it.copy(runners = updatedRunners)
+                    }
+                    Timber.d("러너 추가 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f, rank=${updatedRunners.find { it.runnerId == stream.runnerId }?.rank}", distanceKm, ratio)
+                } else {
+                    // 기존 러너 정보 갱신
+                    val updatedRunners = current.map { runner ->
+                        if (runner.runnerId == stream.runnerId) {
+                            runner.copy(
+                                distanceKm = distanceKm,
+                                ratio = ratio,
+                                rank = 0, // 임시값, calculateRanks에서 재계산
+                                distanceKmFormatted = String.format("%.2f km", distanceKm),
+                                paceFormatted = formatPace(stream.pace)
+                            )
+                        } else {
+                            runner
+                        }
+                    }
+                    val rankedRunners = calculateRanks(updatedRunners)
+                    _uiState.update {
+                        it.copy(runners = rankedRunners)
+                    }
+                    Timber.d("러너 업데이트 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f, rank=${rankedRunners.find { it.runnerId == stream.runnerId }?.rank}", distanceKm, ratio)
+                }
+            }
+            "FINISH" -> {
+                Timber.d("STREAM FINISH runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
+                // FINISH도 마지막 거리 정보 업데이트
+                val existing = current.find { it.runnerId == stream.runnerId }
+                if (existing != null) {
+                    val updatedRunners = current.map { runner ->
+                        if (runner.runnerId == stream.runnerId) {
+                            runner.copy(
+                                distanceKm = distanceKm,
+                                ratio = ratio,
+                                rank = 0, // 임시값, calculateRanks에서 재계산
+                                distanceKmFormatted = String.format("%.2f km", distanceKm),
+                                paceFormatted = formatPace(stream.pace)
+                            )
+                        } else {
+                            runner
+                        }
+                    }
+                    val rankedRunners = calculateRanks(updatedRunners)
+                    _uiState.update {
+                        it.copy(runners = rankedRunners)
+                    }
+                    Timber.d("FINISH 업데이트 완료: runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f, rank=${rankedRunners.find { it.runnerId == stream.runnerId }?.rank}", distanceKm, ratio)
+                }
+            }
+            "LEAVE" -> {
+                Timber.d("STREAM LEAVE runnerId=${stream.runnerId}, distance=%.2f km, ratio=%.4f", distanceKm, ratio)
+                val existing = current.find { it.runnerId == stream.runnerId }
+
+                if (existing != null) {
+                    // LEAVE 전에 마지막 거리 정보를 먼저 업데이트 후 제거
+                    val remainingRunners = current.filterNot { r -> r.runnerId == stream.runnerId }
+                    val rankedRunners = calculateRanks(remainingRunners)
+                    _uiState.update {
+                        it.copy(runners = rankedRunners)
+                    }
+                    Timber.d("LEAVE 업데이트 후 제거 완료: runnerId=${stream.runnerId}, 마지막 distance=%.2f km", distanceKm)
+                } else {
+                    // 러너가 없으면 그냥 제거 (이미 없음)
+                    val currentRunners = _uiState.value.runners
+                    val remainingRunners = currentRunners.filterNot { r -> r.runnerId == stream.runnerId }
+                    val rankedRunners = calculateRanks(remainingRunners)
+                    _uiState.update {
+                        it.copy(runners = rankedRunners)
+                    }
+                    Timber.d("LEAVE: 러너가 이미 없음, 제거 스킵: runnerId=${stream.runnerId}")
+                }
+            }
+        }
+    }
+
+    private fun handleLlmMessage(wrapper: WebSocketWrapper) {
+        val payloadObj: JsonObject = wrapper.payload
+        val llm = gson.fromJson(payloadObj, LlmPayload::class.java)
+        Timber.d("LLM ${wrapper.subtype} commentary=${llm.commentary}")
+        _uiState.update { it.copy(highlightCommentary = llm.commentary) }
+        enqueueTts(llm.commentary)
+    }
+
+    private fun enqueueTts(text: String) {
+        synchronized(ttsQueue) {
+            ttsQueue.addLast(text)
+            if (!isTtsSpeaking) {
+                playNextFromQueue()
+            }
+        }
+    }
+
+    private fun playNextFromQueue() {
+        val nextText: String? = synchronized(ttsQueue) {
+            if (ttsQueue.isNotEmpty() && !isTtsSpeaking) {
+                ttsQueue.removeFirst()
+            } else {
+                null
+            }
+        }
+        if (nextText != null) {
+            speakOut(nextText)
+        }
+    }
+
+    private fun speakOut(text: String) {
+        if (tts == null) {
+            Timber.e("TTS가 초기화되지 않았습니다.")
+            return
+        }
+        val utteranceId = "runnity_tts_${System.currentTimeMillis()}"
+        val result = tts?.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        if (result == TextToSpeech.ERROR) {
+            Timber.e("TTS speak() 호출 실패. TTS 엔진에 문제가 있을 수 있습니다.")
+        } else {
+            Timber.d("TTS speak() 호출 성공.")
+        }
+    }
+
+    private fun pickColor(index: Int): Color {
+        val palette = listOf(
+            Color(0xFF3DDC84), Color(0xFFFF6F61), Color(0xFF42A5F5),
+            Color(0xFFFFB300), Color(0xFF7E57C2), Color(0xFF26C6DA),
+            Color(0xFFEF5350), Color(0xFF66BB6A), Color(0xFFAB47BC),
+            Color(0xFFFF7043)
+        )
+        return palette[index % palette.size]
+    }
+
+    fun disconnectStomp() {
+        subscription?.dispose()
+        lifecycleSub?.dispose()
+        stompClient?.disconnect()
+        subscription = null
+        lifecycleSub = null
+        stompClient = null
+        stopPingLoop()
+        eventLoopJob.cancel()
+    }
+
+    private fun formatPace(totalSeconds: Double): String {
+        if (totalSeconds <= 0) return "0'00\""
+        val minutes = (totalSeconds / 60).toInt()
+        val seconds = (totalSeconds % 60).toInt()
+        return "${minutes}'${String.format("%02d", seconds)}\""
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        releasePlayer()
+        disconnectStomp()
+
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+        Timber.d("TTS 엔진 해제 완료")
+    }
+}

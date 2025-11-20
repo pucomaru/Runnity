@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  llm:
+    image: docker.io/daum0604/runnity-llm:${TAG}
+    container_name: llm
+    env_file:
+      - .env.ai              # AI 서버용 환경변수 파일 (서버에만 있음)
+    environment:
+      # docker-compose env_file에 있는 값들을 override 가능
+
+      GOOGLE_APPLICATION_CREDENTIALS: "/app/google-tts-key.json"
+    volumes:
+      # 서버 로컬에 있는 키 파일을 컨테이너로 마운트
+      - ./google-tts-key.json:/app/google-tts-key.json:ro
+    ports:
+      - "8000:8000"          # 필요하면 외부에서 바로 호출 가능
+    restart: unless-stopped
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    external: true           # 이미 있는 네트워크 쓰거나, 처음엔 직접 생성 필요

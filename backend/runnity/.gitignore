@@ -33,6 +33,14 @@ out/
 /dist/
 /nbdist/
 /.nb-gradle/
+backend/.env
+backend/.env.local
 
 ### VS Code ###
 .vscode/
+.env.local
+.env
+
+### file_upload ###
+/uploads/
+

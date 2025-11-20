@@ -1,0 +1,588 @@
+package com.runnity.websocket.handler;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runnity.websocket.dto.websocket.client.KickedMessage;
+import com.runnity.websocket.dto.websocket.client.PongMessage;
+import com.runnity.websocket.dto.websocket.client.RecordMessage;
+import com.runnity.websocket.dto.websocket.server.ErrorMessage;
+import com.runnity.websocket.dto.websocket.server.ConnectedMessage;
+import com.runnity.websocket.enums.LeaveReason;
+import com.runnity.websocket.exception.InvalidTicketException;
+import com.runnity.websocket.manager.SessionManager;
+import com.runnity.websocket.service.ChallengeKafkaProducer;
+import com.runnity.websocket.service.ChallengeParticipationService;
+import com.runnity.websocket.service.RedisPubSubService;
+import com.runnity.websocket.service.TimeoutCheckService;
+import com.runnity.websocket.service.TicketService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.util.List;
+
+/**
+ * 챌린지 WebSocket 핸들러
+ * 
+ * 입장, 메시지 처리, 퇴장 로직을 담당합니다.
+ */
+@Slf4j
+@Component
+public class ChallengeWebSocketHandler extends TextWebSocketHandler {
+
+    private final TicketService ticketService;
+    private final SessionManager sessionManager;
+    private final RedisPubSubService redisPubSubService;
+    private final ChallengeKafkaProducer kafkaProducer;
+    private final TimeoutCheckService timeoutCheckService;
+    private final ChallengeParticipationService participationService;
+    private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, String> redisTemplate;
+
+    public ChallengeWebSocketHandler(
+            TicketService ticketService,
+            SessionManager sessionManager,
+            RedisPubSubService redisPubSubService,
+            ChallengeKafkaProducer kafkaProducer,
+            TimeoutCheckService timeoutCheckService,
+            ChallengeParticipationService participationService,
+            ObjectMapper objectMapper,
+            @Qualifier("stringRedisTemplate") RedisTemplate<String, String> redisTemplate) {
+        this.ticketService = ticketService;
+        this.sessionManager = sessionManager;
+        this.redisPubSubService = redisPubSubService;
+        this.kafkaProducer = kafkaProducer;
+        this.timeoutCheckService = timeoutCheckService;
+        this.participationService = participationService;
+        this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
+    }
+
+    /**
+     * WebSocket 연결 수립 (입장 로직)
+     */
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) {
+        try {
+            // 1. 티켓 추출
+            String ticket = (String) session.getAttributes().get("ticket");
+            if (ticket == null || ticket.isBlank()) {
+                log.warn("티켓 없음: sessionId={}", session.getId());
+                sendErrorAndClose(session, "UNAUTHORIZED", "티켓이 필요합니다.");
+                return;
+            }
+
+            // 2. 티켓 검증 및 소모
+            TicketService.TicketData ticketData = ticketService.verifyAndConsumeTicket(ticket);
+            Long challengeId = ticketData.challengeId();
+            Long userId = ticketData.userId();
+
+            // 3. 세션 attributes에 정보 저장
+            session.getAttributes().put("challengeId", challengeId);
+            session.getAttributes().put("userId", userId);
+
+            // 티켓에서 nickname, profileImage 추출
+            String nickname = ticketData.nickname();
+            String profileImage = ticketData.profileImage();
+
+            // null 체크 (방어 코드)
+            if (nickname == null || nickname.isBlank()) {
+                nickname = "User_" + userId;
+                log.warn("티켓에 nickname 없음. 기본값 사용: userId={}, nickname={}", userId, nickname);
+            }
+            // profileImage는 null 허용 (ConcurrentHashMap은 null value를 허용하지 않으므로 빈 문자열 사용)
+            // 나중에 사용할 때 빈 문자열을 null로 변환
+            if (profileImage == null) {
+                profileImage = ""; // null 대신 빈 문자열 사용 (ConcurrentHashMap null value 제약)
+            }
+
+            session.getAttributes().put("nickname", nickname);
+            session.getAttributes().put("profileImage", profileImage);
+
+            // 4. 티켓 타입 확인 및 재입장 처리
+            String ticketType = ticketData.ticketType(); // "ENTER" or "REENTER"
+            
+            // REENTER인 경우 이전 세션 종료
+            if ("REENTER".equals(ticketType)) {
+                WebSocketSession previousSession = sessionManager.getSession(challengeId, userId);
+                if (previousSession != null && previousSession.isOpen()) {
+                    try {
+                        previousSession.close(CloseStatus.NORMAL);
+                        log.info("재입장: 이전 세션 종료: challengeId={}, userId={}", challengeId, userId);
+                    } catch (Exception e) {
+                        log.warn("이전 세션 종료 실패: challengeId={}, userId={}", challengeId, userId, e);
+                    }
+                }
+            }
+            
+            // 재접속 여부 확인 (이전 참가자 정보가 있는지)
+            // 재입장 시에는 프론트에서 최신 데이터를 전송하므로 이전 정보 복구 불필요
+            SessionManager.ParticipantInfoWithDistance previousInfo = sessionManager.getParticipantInfo(challengeId, userId);
+            
+            // 재입장 시에는 항상 0.0/0으로 시작 (프론트에서 최신 데이터 전송)
+            // ENTER이고 이전 정보가 있는 경우에만 이전 정보 사용
+            Double previousDistance = null;
+            Integer previousPace = null;
+            if (!"REENTER".equals(ticketType) && previousInfo != null) {
+                previousDistance = previousInfo.distance();
+                previousPace = previousInfo.pace();
+            }
+
+            // 5. 다른 참가자 목록 조회 (본인 제외)
+            List<ConnectedMessage.Participant> participants = sessionManager.getParticipants(challengeId, userId);
+
+            // 6. 세션 등록 (메모리 + Redis)
+            // 재입장 시에는 0.0/0으로 시작, ENTER이고 이전 정보가 있으면 이전 정보 사용
+            sessionManager.registerSession(challengeId, userId, nickname, normalizeProfileImage(profileImage), session, 
+                    previousDistance, previousPace);
+
+            // 6-1. 타임아웃 체크를 위한 초기 RECORD 시간 설정
+            timeoutCheckService.updateLastRecordTime(challengeId, userId);
+
+            // 7. CONNECTED 메시지 전송 (본인에게)
+            // 재입장 시에는 항상 0.0/0으로 시작 (프론트에서 최신 데이터 전송)
+            Double initialDistance = previousDistance != null ? previousDistance : 0.0;
+            Integer initialPace = previousPace != null ? previousPace : 0;
+            
+            log.debug("Participant 생성 전: userId={}, nickname={}, profileImage={}, ticketType={}, initialDistance={}, initialPace={}", 
+                    userId, nickname, profileImage, ticketType, initialDistance, initialPace);
+            ConnectedMessage.Participant me = new ConnectedMessage.Participant(
+                    userId, nickname, normalizeProfileImage(profileImage), initialDistance, initialPace);
+            log.debug("Participant 생성 후: me={}", me);
+            ConnectedMessage connectedMessage = new ConnectedMessage(challengeId, userId, me, participants);
+            String connectedJson = objectMapper.writeValueAsString(connectedMessage);
+            session.sendMessage(new TextMessage(connectedJson));
+
+            // 8. Redis Pub/Sub으로 입장 이벤트 발행 (다른 WebSocket 서버에 알림)
+            redisPubSubService.publishUserEntered(challengeId, userId, nickname, normalizeProfileImage(profileImage));
+
+            // 9. Kafka 이벤트 발행 (티켓 타입 기반)
+            if ("ENTER".equals(ticketType)) {
+                // 첫 입장: START 이벤트 발행
+                kafkaProducer.publishStartEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage));
+                log.info("첫 입장 처리: challengeId={}, userId={}", challengeId, userId);
+            } else if ("REENTER".equals(ticketType)) {
+                // 재입장: RUNNING 이벤트 발행 (distance=0.0, pace=0, 프론트에서 최신 데이터 전송)
+                Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+                kafkaProducer.publishRunningEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage), 
+                        0.0, 0, ranking);
+                log.info("재입장 처리: challengeId={}, userId={}, distance=0.0, pace=0", 
+                        challengeId, userId);
+            }
+
+            log.info("챌린지 입장 성공: challengeId={}, userId={}, nickname={}, sessionId={}", 
+                    challengeId, userId, nickname, session.getId());
+
+        } catch (InvalidTicketException e) {
+            log.warn("티켓 검증 실패: sessionId={}, error={}", session.getId(), e.getMessage());
+            sendErrorAndClose(session, "INVALID_TICKET", e.getMessage());
+        } catch (Exception e) {
+            log.error("입장 처리 실패: sessionId={}", session.getId(), e);
+            sendErrorAndClose(session, "INTERNAL_ERROR", "서버 오류가 발생했습니다.");
+        }
+    }
+
+    /**
+     * 메시지 수신 처리
+     */
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        try {
+            String payload = message.getPayload();
+            log.debug("메시지 수신: sessionId={}, payload={}", session.getId(), payload);
+
+            // 세션 정보 확인
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+            
+            if (challengeId == null || userId == null) {
+                log.warn("세션 정보 없음: sessionId={}", session.getId());
+                sendError(session, "INVALID_SESSION", "세션 정보가 없습니다.");
+                return;
+            }
+
+            // JSON 파싱하여 타입 확인
+            JsonNode jsonNode = objectMapper.readTree(payload);
+            String type = jsonNode.get("type").asText();
+
+            // 메시지 타입별 처리
+            switch (type) {
+                case "RECORD" -> handleRecord(session, challengeId, userId, payload);
+                case "QUIT" -> handleQuit(session, challengeId, userId);
+                case "KICKED" -> handleKick(session, challengeId, userId, payload);
+                case "PING" -> handlePing(session);
+                case "PONG" -> handlePong(session);
+                default -> {
+                    log.warn("알 수 없는 메시지 타입: type={}, sessionId={}", type, session.getId());
+                    sendError(session, "INVALID_MESSAGE_TYPE", "알 수 없는 메시지 타입입니다: " + type);
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("메시지 처리 실패: sessionId={}", session.getId(), e);
+            sendError(session, "MESSAGE_PROCESSING_ERROR", "메시지 처리 중 오류가 발생했습니다.");
+        }
+    }
+
+    /**
+     * RECORD 메시지 처리
+     */
+    private void handleRecord(WebSocketSession session, Long challengeId, Long userId, String payload) {
+        try {
+            // JSON 역직렬화
+            RecordMessage recordMessage = objectMapper.readValue(payload, RecordMessage.class);
+            Double distance = recordMessage.distance();
+            Integer pace = recordMessage.pace();
+
+            // 세션에서 nickname, profileImage 가져오기
+            String nickname = (String) session.getAttributes().get("nickname");
+            String profileImage = (String) session.getAttributes().get("profileImage");
+
+            // 참가자 정보 업데이트 (Redis)
+            // ZSet score (distance)와 참가자 정보 (pace) 모두 업데이트
+            sessionManager.updateParticipantInfo(challengeId, userId, distance, pace);
+
+            // 순위 계산 (ZREVRANGE 사용)
+            Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+
+            // Redis Pub/Sub으로 참가자 업데이트 이벤트 발행 (다른 서버에 알림)
+            redisPubSubService.publishParticipantUpdate(challengeId, userId, distance, pace);
+
+            // Kafka로 RUNNING 이벤트 발행
+            kafkaProducer.publishRunningEvent(challengeId, userId, nickname, normalizeProfileImage(profileImage), 
+                    distance, pace, ranking);
+
+            // 마지막 RECORD 시간 업데이트 (타임아웃 체크용)
+            timeoutCheckService.updateLastRecordTime(challengeId, userId);
+
+            log.debug("RECORD 처리 완료: challengeId={}, userId={}, distance={}, pace={}, ranking={}", 
+                    challengeId, userId, distance, pace, ranking);
+
+            // 완주 체크 (목표 거리 달성 시)
+            checkAndHandleFinish(session, challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking);
+
+        } catch (Exception e) {
+            log.error("RECORD 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
+            sendError(session, "RECORD_PROCESSING_ERROR", "러닝 기록 처리 중 오류가 발생했습니다.");
+        }
+    }
+
+    /**
+     * QUIT 메시지 처리
+     */
+    private void handleQuit(WebSocketSession session, Long challengeId, Long userId) {
+        try {
+            log.info("자발적 포기: challengeId={}, userId={}", challengeId, userId);
+
+            // 참가자 정보 조회 (현재 distance, pace)
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
+            Double distance = info != null ? info.distance() : 0.0;
+            Integer pace = info != null ? info.pace() : 0;
+            Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+
+            String nickname = (String) session.getAttributes().get("nickname");
+            String profileImage = (String) session.getAttributes().get("profileImage");
+
+            // 퇴장 처리
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
+                    LeaveReason.QUIT.getValue());
+
+            // 이미 처리되었음을 표시 (중복 처리 방지)
+            session.getAttributes().put("leaveReason", LeaveReason.QUIT.getValue());
+
+            // 연결 종료
+            session.close(CloseStatus.NORMAL);
+
+        } catch (Exception e) {
+            log.error("QUIT 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
+            try {
+                session.close(CloseStatus.SERVER_ERROR);
+            } catch (Exception ex) {
+                log.error("연결 종료 실패: sessionId={}", session.getId(), ex);
+            }
+        }
+    }
+
+    /**
+     * PING 메시지 처리
+     */
+    private void handlePing(WebSocketSession session) {
+        try {
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+            if (challengeId != null && userId != null) {
+                timeoutCheckService.updateLastRecordTime(challengeId, userId);
+            }
+
+            // PONG 응답
+            PongMessage pong = new PongMessage();
+            String pongJson = objectMapper.writeValueAsString(pong);
+            session.sendMessage(new TextMessage(pongJson));
+            
+            log.debug("PING 응답: sessionId={}", session.getId());
+        } catch (Exception e) {
+            log.error("PING 처리 실패: sessionId={}", session.getId(), e);
+        }
+    }
+
+    /**
+     * PONG 메시지 처리
+     */
+    private void handlePong(WebSocketSession session) {
+        try {
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+            if (challengeId != null && userId != null) {
+                timeoutCheckService.updateLastRecordTime(challengeId, userId);
+            }
+            log.debug("PONG 수신: sessionId={}", session.getId());
+        } catch (Exception e) {
+            log.error("PONG 처리 실패: sessionId={}", session.getId(), e);
+        }
+    }
+
+    /**
+     * KICKED 메시지 처리 (강제 퇴장)
+     * 이상 사용자가 자신의 웹소켓 연결에서 강제 퇴장 메시지를 받을 때 처리
+     */
+    private void handleKick(WebSocketSession session, Long challengeId, Long userId, String payload) {
+        try {
+            // JSON 역직렬화 (검증용)
+            objectMapper.readValue(payload, KickedMessage.class);
+            log.info("강제 퇴장 요청 수신: challengeId={}, userId={}", challengeId, userId);
+
+            // 참가자 정보 조회
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
+            Double distance = info != null ? info.distance() : 0.0;
+            Integer pace = info != null ? info.pace() : 0;
+            Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+            String nickname = (String) session.getAttributes().get("nickname");
+            String profileImage = (String) session.getAttributes().get("profileImage");
+
+            // 퇴장 처리 (Redis 정리, Pub/Sub 발행, Kafka 이벤트)
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, 
+                    LeaveReason.KICKED.getValue());
+
+            // 이미 처리되었음을 표시 (중복 처리 방지)
+            session.getAttributes().put("leaveReason", LeaveReason.KICKED.getValue());
+
+            // 연결 종료
+            session.close(CloseStatus.POLICY_VIOLATION);
+
+            log.info("강제 퇴장 처리 완료: challengeId={}, userId={}", challengeId, userId);
+
+        } catch (Exception e) {
+            log.error("KICKED 처리 실패: challengeId={}, userId={}", challengeId, userId, e);
+            try {
+                session.close(CloseStatus.SERVER_ERROR);
+            } catch (Exception ex) {
+                log.error("세션 종료 실패: sessionId={}", session.getId(), ex);
+            }
+        }
+    }
+
+    /**
+     * 완주 체크 및 처리
+     */
+    private void checkAndHandleFinish(WebSocketSession session, Long challengeId, Long userId, String nickname, String profileImage,
+                                      Double distance, Integer pace, Integer ranking) {
+        try {
+            // 목표 거리 조회 (Redis 또는 외부 API)
+            Double targetDistance = getTargetDistance(challengeId);
+            
+            if (targetDistance != null && distance >= targetDistance) {
+                log.info("완주 달성: challengeId={}, userId={}, distance={}, targetDistance={}", 
+                        challengeId, userId, distance, targetDistance);
+
+                // 참가자 상태 DB 업데이트 (COMPLETE)
+                participationService.updateParticipationStatus(challengeId, userId, LeaveReason.FINISH.getValue());
+
+                // 타임아웃 체크 서비스에서 마지막 RECORD 시간 제거
+                timeoutCheckService.removeLastRecordTime(challengeId, userId);
+
+                // Kafka로 FINISH 이벤트 발행
+                kafkaProducer.publishFinishEvent(challengeId, userId, nickname, profileImage, 
+                        distance, pace, ranking);
+
+                // Redis Pub/Sub으로 퇴장 이벤트 발행 (reason: FINISH)
+                redisPubSubService.publishUserLeft(challengeId, userId, LeaveReason.FINISH.getValue());
+
+                // 이미 처리되었음을 표시 (중복 처리 방지)
+                session.getAttributes().put("leaveReason", LeaveReason.FINISH.getValue());
+
+                // 세션 제거 (FINISH는 랭킹 유지)
+                sessionManager.removeSession(challengeId, userId, LeaveReason.FINISH.getValue());
+            }
+        } catch (Exception e) {
+            log.error("완주 체크 실패: challengeId={}, userId={}", challengeId, userId, e);
+        }
+    }
+
+    /**
+     * 목표 거리 조회 (Redis 챌린지 meta에서)
+     */
+    private Double getTargetDistance(Long challengeId) {
+        try {
+            // Redis에서 챌린지 meta 정보 조회
+            // 키 형식: challenge:{challengeId}:meta
+            String metaKey = "challenge:" + challengeId + ":meta";
+            Object distanceObj = redisTemplate.opsForHash().get(metaKey, "distance");
+            
+            if (distanceObj == null) {
+                log.debug("목표 거리 정보 없음: challengeId={}", challengeId);
+                return null;
+            }
+            
+            // String 또는 Number로 변환
+            Double targetDistance;
+            if (distanceObj instanceof Number) {
+                targetDistance = ((Number) distanceObj).doubleValue();
+            } else {
+                targetDistance = Double.parseDouble(distanceObj.toString());
+            }
+            
+            log.debug("목표 거리 조회: challengeId={}, targetDistance={}", challengeId, targetDistance);
+            return targetDistance;
+        } catch (Exception e) {
+            log.error("목표 거리 조회 실패: challengeId={}", challengeId, e);
+            return null;
+        }
+    }
+
+    /**
+     * WebSocket 연결 종료 (퇴장 로직)
+     */
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        try {
+            Long challengeId = (Long) session.getAttributes().get("challengeId");
+            Long userId = (Long) session.getAttributes().get("userId");
+
+            if (challengeId == null || userId == null) {
+                log.warn("세션 정보 없음: sessionId={}", session.getId());
+                return;
+            }
+
+            // 참가자 정보 조회 (현재 distance, pace)
+            SessionManager.ParticipantInfoWithDistance info = sessionManager.getParticipantInfo(challengeId, userId);
+            Double distance = info != null ? info.distance() : 0.0;
+            Integer pace = info != null ? info.pace() : 0;
+            Integer ranking = sessionManager.calculateRanking(challengeId, userId);
+
+            String nickname = (String) session.getAttributes().get("nickname");
+            String profileImage = (String) session.getAttributes().get("profileImage");
+
+            // 이미 처리된 경우 중복 처리 방지 (QUIT, TIMEOUT 등에서 이미 처리됨)
+            String alreadyProcessedReason = (String) session.getAttributes().get("leaveReason");
+            if (alreadyProcessedReason != null) {
+                log.debug("이미 처리된 퇴장: challengeId={}, userId={}, reason={}, sessionId={}", 
+                        challengeId, userId, alreadyProcessedReason, session.getId());
+                return; // 중복 처리 방지
+            }
+
+            // 퇴장 사유 결정
+            String reason = determineLeaveReason(status);
+
+            // 퇴장 처리
+            handleLeave(challengeId, userId, nickname, normalizeProfileImage(profileImage), distance, pace, ranking, reason);
+
+            log.info("❌ 챌린지 퇴장: challengeId={}, userId={}, sessionId={}, status={}, reason={}", 
+                    challengeId, userId, session.getId(), status, reason);
+
+        } catch (Exception e) {
+            log.error("퇴장 처리 실패: sessionId={}", session.getId(), e);
+        }
+    }
+
+    /**
+     * 퇴장 처리 공통 로직
+     */
+    private void handleLeave(Long challengeId, Long userId, String nickname, String profileImage,
+                             Double distance, Integer pace, Integer ranking, String reason) {
+        try {
+            // 1. 참가자 상태 DB 업데이트 (웹소켓 서버에서 직접 처리)
+            participationService.updateParticipationStatus(challengeId, userId, reason);
+
+            // 2. 타임아웃 체크 서비스에서 마지막 RECORD 시간 제거
+            timeoutCheckService.removeLastRecordTime(challengeId, userId);
+
+            // 3. 세션 제거 (메모리 + Redis, reason에 따라 다르게 처리)
+            sessionManager.removeSession(challengeId, userId, reason);
+
+            // 4. Redis Pub/Sub으로 퇴장 이벤트 발행 (다른 서버에 알림)
+            redisPubSubService.publishUserLeft(challengeId, userId, reason);
+
+            // 5. Kafka로 LEAVE 이벤트 발행
+            kafkaProducer.publishLeaveEvent(challengeId, userId, nickname, profileImage, 
+                    distance, pace, ranking, reason);
+
+        } catch (Exception e) {
+            log.error("퇴장 처리 실패: challengeId={}, userId={}, reason={}", challengeId, userId, reason, e);
+        }
+    }
+
+    /**
+     * CloseStatus에 따라 퇴장 사유 결정
+     */
+    private String determineLeaveReason(CloseStatus status) {
+        if (status == null) {
+            return LeaveReason.DISCONNECTED.getValue();
+        }
+
+        // CloseStatus 코드에 따라 사유 결정
+        if (status.equals(CloseStatus.NORMAL)) {
+            // 정상 종료는 DISCONNECTED로 처리
+            // (QUIT는 이미 handleQuit에서 처리되었고, 플래그로 중복 방지됨)
+            return LeaveReason.DISCONNECTED.getValue();
+        } else if (status.equals(CloseStatus.SERVER_ERROR) || status.equals(CloseStatus.POLICY_VIOLATION)) {
+            return LeaveReason.ERROR.getValue();
+        } else {
+            // 기타는 연결 끊김으로 간주
+            return LeaveReason.DISCONNECTED.getValue();
+        }
+    }
+
+    /**
+     * 에러 메시지 전송 (연결 종료 없이)
+     */
+    private void sendError(WebSocketSession session, String errorCode, String errorMessage) {
+        try {
+            ErrorMessage error = new ErrorMessage(errorCode, errorMessage);
+            String errorJson = objectMapper.writeValueAsString(error);
+            session.sendMessage(new TextMessage(errorJson));
+        } catch (Exception e) {
+            log.error("에러 메시지 전송 실패: sessionId={}", session.getId(), e);
+        }
+    }
+
+    /**
+     * 에러 메시지 전송 및 연결 종료
+     */
+    private void sendErrorAndClose(WebSocketSession session, String errorCode, String errorMessage) {
+        try {
+            ErrorMessage error = new ErrorMessage(errorCode, errorMessage);
+            String errorJson = objectMapper.writeValueAsString(error);
+            session.sendMessage(new TextMessage(errorJson));
+            session.close(CloseStatus.POLICY_VIOLATION);
+        } catch (Exception e) {
+            log.error("에러 메시지 전송 실패: sessionId={}", session.getId(), e);
+            try {
+                session.close(CloseStatus.SERVER_ERROR);
+            } catch (Exception ex) {
+                log.error("연결 종료 실패: sessionId={}", session.getId(), ex);
+            }
+        }
+    }
+
+    /**
+     * 빈 문자열을 null로 변환 (ConcurrentHashMap null value 제약으로 인해 빈 문자열로 저장된 경우)
+     */
+    private String normalizeProfileImage(String profileImage) {
+        return (profileImage == null || profileImage.isEmpty()) ? null : profileImage;
+    }
+}

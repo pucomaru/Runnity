@@ -22,6 +22,8 @@ Thumbs.db
 **/tmp/
 **/cache/
 **/data/
+!frontend/app/src/main/java/**/data/
+!frontend/watch/src/main/java/**/data/
 **/volumes/
 **/backups/
 
@@ -72,5 +74,14 @@ logs/
 *.gz
 *.zip
 
+<<<<<<< HEAD
+**/.git
+**/.gradle
+**/build
+**/.idea
+**/*.iml
+**/node_modules
+=======
 # FCM Service Account Key (Firebase)
 backend/stream/src/main/resources/fcmservice-account-key.json
+>>>>>>> origin/consume
