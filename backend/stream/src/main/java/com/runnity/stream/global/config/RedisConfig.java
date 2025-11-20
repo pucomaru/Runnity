@@ -1,5 +1,6 @@
 package com.runnity.stream.global.config;
 
+import com.runnity.stream.socket.util.ChallengeEventListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -85,9 +87,17 @@ public class RedisConfig {
 
     // Pub/Sub 수신용: MessageListenerContainer
     @Bean
-    public RedisMessageListenerContainer redisMessageListenerContainer() {
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            RedisConnectionFactory redisPubsubConnectionFactory,
+            ChallengeEventListener challengeEventListener
+    ) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(redisPubsubConnectionFactory());
+        container.setConnectionFactory(redisPubsubConnectionFactory);
+
+        container.addMessageListener(challengeEventListener, new PatternTopic("challenge:*:ready"));
+        container.addMessageListener(challengeEventListener, new PatternTopic("challenge:*:running"));
+        container.addMessageListener(challengeEventListener, new PatternTopic("challenge:*:done"));
+
         return container;
     }
 }

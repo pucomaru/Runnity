@@ -19,6 +19,7 @@ import androidx.navigation.NavController
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.components.*
 import androidx.compose.foundation.lazy.items
+import com.example.runnity.data.util.DistanceUtils
 import timber.log.Timber
 
 /**
@@ -149,7 +150,7 @@ fun BroadcastScreen(
                                 title = broadcast.title,
                                 viewerCount = broadcast.viewerCount,
                                 participantCount = broadcast.participantCount,
-                                distance = codeToLabel(broadcast.distance),
+                                distance = DistanceUtils.codeToLabel(broadcast.distance),
                                 onCardClick = {
                                     selectedChallengeId = broadcast.challengeId
                                     showJoinDialog = true
@@ -170,8 +171,15 @@ fun BroadcastScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         selectedChallengeId?.let { id ->
-                            viewModel.joinBroadcast(id.toString())
-                            navController?.navigate("broadcast_live/$id")
+                            val itemToPass = (uiState as? BroadcastUiState.Success)
+                                ?.broadcasts?.find { it.challengeId == id }
+
+                            if (itemToPass != null) {
+                                // 2. 공유 ViewModel에 아이템 정보 저장
+                                viewModel.selectBroadcastForLive(itemToPass)
+                                // 3. 파라미터 없이 ID만 가지고 이동
+                                navController?.navigate("broadcast_live/$id")
+                            }
                         }
                         showJoinDialog = false
                     }) { Text("입장하기") }
@@ -184,20 +192,4 @@ fun BroadcastScreen(
             )
         }
     }
-}
-
-fun codeToLabel(code: String?): String = when (code) {
-    "ONE" -> "1 km"
-    "TWO" -> "2 km"
-    "THREE" -> "3 km"
-    "FOUR" -> "4 km"
-    "FIVE" -> "5 km"
-    "SIX" -> "6 km"
-    "SEVEN" -> "7 km"
-    "EIGHT" -> "8 km"
-    "NINE" -> "9 km"
-    "TEN" -> "10 km"
-    "FIFTEEN" -> "15 km"
-    "HALF" -> "하프"
-    else -> "UNKNOWN km"
 }

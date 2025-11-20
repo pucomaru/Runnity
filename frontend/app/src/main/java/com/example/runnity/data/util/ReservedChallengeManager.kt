@@ -161,6 +161,7 @@ object ReservedChallengeManager {
                 when {
                     v == 0.1 -> "100m"
                     v == 0.5 -> "500m"
+                    v != null && v >= 21.0 && v <= 22.0 -> "하프"
                     v != null && v >= 1.0 -> "${v.toInt()}km"
                     else -> "${raw}km"
                 }

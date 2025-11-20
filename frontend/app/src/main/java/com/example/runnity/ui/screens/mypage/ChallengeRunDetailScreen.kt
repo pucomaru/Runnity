@@ -329,11 +329,17 @@ fun ChallengeRunDetailContent(
             Spacer(modifier = Modifier.height(6.dp))
 
             // 현재 사용자의 순위 찾기
-            val myRank = challengeDetail?.participants?.find { it.memberId == currentUserId }?.rank
+            val myParticipant = challengeDetail?.participants?.find { it.memberId == currentUserId }
+            val isMyRetired = myParticipant?.status != "COMPLETED" || myParticipant?.rank == 0
+            val myRankText = when {
+                myParticipant == null -> "-"
+                isMyRetired -> "-위"
+                else -> "${myParticipant.rank}위"
+            }
             Text(
-                text = if (myRank != null) "${myRank}위" else "-",
+                text = myRankText,
                 style = Typography.LargeTitle.copy(fontSize = 72.sp),
-                color = ColorPalette.Light.primary
+                color = if (isMyRetired) ColorPalette.Light.secondary else ColorPalette.Light.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -498,14 +504,19 @@ private fun ChallengeRankingItem(
             modifier = Modifier.weight(1f)
         ) {
             // 순위
+            val isRetired = participant.status != "COMPLETED" || participant.rank == 0
             Text(
-                text = "${participant.rank}위",
+                text = if (isRetired) "-위" else "${participant.rank}위",
                 style = Typography.Subheading,
-                color = when (participant.rank) {
-                    1 -> Color(0xFFFFD700) // 금색
-                    2 -> Color(0xFFC0C0C0) // 은색
-                    3 -> Color(0xFFCD7F32) // 동색
-                    else -> ColorPalette.Light.primary
+                color = if (isRetired) {
+                    ColorPalette.Light.secondary
+                } else {
+                    when (participant.rank) {
+                        1 -> Color(0xFFFFD700) // 금색
+                        2 -> Color(0xFFC0C0C0) // 은색
+                        3 -> Color(0xFFCD7F32) // 동색
+                        else -> ColorPalette.Light.primary
+                    }
                 },
                 modifier = Modifier.width(50.dp)
             )
@@ -546,7 +557,7 @@ private fun ChallengeRankingItem(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // 닉네임 + 나 배지
+            // 닉네임 + 나 배지 + 리타이어 배지
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -568,6 +579,23 @@ private fun ChallengeRankingItem(
                     ) {
                         Text(
                             text = "나",
+                            style = Typography.Caption,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                if (isRetired) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = ColorPalette.Light.component,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "리타이어",
                             style = Typography.Caption,
                             color = Color.White
                         )

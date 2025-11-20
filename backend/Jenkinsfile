@@ -9,6 +9,7 @@ pipeline {
   options { disableConcurrentBuilds(); timestamps() }
 
   stages {
+
     stage('Checkout') {
       steps {
         checkout scm
@@ -50,13 +51,13 @@ pipeline {
             ls -al deploy_bundle
           """
         }
-        // workspace 기준 경로 주의: backend/ 안에 파일이 있음
         archiveArtifacts artifacts: 'backend/deploy_bundle.tgz', fingerprint: true, onlyIfSuccessful: true
       }
     }
 
     stage('Deploy to servers') {
       parallel {
+
         stage('Deploy 13.209.87.132') {
           steps {
             sshagent (credentials: ['ssh_deploy_key']) {
@@ -75,6 +76,7 @@ pipeline {
             }
           }
         }
+
         stage('Deploy 15.164.230.99') {
           steps {
             sshagent (credentials: ['ssh_deploy_key']) {
@@ -92,7 +94,9 @@ pipeline {
             }
           }
         }
+
       }
     }
+
   }
 }

@@ -143,18 +143,9 @@ class ExerciseFgService : Service() {
     private fun sendMetricsOnce() {
         val now = System.currentTimeMillis()
         val activeElapsed = if (isRunning) activeElapsedAccumMs + (now - activeStartMs) else activeElapsedAccumMs
-        val dist = latestDistanceM
-        val rawPaceSpKm = if (dist != null && dist > 0.0 && activeElapsed > 0L) {
-            (activeElapsed / 1000.0) / (dist / 1000.0)
-        } else null
-        // 워치 페이스도 2'30"/km ~ 20'00"/km 범위만 정상값으로 사용
-        val paceSpKm = rawPaceSpKm?.takeIf { it.isFinite() && it in 150.0..1200.0 }
         val json = JSONObject()
         json.put("type", "metrics")
         if (latestHrBpm != null) json.put("hr_bpm", latestHrBpm)
-        if (dist != null) json.put("distance_m", dist)
-        if (paceSpKm != null && paceSpKm.isFinite()) json.put("pace_spkm", paceSpKm)
-        if (latestCaloriesKcal != null) json.put("cal_kcal", latestCaloriesKcal)
         json.put("elapsed_ms", activeElapsed)
         val bytes = json.toString().toByteArray()
         Wearable.getNodeClient(this).connectedNodes
@@ -170,9 +161,6 @@ class ExerciseFgService : Service() {
             setPackage(packageName)
             putExtra("elapsed_ms", activeElapsed)
             latestHrBpm?.let { putExtra("hr_bpm", it) }
-            dist?.let { putExtra("distance_m", it) }
-            if (paceSpKm != null && paceSpKm.isFinite()) putExtra("pace_spkm", paceSpKm)
-            latestCaloriesKcal?.let { putExtra("cal_kcal", it) }
         }
         sendBroadcast(intent)
     }
@@ -203,6 +191,15 @@ class ExerciseFgService : Service() {
                 sessionStartMs = 0L
                 activeStartMs = 0L
                 isRunning = false
+
+                // 워치 UI 상태(특히 순위 표시)를 새로운 세션 기준으로 초기화
+                runCatching {
+                    val resetRankIntent = Intent("com.example.runnity.action.RANK").apply {
+                        setPackage(packageName)
+                        putExtra("rank", -1)
+                    }
+                    sendBroadcast(resetRankIntent)
+                }
 
                 // 준비/진행 중 센서(HR, 위치 등) 가용성 변경 알림
                 ensureExerciseClient()
@@ -272,6 +269,13 @@ class ExerciseFgService : Service() {
                 latestHrBpm = null
                 latestDistanceM = null
                 latestCaloriesKcal = null
+                // 워치 운동 화면 종료 신호 전송 (홈/런처로 돌아가도록)
+                runCatching {
+                    val finishIntent = Intent(ACTION_FINISH_UI).apply {
+                        setPackage(packageName)
+                    }
+                    sendBroadcast(finishIntent)
+                }
                 stopSelf()
             }
         }

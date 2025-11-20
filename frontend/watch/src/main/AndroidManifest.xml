@@ -59,6 +59,15 @@
                 <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
             </intent-filter>
         </service>
+
+        <!-- 폰 -> 워치 메트릭 수신 서비스 (/phone/metrics) -->
+        <service
+            android:name=".data.datalayer.wear.PhoneMetricsListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
