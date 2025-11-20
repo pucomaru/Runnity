@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 개발/테스트 환경용: cleartext 통신 허용 -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- 특정 도메인만 허용하려면 아래 주석을 해제하고 사용하세요 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">43.203.250.119</domain>
+    </domain-config>
+</network-security-config>
+

@@ -9,5 +9,5 @@
     <color name="white">#FFFFFFFF</color>
 
     <!-- 스플래시 스크린 배경색 (원하는 색상으로 변경하세요) -->
-    <color name="splash_background">#595858</color>
+    <color name="splash_background">#3958BD</color>
 </resources>

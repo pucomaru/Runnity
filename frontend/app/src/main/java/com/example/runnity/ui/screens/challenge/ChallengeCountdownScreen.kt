@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.runnity.theme.Typography
+import com.example.runnity.data.datalayer.sendSessionControl
 
 /**
  * 챌린지용 카운트다운 화면 (5 → 1)
@@ -33,6 +35,7 @@ fun ChallengeCountdownScreen(
 ) {
     var current by remember { mutableStateOf(5) }
     val scale = remember { Animatable(1f) }
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         val values = listOf(5, 4, 3, 2, 1)
@@ -42,7 +45,8 @@ fun ChallengeCountdownScreen(
             scale.animateTo(1.25f, animationSpec = tween(durationMillis = 500))
             scale.animateTo(1.0f, animationSpec = tween(durationMillis = 500))
         }
-        // 카운트 종료 후 챌린지 운동 화면으로 이동 (운동 화면은 이후 구현 예정)
+        // 카운트 종료 후 워치에 start 전송 후 챌린지 운동 화면으로 이동
+        sendSessionControl(context, "start")
         navController.navigate("challenge_workout/$challengeId") {
             // 카운트다운을 백스택에서 제거
             popUpTo("challenge_countdown/$challengeId") { inclusive = true }

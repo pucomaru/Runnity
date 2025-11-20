@@ -24,10 +24,10 @@ class PhoneControlListenerService : WearableListenerService() {
                 val json = runCatching { JSONObject(payload) }.getOrNull() ?: return
                 val m = SessionMetricsBus.WatchMetrics(
                     hrBpm = json.optInt("hr_bpm").let { if (json.has("hr_bpm")) it else null },
-                    distanceM = json.optDouble("distance_m").let { if (json.has("distance_m")) it else null },
-                    elapsedMs = json.optLong("elapsed_ms").let { if (json.has("elapsed_ms")) it else null },
-                    paceSpKm = json.optDouble("pace_spkm").let { if (json.has("pace_spkm")) it else null },
-                    caloriesKcal = json.optDouble("cal_kcal").let { if (json.has("cal_kcal")) it else null },
+                    distanceM = null,
+                    elapsedMs = null,
+                    paceSpKm = null,
+                    caloriesKcal = null,
                 )
                 SessionMetricsBus.emit(m)
             }

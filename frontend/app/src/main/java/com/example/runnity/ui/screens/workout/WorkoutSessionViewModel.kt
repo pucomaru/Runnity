@@ -112,30 +112,17 @@ class WorkoutSessionViewModel : ViewModel() {
     // 워치 메트릭 우선 적용을 위한 최근 수신 시각
     private var lastWatchMetricsAt: Long = 0L
     private fun isWatchPrimaryActive(now: Long = System.currentTimeMillis()): Boolean =
-        (now - lastWatchMetricsAt) <= 4000L
+        // 현재는 워치는 심박(HR) 정보만 사용하고, 거리/페이스/칼로리는 항상 폰(GPS) 기준으로 누적한다.
+        false
 
     // 워치로부터 메트릭을 수신하여 우선 반영
+    // 현재 정책: 워치는 심박(HR)만 제공하고, 거리/페이스/칼로리는 항상 폰(GPS) 기준으로 계산한다.
     fun ingestWatchMetrics(hrBpm: Int?, distanceM: Double?, elapsedMs: Long?, paceSpKm: Double?, caloriesKcal: Double?) {
-        val now = System.currentTimeMillis()
-        lastWatchMetricsAt = now
-        // 시간은 내부 ticker가 관리하지만, 활동/총 경과는 유지
+        lastWatchMetricsAt = System.currentTimeMillis()
         val cur = _metrics.value
-        val newDistance = distanceM ?: cur.distanceMeters
-        val newCalories = caloriesKcal ?: cur.caloriesKcal
-        val safePace = paceSpKm
-            // 워치 페이스는 2'30"/km ~ 20'00"/km 사이만 정상값으로 인정
-            ?.takeIf { it.isFinite() && it in 150.0..1200.0 }
-        val newAvgPace = safePace ?: cur.avgPaceSecPerKm
         val newHr = hrBpm ?: cur.avgHeartRate
-        _metrics.value = cur.copy(
-            distanceMeters = newDistance,
-            caloriesKcal = newCalories,
-            avgPaceSecPerKm = newAvgPace,
-            avgHeartRate = newHr
-        )
-        if (safePace != null) _currentPaceSecPerKm.value = safePace
+        _metrics.value = cur.copy(avgHeartRate = newHr)
         if (hrBpm != null) lastInstantHr = hrBpm
-        if (distanceM != null) hasWatchDistancePrimary = true
     }
 
     // 목표 관련 상태

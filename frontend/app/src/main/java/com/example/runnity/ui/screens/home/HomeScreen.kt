@@ -164,7 +164,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(ColorPalette.Common.accent)  // 액센트 색상 배경
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -189,7 +189,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(ColorPalette.Common.accent)  // 액센트 색상 배경
-                    .padding(16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 16.dp)
             ) {
                 if (weatherLoading) {
                     // 로딩 중
@@ -402,7 +402,7 @@ fun HomeScreen(
         // FloatingActionButton (중계방 보기)
         FloatingActionButton(
             onClick = {
-                 navController?.navigate("broadcast_graph")
+                 navController?.navigate("broadcast_view")
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)

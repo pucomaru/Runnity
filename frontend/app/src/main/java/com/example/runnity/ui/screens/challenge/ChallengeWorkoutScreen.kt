@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.DirectionsRun
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,7 +57,9 @@ import com.example.runnity.theme.Typography
 import com.example.runnity.ui.components.PrimaryButton
 import com.example.runnity.ui.components.TabBar
 import com.example.runnity.socket.WebSocketManager
+import com.example.runnity.data.datalayer.sendSessionControl
 import com.example.runnity.data.datalayer.SessionMetricsBus
+import com.example.runnity.data.datalayer.sendSessionMetricsToWatch
 import com.example.runnity.ui.screens.workout.WorkoutLocationTracker
 import com.example.runnity.ui.screens.workout.WorkoutPhase
 import com.example.runnity.ui.screens.workout.WorkoutSessionViewModel
@@ -88,7 +93,7 @@ fun ChallengeWorkoutScreen(
     val challengeDetailState by challengeViewModel.challengeDetail.collectAsState()
     val participantsState by socketViewModel.participants.collectAsState()
 
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val tracker = remember(context) { WorkoutLocationTracker(context) }
 
     // 목표 거리(km) 캐시 및 최종 RECORD 전송 여부 플래그
@@ -129,6 +134,20 @@ fun ChallengeWorkoutScreen(
                 elapsedMs = m.elapsedMs,
                 paceSpKm = m.paceSpKm,
                 caloriesKcal = m.caloriesKcal
+            )
+        }
+    }
+
+    // 폰에서 계산된 메트릭을 워치로 전송하여, 챌린지 모드에서도 워치 UI가 거리/페이스/칼로리를 폰 기준으로 표시하도록 한다.
+    LaunchedEffect(metrics, phase) {
+        if (phase == WorkoutPhase.Running) {
+            val paceToSend = currentPace ?: metrics.avgPaceSecPerKm
+            sendSessionMetricsToWatch(
+                context = context,
+                distanceMeters = metrics.distanceMeters,
+                paceSecPerKm = paceToSend,
+                caloriesKcal = metrics.caloriesKcal,
+                elapsedMs = metrics.activeElapsedMs,
             )
         }
     }
@@ -205,6 +224,8 @@ fun ChallengeWorkoutScreen(
 
             // 목표 거리 이상을 채운 정상 종료인 경우에만 결과 화면으로 이동
             if (distanceKm >= goalKm) {
+                // 워치 운동 세션도 함께 종료하여 워치가 홈 화면으로 돌아가도록 stop 제어 전송
+                sendSessionControl(context, "stop")
                 navController.navigate("challenge_result/$challengeId") {
                     popUpTo("challenge_workout/$challengeId") { inclusive = true }
                 }
@@ -520,96 +541,110 @@ fun ChallengeWorkoutScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .background(ColorPalette.Light.containerBackground)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start
+            // 헤더: 실시간 랭킹 + 인원수
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // 왼쪽: 실시간 랭킹 + 챌린지 이름(목표거리)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 왼쪽: 실시간 랭킹 + 챌린지 이름(목표거리)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "실시간 랭킹",
-                            style = Typography.Subtitle,
-                            color = ColorPalette.Light.secondary
-                        )
+                    Text(
+                        text = "실시간 랭킹",
+                        style = Typography.Subtitle,
+                        color = ColorPalette.Light.secondary
+                    )
 
-                        // 챌린지 이름 + 목표 거리
-                        val challengeName = challengeDetailState?.title ?: ""
-                        val distanceLabel = targetKm?.let { km ->
-                            when {
-                                km == 21.0975 -> "하프"
-                                km < 1.0 -> "${(km * 1000).toInt()}m"
-                                else -> "${km.toInt()}km"
-                            }
-                        } ?: ""
-
-                        if (challengeName.isNotEmpty() && distanceLabel.isNotEmpty()) {
-                            Text(
-                                text = "$challengeName($distanceLabel)",
-                                style = Typography.Caption,
-                                color = ColorPalette.Light.secondary
-                            )
+                    // 챌린지 이름 + 목표 거리
+                    val challengeName = challengeDetailState?.title ?: ""
+                    val distanceLabel = targetKm?.let { km ->
+                        when {
+                            km == 21.0975 -> "하프"
+                            km < 1.0 -> "${(km * 1000).toInt()}m"
+                            else -> "${km.toInt()}km"
                         }
-                    }
+                    } ?: ""
 
-                    // 오른쪽: 인원수
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = "참여 인원",
-                            tint = ColorPalette.Light.component,
-                            modifier = Modifier.size(16.dp)
-                        )
+                    if (challengeName.isNotEmpty() && distanceLabel.isNotEmpty()) {
                         Text(
-                            text = "${participantsState.size}",
+                            text = "$challengeName($distanceLabel)",
                             style = Typography.Caption,
                             color = ColorPalette.Light.secondary
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                val rankingRows = remember(participantsState) {
-                    selectRankingRows(participantsState)
-                }
-
-                LaunchedEffect(participantsState) {
-                    timber.log.Timber.d(
-                        "[ChallengeWorkout] participantsState size=%d, rankingRows size=%d",
-                        participantsState.size,
-                        rankingRows.size
-                    )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                // 오른쪽: 인원수
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    rankingRows.forEach { p ->
-                        RankingRow(participant = p)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "참여 인원",
+                        tint = ColorPalette.Light.component,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "${participantsState.size}",
+                        style = Typography.Caption,
+                        color = ColorPalette.Light.secondary
+                    )
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val rankingRows = remember(participantsState) {
+                selectRankingRows(participantsState)
+            }
+
+            LaunchedEffect(participantsState) {
+                timber.log.Timber.d(
+                    "[ChallengeWorkout] participantsState size=%d, rankingRows size=%d",
+                    participantsState.size,
+                    rankingRows.size
+                )
+
+                // 내 현재 순위를 워치로 전달 (챌린지 워치 UI 상단에 표시용)
+                val me = participantsState.firstOrNull { it.isMe }
+                val rank = me?.rank
+                if (rank != null && rank > 0) {
+                    // 기존 컨트롤 채널(/session/control)을 재사용하여 type=rank, seconds=rank 로 전송
+                    sendSessionControl(context, "rank", seconds = rank)
+                }
+            }
+
+            // 스크롤 가능한 랭킹 리스트
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
+                rankingRows.forEach { p ->
+                    RankingRow(participant = p)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 하단 고정 버튼
             PrimaryButton(
-                text = "챌린지 나가기",
+                text = "챌린지 포기하기",
                 onClick = {
+                    // 워치 연동 중이면 워치 운동 세션도 함께 종료
+                    sendSessionControl(context, "stop")
                     val quitJson = "{" +
                         "\"type\":\"QUIT\"," +
                         "\"timestamp\":" + System.currentTimeMillis() +
