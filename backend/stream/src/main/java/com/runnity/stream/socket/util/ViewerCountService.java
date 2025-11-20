@@ -1,7 +1,12 @@
 package com.runnity.stream.socket.util;
+import com.runnity.stream.socket.dto.WebSocketPayloadWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
 
 /**
  * Redis에 저장된 방송 시청자 수(viewerCount)를 관리하는 서비스
@@ -15,6 +20,8 @@ import org.springframework.stereotype.Service;
 public class ViewerCountService {
 
     private final BroadcastRedisUtil redisUtil;
+    private final SimpMessagingTemplate messagingTemplate;
+
 
     // 시청자 수 증가
     public void increment(Long challengeId){
@@ -35,6 +42,22 @@ public class ViewerCountService {
             log.error("Failed to decrement viewerCount: {}", e.getMessage());
         }
 
+    }
+
+    private void sendViewerCountUpdate(Long challengeId, int viewerCount) {
+        try {
+            WebSocketPayloadWrapper wrapper = WebSocketPayloadWrapper.builder()
+                    .type("VIEWER")
+                    .subtype("COUNT")
+                    .challengeId(challengeId)
+                    .timestamp(System.currentTimeMillis())
+                    .payload(Map.of("viewerCount", viewerCount))
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/broadcast/" + challengeId, wrapper);
+        } catch (Exception e) {
+            log.error("Failed to send viewerCount WS update: {}", e.getMessage());
+        }
     }
 
 
