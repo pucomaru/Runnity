@@ -47,6 +47,7 @@ public class BroadcastStreamService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+
     public void handleEvent(ChallengeStreamMessage msg) {
 
         Long challengeId = msg.getChallengeId();
@@ -96,6 +97,29 @@ public class BroadcastStreamService {
 
         // 5) WS 전달
         sendToWebSocket(msg);
+    }
+
+    public void handleStart(ChallengeStreamMessage msg) {
+
+        Long challengeId = msg.getChallengeId();
+        Long runnerId = msg.getRunnerId();
+
+        // 1) runner 정보 Redis 저장 (대기 UI 구성용)
+        redisRunnerUtil.updateRunnerProgress(
+                challengeId,
+                runnerId,
+                msg.getNickname(),
+                msg.getProfileImage(),
+                msg.getDistance(),   // 보통 0
+                msg.getPace(),
+                msg.getRanking()     // null일 수도 있음
+        );
+
+        // 2) 프론트로 WS 브로드캐스트
+        var wrapper = wrapStreamMessage(msg);
+        messagingTemplate.convertAndSend(WS_DEST_PREFIX + challengeId, wrapper);
+
+        log.info("[START] Runner added to waiting list: {}", msg);
     }
 
     private void publishHighlight(HighlightEventDto highlight, Long challengeId, Long targetId) {

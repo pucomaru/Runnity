@@ -1,8 +1,8 @@
 package com.runnity.stream.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.runnity.stream.socket.BroadcastSessionService;
-import com.runnity.stream.socket.BroadcastSessionService;
+import com.runnity.stream.socket.BroadcastStateService;
+import com.runnity.stream.socket.BroadcastStreamService;
 import com.runnity.stream.socket.dto.ChallengeStreamMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,15 +18,36 @@ import org.springframework.stereotype.Service;
 public class BroadcastConsumer {
 
     private final ObjectMapper objectMapper;
-    private final BroadcastSessionService broadcastSessionService;
+    private final BroadcastStreamService broadcastStreamService;
+    private final BroadcastStateService broadcastStateService;
 
     @KafkaListener(topics = "challenge-stream", groupId = "stream-broadcast-group")
     public void consume(String message) {
         try {
-            ChallengeStreamMessage streamMsg = objectMapper.readValue(message, ChallengeStreamMessage.class);
+            ChallengeStreamMessage msg = objectMapper.readValue(message, ChallengeStreamMessage.class);
+            log.debug("Kafka message consumed: {}", msg);
 
-            log.debug("Kafka message consumed: {}", streamMsg);
-            broadcastSessionService.handleEvent(streamMsg);
+            String event = msg.getEventType();
+            if (event == null) {
+                log.warn("EventType null: {}", msg);
+                return;
+            }
+
+            switch (event.toLowerCase()) {
+
+//                // === 1) 방송 상태 이벤트 ===
+//                case "ready" -> broadcastStateService.handleReady(msg.getChallengeId());
+//                case "running" -> broadcastStateService.handleRunning(msg.getChallengeId());
+//                case "done" -> broadcastStateService.handleDone(msg.getChallengeId());
+
+                case "start" -> broadcastStreamService.handleStart(msg);
+                case "running" -> broadcastStreamService.handleEvent(msg);
+                case "finish" -> broadcastStreamService.handleEvent(msg);
+                case "leave" -> broadcastStreamService.handleEvent(msg);
+
+                default -> log.warn("Unknown eventType: {}", event);
+            }
+
         } catch (Exception e) {
             log.error("Kafka consume error: raw = {} | err = {}", message, e.getMessage());
         }
