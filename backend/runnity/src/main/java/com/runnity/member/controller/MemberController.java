@@ -304,6 +304,39 @@ public class MemberController {
         }
     }
 
+    @PostMapping("/auth/test-login")
+    @Operation(
+            summary = "테스트용 로그인",
+            description = "테스트용 회원 ID로 AccessToken과 RefreshToken을 즉시 발급합니다. " +
+                    "서버 부하 테스트를 위한 인증 건너뛰기 용도입니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "토큰 발급 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 데이터 검증 실패"),
+            @ApiResponse(responseCode = "404", description = "회원 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    public ResponseEntity<com.runnity.global.response.ApiResponse<LoginResponseDto>> testLogin(
+            @RequestParam("memberId") Long memberId
+    ) {
+        try {
+            if (memberId == null) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+            }
+
+            LoginResponseDto resp = memberService.testLogin(memberId);
+            return com.runnity.global.response.ApiResponse.success(SuccessStatus.LOGIN_SUCCESS, resp);
+        } catch (IllegalArgumentException e) {
+            String key = e.getMessage();
+            if ("MEMBER_NOT_FOUND".equals(key)) {
+                return com.runnity.global.response.ApiResponse.error(ErrorStatus.MEMBER_NOT_FOUND);
+            }
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return com.runnity.global.response.ApiResponse.error(ErrorStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Authorization 헤더에서 Bearer 토큰 추출
      */
