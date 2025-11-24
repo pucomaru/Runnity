@@ -34,7 +34,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
         listOf(
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 1,
-                nickname = "선호",
+                nickname = "마루마루",
                 profileImage = null,
                 color = Color(0xFF3DDC84),
                 distanceKm = 4.5,
@@ -45,7 +45,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
             ),
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 2,
-                nickname = "지훈",
+                nickname = "나옹이",
                 profileImage = null,
                 color = Color(0xFFFF6F61),
                 distanceKm = 4.4,
@@ -56,7 +56,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
             ),
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 3,
-                nickname = "민수",
+                nickname = "흰둥이",
                 profileImage = null,
                 color = Color(0xFF42A5F5),
                 distanceKm = 4.35,
@@ -67,7 +67,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
             ),
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 4,
-                nickname = "영희",
+                nickname = "동이",
                 profileImage = null,
                 color = Color(0xFFFFB300),
                 distanceKm = 3.8,
@@ -78,7 +78,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
             ),
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 5,
-                nickname = "철수",
+                nickname = "g2v",
                 profileImage = null,
                 color = Color(0xFF7E57C2),
                 distanceKm = 3.2,
@@ -89,7 +89,7 @@ fun BroadcastLiveScreenPreviewStandalone() {
             ),
             BroadcastLiveViewModel.RunnerUi(
                 runnerId = 6,
-                nickname = "수진",
+                nickname = "뿌엥이",
                 profileImage = null,
                 color = Color(0xFF26C6DA),
                 distanceKm = 2.5,
@@ -325,7 +325,7 @@ private fun MockRankingItem(runner: BroadcastLiveViewModel.RunnerUi) {
             // 색상 마커
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(24.dp)
                     .clip(CircleShape)
                     .background(runner.color)
                     .border(
