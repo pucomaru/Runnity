@@ -1,7 +1,6 @@
 <div align="center">
 
 <img src="exec/image/로고.png" width="800">
-<h1 style="background-color: #3958bd; color: white; padding: 20px; border-radius: 10px; margin: 0; display: inline-block;">Runnity</h1>
 
 </div>
 
