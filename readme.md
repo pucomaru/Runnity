@@ -1,5 +1,6 @@
 <div align="center">
 
+<img src="exec/image/로고.png" width="800">
 <h1 style="background-color: #3958bd; color: white; padding: 20px; border-radius: 10px; margin: 0; display: inline-block;">Runnity</h1>
 
 </div>
@@ -213,21 +214,21 @@
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/신상원.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>신상원</b>
 <br/>
 <i>팀장 / FE</i>
 </td>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/김동휘.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>김동휘</b>
 <br/>
 <i>BE</i>
 </td>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/김상경.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>김상경</b>
 <br/>
@@ -236,21 +237,21 @@
 </tr>
 <tr>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/윤선호.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>윤선호</b>
 <br/>
 <i>BE</i>
 </td>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/이상민.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>이상민</b>
 <br/>
 <i>INFRA</i>
 </td>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/이다예.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>이다예</b>
 <br/>
@@ -259,7 +260,7 @@
 </tr>
 <tr>
 <td align="center" width="33%">
-<img src="https://via.placeholder.com/120" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/조예림.png" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>조예림</b>
 <br/>
