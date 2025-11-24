@@ -14,7 +14,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.example.runnity.theme.ColorPalette
 import com.example.runnity.ui.navigation.AppNavigation
-import com.example.runnity.ui.screens.broadcast.BroadcastLiveScreenPreviewStandalone
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,8 +44,6 @@ class MainActivity : ComponentActivity() {
                         .background(ColorPalette.Light.background)
                 ) {
                     AppNavigation()
-                    // 🔥 임시: 백엔드 없이 방송 화면 확인용
-                    // BroadcastLiveScreenPreviewStandalone()
                 }
             }
         }
