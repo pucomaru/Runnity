@@ -227,7 +227,7 @@
 <i>BE</i>
 </td>
 <td align="center" width="33%">
-<img src="exec/image/김상경.png" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/김상경.jpg" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>김상경</b>
 <br/>
@@ -243,14 +243,14 @@
 <i>BE</i>
 </td>
 <td align="center" width="33%">
-<img src="exec/image/이상민.png" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/이상민.jpg" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>이상민</b>
 <br/>
 <i>INFRA</i>
 </td>
 <td align="center" width="33%">
-<img src="exec/image/이다예.png" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/이다예.jpg" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>이다예</b>
 <br/>
@@ -259,7 +259,7 @@
 </tr>
 <tr>
 <td align="center" width="33%">
-<img src="exec/image/조예림.png" width="120" height="120" style="border-radius: 50%;">
+<img src="exec/image/조예림.jpg" width="120" height="120" style="border-radius: 50%;">
 <br/>
 <b>조예림</b>
 <br/>
