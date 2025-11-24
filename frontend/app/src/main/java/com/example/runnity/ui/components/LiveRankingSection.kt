@@ -2,19 +2,20 @@ package com.example.runnity.ui.screens.broadcast.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.runnity.theme.ColorPalette
+import com.example.runnity.theme.Typography
 import com.example.runnity.ui.screens.broadcast.BroadcastLiveViewModel
 
 /**
@@ -26,25 +27,36 @@ fun LiveRankingSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Text(
-            text = "📊 실시간 순위 (${runners.size}명)",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "실시간 순위",
+                style = Typography.Subheading,
+                color = ColorPalette.Light.primary,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${runners.size}명",
+                style = Typography.Caption,
+                color = ColorPalette.Light.secondary
+            )
+        }
 
         if (runners.isEmpty()) {
             Text(
                 text = "참가자가 없습니다",
-                fontSize = 14.sp,
-                color = Color.Gray,
+                style = Typography.Body,
+                color = ColorPalette.Light.secondary,
                 modifier = Modifier.padding(16.dp)
             )
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxSize()
             ) {
                 items(
                     items = runners,
@@ -56,9 +68,9 @@ fun LiveRankingSection(
                     )
 
                     if (runners.indexOf(runner) < runners.size - 1) {
-                        Divider(
+                        HorizontalDivider(
                             modifier = Modifier.padding(vertical = 4.dp),
-                            color = Color(0xFFECF0F1)
+                            color = ColorPalette.Light.containerBackground
                         )
                     }
                 }

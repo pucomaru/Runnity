@@ -9,9 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.runnity.theme.ColorPalette
+import com.example.runnity.theme.Typography
 import com.example.runnity.ui.screens.broadcast.BroadcastLiveViewModel
 
 @Composable
@@ -21,13 +21,13 @@ fun RankingItem(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier  // ← 적용
+        modifier = modifier
             .fillMaxWidth()
             .background(
-                color = if (rank <= 3) Color(0xFFFFF9E6) else Color.Transparent,
+                color = if (rank <= 3) ColorPalette.Common.accent.copy(alpha = 0.08f) else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 순위
@@ -39,7 +39,7 @@ fun RankingItem(
                         1 -> Color(0xFFFFD700)
                         2 -> Color(0xFFC0C0C0)
                         3 -> Color(0xFFCD7F32)
-                        else -> Color(0xFFECF0F1)
+                        else -> ColorPalette.Light.containerBackground
                     },
                     shape = CircleShape
                 ),
@@ -47,9 +47,8 @@ fun RankingItem(
         ) {
             Text(
                 text = "$rank",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (rank <= 3) Color.White else Color.Black
+                style = Typography.Body,
+                color = if (rank <= 3) Color.White else ColorPalette.Light.primary
             )
         }
 
@@ -67,24 +66,22 @@ fun RankingItem(
         // 닉네임
         Text(
             text = runner.nickname,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.Black,
+            style = Typography.Body,
+            color = ColorPalette.Light.primary,
             modifier = Modifier.weight(1f)
         )
 
-        // 거리
+        // 거리 및 페이스
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = runner.distanceKmFormatted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
+                style = Typography.Body,
+                color = ColorPalette.Common.accent
             )
             Text(
-                text = "페이스: ${runner.paceFormatted}",
-                fontSize = 11.sp,
-                color = Color.Gray
+                text = runner.paceFormatted,
+                style = Typography.CaptionSmall,
+                color = ColorPalette.Light.secondary
             )
         }
     }
