@@ -4,8 +4,8 @@ import com.google.gson.JsonObject
 
 // WebSocket 공통 래퍼
 data class WebSocketWrapper(
-    val type: String,          // "STREAM" | "LLM"
-    val subtype: String,       // STREAM: RUNNING/START/FINISH/LEAVE, LLM: OVERTAKE/...
+    val type: String,          // "STREAM" | "LLM" | "VIEWER"
+    val subtype: String,       // STREAM: RUNNING/START/FINISH/LEAVE, LLM: OVERTAKE/..., VIEWER: COUNT
     val challengeId: Long,
     val timestamp: Long,
     val payload: JsonObject    // 내부에서 다시 파싱
@@ -34,4 +34,9 @@ data class LlmPayload(
     val distance: Double,
     val pace: Double,
     val ranking: Int
+)
+
+// VIEWER payload
+data class ViewerPayload(
+    val viewerCount: Int           // 현재 시청자 수
 )

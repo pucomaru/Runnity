@@ -222,9 +222,12 @@ class BroadcastLiveViewModel(
         }
     }
 
+    private var currentChallengeId: Long? = null
+
     private fun connectStomp(wsUrl: String, topic: String, challengeId: Long) {
         Timber.d("STOMP 연결 시도: $wsUrl")
-        disconnectStomp()
+        currentChallengeId = challengeId
+        disconnectStomp(challengeId)
 
         val client = Stomp.over(Stomp.ConnectionProvider.OKHTTP, wsUrl)
         stompClient = client
@@ -307,6 +310,7 @@ class BroadcastLiveViewModel(
                     when (event.type) {
                         "STREAM" -> handleStreamMessage(event)
                         "LLM"    -> handleLlmMessage(event)
+                        "VIEWER" -> handleViewerMessage(event)
                         else      -> Timber.d("알 수 없는 type=${event.type}")
                     }
                 }
@@ -386,6 +390,7 @@ class BroadcastLiveViewModel(
             when (wrapper.type) {
                 "STREAM" -> handleStreamMessage(wrapper)
                 "LLM"    -> handleLlmMessage(wrapper)
+                "VIEWER" -> handleViewerMessage(wrapper)
                 else     -> Timber.d("알 수 없는 type=${wrapper.type}")
             }
         } catch (e: Exception) {
@@ -605,6 +610,13 @@ class BroadcastLiveViewModel(
         enqueueTts(llm.commentary)
     }
 
+    private fun handleViewerMessage(wrapper: WebSocketWrapper) {
+        val payloadObj: JsonObject = wrapper.payload
+        val viewer = gson.fromJson(payloadObj, ViewerPayload::class.java)
+        Timber.d("VIEWER ${wrapper.subtype} viewerCount=${viewer.viewerCount}")
+        _uiState.update { it.copy(viewerCount = viewer.viewerCount) }
+    }
+
     private fun enqueueTts(text: String) {
         synchronized(ttsQueue) {
             ttsQueue.addLast(text)
@@ -651,7 +663,32 @@ class BroadcastLiveViewModel(
         return palette[index % palette.size]
     }
 
-    fun disconnectStomp() {
+    /**
+     * challengeId 헤더를 포함한 커스텀 DISCONNECT 프레임 전송
+     * 백엔드가 시청자 수를 정확히 감소시키기 위해 필요
+     */
+    private fun disconnectWithHeader(challengeId: Long) {
+        val client = stompClient ?: return
+
+        // DISCONNECT frame 직접 구성
+        val frame = "DISCONNECT\nchallengeId:$challengeId\n\n\u0000"
+
+        try {
+            Timber.d("Sending DISCONNECT frame with challengeId=$challengeId")
+            client.send(frame).subscribe(
+                { Timber.d("Custom DISCONNECT frame sent successfully") },
+                { error -> Timber.e(error, "Failed to send custom DISCONNECT frame") }
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to send custom DISCONNECT frame")
+        }
+    }
+
+    fun disconnectStomp(challengeId: Long? = null) {
+        // 1) challengeId가 있으면 헤더가 포함된 DISCONNECT frame을 먼저 보내기
+        challengeId?.let { disconnectWithHeader(it) }
+
+        // 2) stompClient.disconnect() 는 연결만 종료
         subscription?.dispose()
         lifecycleSub?.dispose()
         stompClient?.disconnect()
@@ -672,7 +709,7 @@ class BroadcastLiveViewModel(
     override fun onCleared() {
         super.onCleared()
         releasePlayer()
-        disconnectStomp()
+        disconnectStomp(currentChallengeId)
 
         tts?.stop()
         tts?.shutdown()
